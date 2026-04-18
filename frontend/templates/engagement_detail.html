@@ -1,0 +1,1065 @@
+{% extends "base.html" %}
+{% block title %}{{ engagement.name }} — AX FACTORY{% endblock %}
+{% block page_title %}{{ engagement.name }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ── Overall bar ── */
+  .overall-bar {
+    height:28px; background:var(--border); border-radius:8px;
+    overflow:hidden; position:relative; margin-bottom:1.5rem;
+  }
+  .overall-fill {
+    height:100%;
+    background:linear-gradient(90deg,var(--st-completed),var(--accent));
+    border-radius:8px; transition:width 0.6s ease;
+  }
+  .overall-text {
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    font-weight:700; font-size:13px;
+    text-shadow:0 1px 2px rgba(0,0,0,0.6);
+  }
+
+  /* ── Timeline ── */
+  .phase-timeline {
+    display:flex; align-items:center; justify-content:center;
+    gap:0; margin-bottom:1.5rem; overflow-x:auto; padding:4px 0;
+    flex-wrap:nowrap;
+  }
+  .tl-col { display:flex; flex-direction:column; align-items:center; }
+  .tl-node {
+    width:38px; height:38px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; cursor:default;
+    transition:transform 0.2s;
+    flex-shrink:0;
+  }
+  .tl-node:hover { transform:scale(1.15); }
+  .tl-node.completed  { background:var(--st-completed); color:#fff; box-shadow:0 0 0 3px var(--st-completed-ring); }
+  .tl-node.in_progress{ background:var(--accent); color:#fff; animation:tl-pulse 2s infinite; }
+  .tl-node.awaiting   { background:var(--st-awaiting); color:#000; box-shadow:0 0 0 3px var(--st-awaiting-ring); }
+  .tl-node.failed     { background:var(--danger); color:#fff; }
+  .tl-node.blocked    { background:var(--st-blocked); color:#fff; }
+  .tl-node.pending    { background:var(--border); color:var(--text-muted); opacity:.55; }
+  @keyframes tl-pulse {
+    0%,100% { box-shadow:0 0 0 0 var(--st-ready-ring); }
+    50%      { box-shadow:0 0 0 8px transparent; }
+  }
+  .tl-arrow { width:28px; height:2px; background:var(--border); flex-shrink:0; }
+  .tl-arrow.done { background:var(--st-completed); }
+  .tl-label { font-size:10px; color:var(--text-muted); margin-top:4px; text-align:center; white-space:nowrap; }
+  .tl-status{ font-size:9px; font-weight:600; text-align:center; margin-top:1px; white-space:nowrap; }
+
+  /* ── Filter toolbar ── */
+  .filter-bar { display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap; align-items:center; }
+  .filter-btn {
+    background:none; border:1px solid var(--border); color:var(--text-muted);
+    padding:3px 10px; border-radius:6px; font-size:12px; cursor:pointer; transition:all .15s;
+  }
+  .filter-btn:hover { border-color:var(--accent); color:var(--text); }
+  .filter-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+
+  /* ── Phase cards ── */
+  .phase-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; }
+  .phase-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:1.1rem;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .phase-card:hover { border-color:var(--accent); box-shadow:0 2px 12px rgba(0,0,0,.2); }
+  .phase-card.active-phase { border-color:var(--accent); border-width:2px; box-shadow:0 0 0 3px var(--accent-dim); }
+  .phase-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:0.6rem; gap:0.5rem;
+  }
+  .phase-title { font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; }
+  .phase-badge {
+    font-size:10px; padding:2px 8px; border-radius:9999px; font-weight:600;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .pb-completed  { background:var(--st-completed-dim); color:var(--st-completed); }
+  .pb-in_progress{ background:var(--accent-dim);  color:var(--accent); }
+  .pb-awaiting   { background:var(--st-awaiting-dim);  color:var(--st-awaiting); }
+  .pb-failed     { background:var(--st-failed-dim);  color:var(--danger); }
+  .pb-pending    { background:var(--st-muted-dim);  color:var(--text-muted); }
+  .pb-blocked    { background:var(--st-blocked-dim); color:var(--st-muted); }
+
+  .phase-bar { background:var(--border); border-radius:3px; height:5px; margin-bottom:0.75rem; overflow:hidden; }
+  .phase-bar-fill { height:100%; border-radius:3px; transition:width .5s ease; }
+  .pf-completed  { background:var(--st-completed); }
+  .pf-in_progress{ background:var(--accent); }
+  .pf-awaiting   { background:var(--st-awaiting); }
+  .pf-failed     { background:var(--danger); }
+  .pf-pending    { background:var(--border); }
+
+  /* ── Node list ── */
+  .node-list { list-style:none; }
+  .node-item {
+    display:flex; align-items:center; gap:8px;
+    padding:6px 0; border-top:1px solid rgba(42,45,62,.6);
+    font-size:13px;
+  }
+  .node-item:first-child { border-top:none; }
+  .node-icon {
+    width:18px; height:18px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700;
+  }
+  .ni-completed   { background:var(--st-completed); color:#fff; }
+  .ni-in_progress { background:var(--accent); color:#fff; animation: node-pulse 2s infinite; }
+  .ni-ready       { background:var(--st-ready); color:#fff; border:2px solid var(--st-ready); }
+  .ni-awaiting    { background:var(--st-awaiting); color:#000; }
+  .ni-needs_human { background:var(--danger); color:#fff; }
+  .ni-failed      { background:var(--danger); color:#fff; }
+  .ni-blocked     { background:var(--st-blocked); color:#fff; }
+  .ni-pending     { background:var(--border); color:var(--text-muted); border:1px solid var(--border); }
+  .ni-skipped     { background:transparent; border:1px dashed var(--border); color:var(--text-muted); opacity:.4; }
+  @keyframes node-pulse { 0%,100% { box-shadow:0 0 0 0 var(--accent-border); } 50% { box-shadow:0 0 0 4px transparent; } }
+  .ni-qa          { background:transparent; border:1px solid var(--border); color:var(--text-muted); }
+
+  /* ── Markdown rendered content ── */
+  .md-h1 { font-size:1.3rem; font-weight:700; margin:1.5rem 0 .6rem; padding-bottom:.4rem; border-bottom:2px solid var(--accent); color:var(--text); }
+  .md-h2 { font-size:1.1rem; font-weight:700; margin:1.3rem 0 .5rem; padding-bottom:.3rem; border-bottom:1px solid var(--border); }
+  .md-h3 { font-size:.95rem; font-weight:600; margin:1rem 0 .4rem; color:var(--accent); }
+  .md-h4 { font-size:.85rem; font-weight:600; margin:.8rem 0 .3rem; color:var(--text-muted); }
+  .md-p { margin:.4rem 0; line-height:1.8; font-family:-apple-system,sans-serif; font-size:.85rem; }
+  .md-table-wrap { overflow-x:auto; margin:.75rem 0; }
+  .md-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  .md-table th { background:var(--accent-glow); padding:.5rem .75rem; text-align:left; font-weight:600; border:1px solid var(--border); white-space:nowrap; }
+  .md-table td { padding:.45rem .75rem; border:1px solid var(--border); }
+  .md-table tr:hover td { background:rgba(255,255,255,.02); }
+  .md-code { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:.9rem 1rem; overflow-x:auto; font-size:.78rem; line-height:1.5; margin:.75rem 0; }
+  .md-inline { background:var(--accent-dim); color:var(--accent); padding:.1em .4em; border-radius:4px; font-size:.82em; }
+  .md-list { margin:.4rem 0 .4rem 1.5rem; line-height:1.8; font-size:.85rem; }
+  .md-list li { margin:.2rem 0; }
+  .md-hr { border:none; border-top:1px solid var(--border); margin:1.2rem 0; }
+
+  /* ── Agent status bar ── */
+  .agent-bar {
+    display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;
+    padding:.65rem 1rem; margin-bottom:1rem;
+    background:var(--accent-glow); border:1px solid var(--accent-border);
+    border-radius:8px; font-size:.78rem;
+  }
+  .agent-bar .dot {
+    width:8px; height:8px; border-radius:50%; flex-shrink:0;
+  }
+  .dot-running { background:var(--st-completed); animation:dot-blink 1.5s infinite; }
+  .dot-idle    { background:var(--text-muted); }
+  @keyframes dot-blink { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+  .node-name { flex:1; line-height:1.3; }
+  .node-name.dim { color:var(--text-muted); }
+  .node-type-tag {
+    font-size:9px; padding:1px 5px; border-radius:3px; flex-shrink:0;
+    background:rgba(148,163,184,.1); color:var(--text-muted);
+  }
+  .node-link {
+    font-size:11px; padding:2px 8px; border:1px solid var(--accent-border);
+    border-radius:5px; color:var(--accent); text-decoration:none; flex-shrink:0; transition:all .15s;
+  }
+  .node-link:hover { background:var(--accent-dim); border-color:var(--accent); }
+  .node-link.disabled { color:var(--text-muted); pointer-events:none; border-color:var(--border); opacity:.4; }
+
+  /* Gate row */
+  .gate-row {
+    display:flex; align-items:center; gap:6px;
+    padding:4px 8px; border-radius:5px; margin:4px 0;
+    background:var(--st-awaiting-subtle); border:1px solid var(--st-awaiting-dim);
+    font-size:11px; color:var(--st-awaiting);
+  }
+  .gate-row.approved { background:var(--st-completed-subtle); border-color:var(--st-completed-dim); color:var(--st-completed); }
+  .gate-approve-btn {
+    margin-left:auto; font-size:10px; padding:2px 8px; border-radius:4px;
+    background:var(--st-awaiting-dim); border:1px solid var(--st-awaiting-border); color:var(--st-awaiting); cursor:pointer;
+    transition:all .15s;
+  }
+  .gate-approve-btn:hover { background:var(--st-awaiting-ring); }
+
+  /* Project section header */
+  .project-section {
+    border:1px solid var(--border); border-radius:10px;
+    margin-bottom:1.5rem; overflow:hidden;
+  }
+  .project-section-header {
+    display:flex; align-items:center; gap:0.75rem;
+    padding:0.75rem 1rem; background:rgba(255,255,255,.02);
+    border-bottom:1px solid var(--border);
+  }
+  .project-section-header h3 { font-size:0.875rem; font-weight:600; }
+  .proj-pct { font-size:0.75rem; color:var(--text-muted); }
+
+  /* ── Add project modal ── */
+  .add-proj-modal-overlay {
+    position:fixed; inset:0; background:var(--overlay);
+    display:flex; align-items:center; justify-content:center; z-index:9999;
+  }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; margin-bottom:.85rem; }
+  .form-label { display:block; font-size:.75rem; color:var(--text-muted); margin-bottom:.3rem; }
+  .form-input {
+    width:100%; background:var(--bg); border:1px solid var(--border);
+    border-radius:6px; color:var(--text); padding:.45rem .7rem;
+    font-size:.875rem; outline:none;
+  }
+  .form-input:focus { border-color:var(--accent); }
+</style>
+{% endblock %}
+
+{% block modals %}
+<!-- Artifact view modal — body 바깥 -->
+<div id="artifactModal" style="position:fixed;inset:0;background:var(--overlay);z-index:var(--z-modal);display:none;overflow:hidden;" onclick="if(event.target===this)closeArtifact()">
+  <div style="position:absolute;top:56px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-dim);border-radius:12px;width:90%;max-width:900px;bottom:16px;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <h3 id="artifactTitle" style="flex:1;font-size:.95rem;font-weight:600;margin:0;"></h3>
+      <button id="artifactEditBtn" onclick="toggleEdit()" class="btn" style="font-size:.72rem;padding:.25rem .6rem;margin-right:.5rem;">편집</button>
+      <button id="artifactRequestBtn" onclick="toggleRequest()" class="btn" style="font-size:.72rem;padding:.25rem .6rem;margin-right:.5rem;background:var(--accent);color:#fff;border-color:var(--accent);">수정 요청</button>
+      <button id="artifactSaveBtn" onclick="saveEdit()" class="btn btn-primary" style="font-size:.72rem;padding:.25rem .6rem;margin-right:.5rem;display:none;">저장</button>
+      <button id="artifactCancelBtn" onclick="cancelEdit()" class="btn" style="font-size:.72rem;padding:.25rem .6rem;margin-right:.5rem;display:none;">취소</button>
+      <button onclick="closeArtifact()" style="background:none;border:1px solid var(--border-dim);color:var(--text-3);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">&times;</button>
+    </div>
+    <div id="artifactContent" style="padding:1.5rem 2rem;flex:1;overflow-y:auto;"></div>
+    <textarea id="artifactEditor" style="display:none;width:100%;min-height:500px;padding:1.5rem 2rem;background:var(--bg);color:var(--text);border:none;font-family:'SF Mono',monospace;font-size:.82rem;line-height:1.6;resize:vertical;flex:1;"></textarea>
+    <div id="artifactRequestPanel" style="display:none;padding:1.25rem 2rem;border-top:1px solid rgba(255,255,255,.07);">
+      <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem;">수정 요청 (자연어)</div>
+      <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.75rem;">변경하고 싶은 내용을 자유롭게 입력하세요. AI가 산출물을 수정합니다.</div>
+      <div style="font-size:.68rem;color:var(--accent);margin-bottom:.75rem;padding:.4rem .6rem;background:var(--accent-glow);border-radius:4px;">
+        💡 맥락 변경 시 하위 산출물은 자동 재실행되고, 상위 산출물에도 자동 반영됩니다.
+      </div>
+      <textarea id="requestInput" placeholder="예: 결제 방식에 카카오페이를 추가해주세요&#10;예: 회원 등급을 3단계에서 5단계로 변경&#10;예: 관리자 대시보드 화면을 추가해주세요" style="width:100%;min-height:120px;padding:.75rem;background:var(--bg);border:1px solid rgba(255,255,255,.07);border-radius:8px;color:var(--text);font-size:.85rem;line-height:1.6;resize:vertical;"></textarea>
+      <div style="display:flex;gap:.5rem;margin-top:.75rem;">
+        <button class="btn btn-primary" onclick="submitRequest()" id="requestSubmitBtn" style="font-size:.78rem;">AI에게 수정 요청</button>
+        <button class="btn" onclick="cancelRequest()" style="font-size:.78rem;">취소</button>
+      </div>
+      <div id="requestStatus" style="margin-top:.5rem;font-size:.75rem;display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Project Modal -->
+<div id="addProjectModal" class="add-proj-modal-overlay" style="display:none;z-index:9999;" onclick="if(event.target===this)closeAddProject()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.75rem;width:520px;max-width:95vw;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:1px solid var(--border);">
+      <h3 style="font-size:1rem;font-weight:600;">+ 프로젝트 추가</h3>
+      <button style="background:none;border:none;color:var(--text-muted);font-size:1.25rem;cursor:pointer;" onclick="closeAddProject()">&times;</button>
+    </div>
+    <div style="margin-bottom:.85rem;">
+      <label class="form-label">프로젝트명 *</label>
+      <input id="ap-name" class="form-input" placeholder="예: AI 모델 개발 — Phase 1">
+    </div>
+    <div style="margin-bottom:.85rem;">
+      <label class="form-label">프로젝트 유형</label>
+      <select id="ap-type" class="form-input">
+        <option value="ai_model">AI 모델 개발</option>
+        <option value="mlops">MLOps 구축</option>
+        <option value="data_pipeline">데이터 파이프라인</option>
+        <option value="llm">LLM 적용</option>
+        <option value="si">시스템 통합(SI)</option>
+        <option value="vision">비전·영상 분석</option>
+        <option value="prediction">예측·이상감지</option>
+        <option value="chatbot">챗봇·자동화</option>
+        <option value="consulting">컨설팅·PoC</option>
+        <option value="custom">기타</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div>
+        <label class="form-label">우선순위</label>
+        <select id="ap-priority" class="form-input">
+          <option value="1">긴급 (1)</option>
+          <option value="2">높음 (2)</option>
+          <option value="3" selected>보통 (3)</option>
+          <option value="4">낮음 (4)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">클라이언트명</label>
+        <input id="ap-client" class="form-input" value="{{ engagement.client_name }}" placeholder="고객사명">
+      </div>
+    </div>
+    <p id="ap-error" style="color:var(--danger);font-size:.8rem;margin-bottom:.75rem;min-height:1em;"></p>
+    <div style="display:flex;gap:.75rem;justify-content:flex-end;">
+      <button class="btn" onclick="closeAddProject()">취소</button>
+      <button id="ap-submit" class="btn btn-primary" onclick="doAddProject()">프로젝트 생성</button>
+    </div>
+  </div>
+</div>
+
+<!-- Env vars modal -->
+<div id="envVarsModal" style="position:fixed;inset:0;background:var(--overlay);z-index:var(--z-modal);display:none;align-items:flex-start;justify-content:center;padding:2rem;overflow-y:auto;" onclick="if(event.target===this)closeEnvVars()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+      <h3 style="flex:1;font-size:.95rem;font-weight:600;margin:0;">프로젝트 환경 설정</h3>
+      <button onclick="closeEnvVars()" style="background:none;border:1px solid var(--border);color:var(--text-muted);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">&times;</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:1rem;">API 키, 배포 정보 등 프로젝트에 필요한 환경 변수를 설정합니다. 비어있으면 글로벌 설정이 사용됩니다.</div>
+      <div id="envVarsList" style="margin-bottom:1rem;"></div>
+      <div style="display:flex;gap:.5rem;">
+        <input id="envKey" placeholder="변수명 (예: PAYMENT_API_KEY)" style="flex:1;padding:.4rem .6rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.8rem;font-family:monospace;">
+        <input id="envValue" placeholder="값" type="password" style="flex:2;padding:.4rem .6rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.8rem;">
+        <button class="btn btn-primary" style="font-size:.75rem;" onclick="addEnvVar()">추가</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Project Plan (있을 때만 표시) -->
+{% if project_plan %}
+<details style="margin-bottom:1rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+  <summary style="padding:.75rem 1rem;cursor:pointer;font-size:.85rem;font-weight:600;display:flex;align-items:center;gap:.5rem;">
+    <span>📋 프로젝트 실행 계획</span>
+    <span style="font-size:.72rem;font-weight:400;color:var(--text-muted);">AI 자동 생성 — 클릭하여 펼치기</span>
+    {% if project_plan.exclude_nodes %}<span style="font-size:.68rem;padding:1px 6px;border-radius:4px;background:var(--st-awaiting-dim);color:var(--st-awaiting);">{{ project_plan.exclude_nodes|length }}개 노드 제외</span>{% endif %}
+  </summary>
+  <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);font-size:.82rem;line-height:1.7;">
+    {% if project_plan.summary %}
+    <div style="font-weight:600;font-size:.9rem;margin-bottom:.75rem;color:var(--accent);">{{ project_plan.summary }}</div>
+    {% endif %}
+
+    {% if project_plan.core_direction %}
+    <div style="margin-bottom:.75rem;">
+      <div style="font-weight:600;margin-bottom:.3rem;">핵심 방향</div>
+      <div style="color:var(--text-2);">{{ project_plan.core_direction }}</div>
+    </div>
+    {% endif %}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+      {% if project_plan.differentiation %}
+      <div>
+        <div style="font-weight:600;margin-bottom:.3rem;">차별화 전략</div>
+        {% for d in project_plan.differentiation %}<div style="color:var(--text-2);padding:2px 0;">· {{ d }}</div>{% endfor %}
+      </div>
+      {% endif %}
+      {% if project_plan.tech_decisions %}
+      <div>
+        <div style="font-weight:600;margin-bottom:.3rem;">기술 판단</div>
+        {% for t in project_plan.tech_decisions %}<div style="color:var(--text-2);padding:2px 0;">· {{ t }}</div>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if project_plan.user_priorities %}
+    <div style="margin-bottom:.75rem;">
+      <div style="font-weight:600;margin-bottom:.3rem;">사용자 우선순위</div>
+      {% for u in project_plan.user_priorities %}<span style="display:inline-block;padding:2px 8px;margin:2px;border-radius:4px;background:var(--accent-dim);font-size:.75rem;">{{ u }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if project_plan.risk_flags %}
+    <div style="margin-bottom:.75rem;">
+      <div style="font-weight:600;margin-bottom:.3rem;color:var(--st-awaiting);">리스크</div>
+      {% for r in project_plan.risk_flags %}<div style="color:var(--text-2);padding:2px 0;">⚠ {{ r }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if project_plan.phase_focus %}
+    <div style="margin-bottom:.5rem;">
+      <div style="font-weight:600;margin-bottom:.3rem;">단계별 핵심</div>
+      {% for phase, focus in project_plan.phase_focus.items() %}
+      <div style="padding:2px 0;"><span style="font-weight:600;color:var(--accent);font-size:.75rem;">{{ phase }}</span> <span style="color:var(--text-2);">{{ focus }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</details>
+{% endif %}
+
+<!-- Live content area — HTMX 부분 교체 -->
+<div id="live-content"
+     hx-get="/engagements/{{ engagement.id }}/live"
+     hx-trigger="every 10s"
+     hx-swap="innerHTML"
+     hx-indicator="#refresh-indicator">
+{% include "engagement_detail_live.html" %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ENGAGEMENT_ID = "{{ engagement.id }}";
+
+// ── Phase filter ──────────────────────────────────────────────────────────
+function filterPhases(btn, filter, projId) {
+  const container = document.getElementById('proj-' + projId);
+  container.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  // 상태 매핑: 필터값 → 노드 icon 클래스
+  const FILTER_MAP = {
+    'in_progress': ['ni-in_progress'],
+    'ready':       ['ni-ready'],
+    'blocked':     ['ni-blocked'],
+    'awaiting':    ['ni-awaiting'],
+    'completed':   ['ni-completed'],
+    'pending':     ['ni-pending'],
+    'skipped':     ['ni-skipped'],
+  };
+
+  // 1) 모든 노드 show/hide
+  container.querySelectorAll('.node-item').forEach(li => {
+    if (filter === 'all') {
+      li.style.display = '';
+      return;
+    }
+    const icon = li.querySelector('.node-icon');
+    if (!icon) { li.style.display = 'none'; return; }
+    const cls = FILTER_MAP[filter] || [];
+    const match = cls.some(c => icon.classList.contains(c));
+    li.style.display = match ? '' : 'none';
+  });
+
+  // 2) 가시 노드가 0인 phase 카드 숨기기
+  container.querySelectorAll('.phase-card').forEach(card => {
+    if (filter === 'all') { card.style.display = ''; return; }
+    const visibleNodes = card.querySelectorAll('.node-item[style=""], .node-item:not([style])');
+    // 더 정확하게: display가 none이 아닌 노드 수 세기
+    let visCount = 0;
+    card.querySelectorAll('.node-item').forEach(li => {
+      if (li.style.display !== 'none') visCount++;
+    });
+    card.style.display = visCount > 0 ? '' : 'none';
+  });
+}
+
+// ── Gate approve ──────────────────────────────────────────────────────────
+function refreshLive() {
+  htmx.trigger('#live-content', 'htmx:load');
+  // HTMX가 hx-get을 바로 실행하도록 강제 트리거
+  htmx.ajax('GET', '/engagements/' + ENGAGEMENT_ID + '/live', {target:'#live-content', swap:'innerHTML'});
+}
+
+async function approveGate(nodeId, projectId) {
+  const token = localStorage.getItem('ai_si_token');
+  const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/approve`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (r.ok) refreshLive();
+  else { const e = await r.json().catch(()=>({})); alert(e.detail || '승인 실패'); }
+}
+
+function showFeedbackModal(nodeId, projectId) {
+  const feedback = prompt('수정 요청 내용을 입력하세요:\n(예: 관리자 페이지 배정 버튼 클릭 시 반응 없음)');
+  if (!feedback || !feedback.trim()) return;
+  submitFeedback(nodeId, projectId, feedback.trim());
+}
+
+async function submitFeedback(nodeId, projectId, feedback) {
+  const token = localStorage.getItem('ai_si_token');
+  const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/feedback`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ feedback })
+  });
+  if (r.ok) {
+    alert('수정 요청이 접수되었습니다. 관련 노드가 자동으로 재생성됩니다.');
+    refreshLive();
+  } else {
+    const e = await r.json().catch(()=>({}));
+    alert(e.detail || '수정 요청 실패');
+  }
+}
+
+// ── Add project ───────────────────────────────────────────────────────────
+function closeAddProject() {
+  document.getElementById('addProjectModal').style.display = 'none';
+}
+
+async function viewArtifact(nodeId, projectId, nodeName) {
+  const token = localStorage.getItem('ai_si_token') || '';
+  try {
+    const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/artifact`, {
+      headers: {'Authorization': 'Bearer ' + token}
+    });
+    if (!r.ok) { alert('산출물을 찾을 수 없습니다.'); return; }
+    const d = await r.json();
+    _editNodeId = nodeId;
+    _editProjectId = projectId;
+    _editRawContent = d.content || '';
+    _editArtifactType = d.artifact_type || '';
+    document.getElementById('artifactTitle').textContent = nodeName + ' (v' + d.version + ')';
+    const contentEl = document.getElementById('artifactContent');
+    const raw = d.content || '';
+    // 새 탭에서 전체화면 보기 (플로팅 수정 버튼 포함)
+    window.open(`/api/v1/projects/${projectId}/nodes/${nodeId}/artifact/view`, '_blank');
+  } catch(e) { alert('오류: ' + e.message); }
+}
+
+function renderMarkdown(md) {
+  // 1) 코드블록 보호 (치환 방지)
+  const codeBlocks = [];
+  md = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    codeBlocks.push({lang, code});
+    return `%%CODEBLOCK_${codeBlocks.length - 1}%%`;
+  });
+
+  // 2) 인라인 코드 보호
+  const inlineCodes = [];
+  md = md.replace(/`([^`]+)`/g, (_, code) => {
+    inlineCodes.push(code);
+    return `%%INLINE_${inlineCodes.length - 1}%%`;
+  });
+
+  // 3) HTML 주석 제거 (SELF_CHECK 등 메타데이터)
+  md = md.replace(/<!--[\s\S]*?-->/g, '');
+
+  // 4) 이스케이프
+  md = md.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // 4) 헤딩
+  md = md.replace(/^#### (.+)$/gm, '<h5 class="md-h4">$1</h5>');
+  md = md.replace(/^### (.+)$/gm, '<h4 class="md-h3">$1</h4>');
+  md = md.replace(/^## (.+)$/gm, '<h3 class="md-h2">$1</h3>');
+  md = md.replace(/^# (.+)$/gm, '<h2 class="md-h1">$1</h2>');
+
+  // 5) 테이블
+  md = md.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm, (_, header, sep, body) => {
+    const ths = header.split('|').filter(c=>c.trim()).map(c=>`<th>${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(row => {
+      const tds = row.split('|').filter(c=>c.trim()).map(c=>`<td>${c.trim()}</td>`).join('');
+      return `<tr>${tds}</tr>`;
+    }).join('');
+    return `<div class="md-table-wrap"><table class="md-table"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  });
+
+  // 6) 볼드, 이탈릭
+  md = md.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  md = md.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // 7) 목록
+  md = md.replace(/^(\d+)\. (.+)$/gm, '<li class="md-ol">$2</li>');
+  md = md.replace(/^[-*] (.+)$/gm, '<li class="md-ul">$1</li>');
+  // 연속 li를 ol/ul로 감싸기
+  md = md.replace(/((?:<li class="md-ol">.+<\/li>\n?)+)/g, '<ol class="md-list">$1</ol>');
+  md = md.replace(/((?:<li class="md-ul">.+<\/li>\n?)+)/g, '<ul class="md-list">$1</ul>');
+
+  // 8) 수평선
+  md = md.replace(/^---+$/gm, '<hr class="md-hr">');
+
+  // 9) 단락 (빈 줄로 구분)
+  md = md.replace(/\n\n+/g, '</p><p class="md-p">');
+  md = '<p class="md-p">' + md + '</p>';
+  // 빈 단락 제거
+  md = md.replace(/<p class="md-p">\s*<\/p>/g, '');
+
+  // 10) 코드블록 복원
+  codeBlocks.forEach((cb, i) => {
+    md = md.replace(`%%CODEBLOCK_${i}%%`,
+      `<pre class="md-code"><code class="lang-${cb.lang||'text'}">${cb.code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`);
+  });
+
+  // 11) 인라인 코드 복원
+  inlineCodes.forEach((code, i) => {
+    md = md.replace(`%%INLINE_${i}%%`,
+      `<code class="md-inline">${code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code>`);
+  });
+
+  return md;
+}
+
+let _editNodeId = '', _editProjectId = '', _editRawContent = '', _editArtifactType = '';
+
+function closeArtifact() {
+  document.getElementById('artifactModal').style.display = 'none';
+  cancelEdit();
+  cancelRequest();
+}
+
+function toggleRequest() {
+  document.getElementById('artifactContent').style.display = '';
+  document.getElementById('artifactRequestPanel').style.display = 'block';
+  document.getElementById('artifactEditBtn').style.display = 'none';
+  document.getElementById('artifactRequestBtn').style.display = 'none';
+  document.getElementById('artifactSaveBtn').style.display = 'none';
+  document.getElementById('artifactCancelBtn').style.display = 'none';
+}
+
+function cancelRequest() {
+  document.getElementById('artifactContent').style.display = '';
+  document.getElementById('artifactRequestPanel').style.display = 'none';
+  document.getElementById('artifactEditBtn').style.display = '';
+  document.getElementById('artifactRequestBtn').style.display = '';
+  document.getElementById('requestInput').value = '';
+  document.getElementById('requestStatus').style.display = 'none';
+}
+
+async function submitRequest() {
+  const request = document.getElementById('requestInput').value.trim();
+  if (!request) { alert('수정 요청 내용을 입력하세요.'); return; }
+
+  const nodeId = _editNodeId;
+  const projectId = _editProjectId;
+  const token = localStorage.getItem('ai_si_token') || '';
+
+  // 즉시 모달 닫고 대시보드에 "수정 중" 표시
+  closeArtifact();
+
+  // 백그라운드로 요청 (모달 닫아도 계속 진행)
+  fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/revise`, {
+    method: 'POST',
+    headers: {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
+    body: JSON.stringify({request: request})
+  }).then(async r => {
+    const d = await r.json();
+    if (r.ok) {
+      let msg = '✅ 수정 완료 (v' + d.version + ')';
+      if (d.impact === 'minor_fix' || d.impact === 'add_minor' || d.impact === 'delete_minor') {
+        msg += '\n\n단순 수정 — 하위 산출물 영향 없음';
+      } else if (d.invalidated) {
+        msg += '\n\n맥락 변경 감지: ' + (d.reason || '') + '\n→ 하위 ' + d.invalidated + '개 노드 재실행 예정';
+      }
+      if (d.upstream_revised && d.upstream_revised.length) {
+        msg += '\n\n📝 상위 산출물 자동 반영됨:';
+        d.upstream_revised.forEach(u => { msg += '\n  ✅ ' + u; });
+      }
+      alert(msg);
+    } else {
+      alert('❌ 수정 실패: ' + (d.detail || r.status));
+    }
+    refreshLive();
+  }).catch(e => {
+    alert('❌ 오류: ' + e.message);
+  });
+
+  alert('수정 요청이 전송되었습니다.\nAI가 백그라운드에서 수정 중입니다.\n완료되면 알림이 표시됩니다.');
+}
+
+function toggleEdit() {
+  document.getElementById('artifactContent').style.display = 'none';
+  document.getElementById('artifactEditor').style.display = 'block';
+  document.getElementById('artifactEditor').value = _editRawContent;
+  document.getElementById('artifactEditBtn').style.display = 'none';
+  document.getElementById('artifactSaveBtn').style.display = '';
+  document.getElementById('artifactCancelBtn').style.display = '';
+}
+
+function cancelEdit() {
+  document.getElementById('artifactContent').style.display = '';
+  document.getElementById('artifactEditor').style.display = 'none';
+  document.getElementById('artifactEditBtn').style.display = '';
+  document.getElementById('artifactSaveBtn').style.display = 'none';
+  document.getElementById('artifactCancelBtn').style.display = 'none';
+}
+
+async function saveEdit() {
+  const newContent = document.getElementById('artifactEditor').value;
+  if (newContent === _editRawContent) { cancelEdit(); return; }
+  const token = localStorage.getItem('ai_si_token') || '';
+  try {
+    const r = await fetch(`/api/v1/projects/${_editProjectId}/nodes/${_editNodeId}/artifact`, {
+      method: 'PUT',
+      headers: {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
+      body: JSON.stringify({content: newContent})
+    });
+    if (!r.ok) { const d = await r.json().catch(()=>({})); alert('저장 실패: ' + (d.detail || r.status)); return; }
+    const d = await r.json();
+    _editRawContent = newContent;
+    // 뷰어 갱신
+    const contentEl = document.getElementById('artifactContent');
+    if (_editArtifactType === 'html' || newContent.trim().startsWith('<!DOCTYPE') || newContent.trim().startsWith('<html')) {
+      contentEl.innerHTML = '<div id="artifactShadowHost"></div>';
+      const shadow = document.getElementById('artifactShadowHost').attachShadow({mode:'open'});
+      const doc = new DOMParser().parseFromString(newContent, 'text/html');
+      shadow.innerHTML = Array.from(doc.querySelectorAll('style')).map(s=>s.outerHTML).join('') +
+        Array.from(doc.querySelectorAll('link[rel="stylesheet"]')).map(l=>l.outerHTML).join('') +
+        (doc.body ? doc.body.innerHTML : newContent);
+    } else {
+      contentEl.innerHTML = renderMarkdown(newContent);
+    }
+    document.getElementById('artifactTitle').textContent = document.getElementById('artifactTitle').textContent.replace(/v\d+/, 'v' + d.version);
+    cancelEdit();
+    let msg = 'v' + d.version + ' 저장됨';
+    if (d.impact === 'minor_fix') {
+      msg += ' (단순 수정 — 하위 영향 없음)';
+    } else if (d.invalidated) {
+      msg += '\n\n맥락 변경 감지: ' + (d.reason || '') + '\n→ 하위 ' + d.invalidated + '개 노드 재실행 예정 (전체 문서 전달)';
+    }
+    alert(msg);
+    refreshLive();
+  } catch(e) { alert('오류: ' + e.message); }
+}
+
+async function viewAndEdit(nodeId, projectId, nodeName) {
+  _editNodeId = nodeId;
+  _editProjectId = projectId;
+  document.getElementById('artifactTitle').textContent = nodeName + ' — 수정';
+  document.getElementById('artifactContent').innerHTML = '';
+  document.getElementById('artifactModal').style.display = 'flex';
+  toggleRequest();
+}
+
+// ── Env vars ──────────────────────────────────────────────────────────────
+let _envProjectId = '';
+
+// scope별 필요 환경변수 + 발급 가이드
+const ENV_TEMPLATES = {
+  _common: [
+    {key:'GITHUB_TOKEN', label:'GitHub 토큰', guide:'GitHub → Settings → Developer settings → Personal access tokens → Generate', link:'https://github.com/settings/tokens'},
+    {key:'DOMAIN', label:'서비스 도메인', guide:'예: example.com (DNS 설정 필요)', link:''},
+  ],
+  si: [
+    {key:'LEGACY_API_URL', label:'기존 시스템 API URL', guide:'연동 대상 시스템의 API 엔드포인트', link:''},
+    {key:'LEGACY_API_KEY', label:'기존 시스템 API Key', guide:'연동 대상 시스템에서 발급', link:''},
+  ],
+  ai_model: [
+    {key:'WANDB_API_KEY', label:'Weights & Biases 키', guide:'wandb.ai → Settings → API keys', link:'https://wandb.ai/settings'},
+    {key:'HF_TOKEN', label:'Hugging Face 토큰', guide:'huggingface.co → Settings → Access Tokens', link:'https://huggingface.co/settings/tokens'},
+  ],
+  llm: [
+    {key:'OPENAI_API_KEY', label:'OpenAI API Key', guide:'platform.openai.com → API keys', link:'https://platform.openai.com/api-keys'},
+    {key:'ANTHROPIC_API_KEY', label:'Anthropic API Key', guide:'console.anthropic.com → API Keys', link:'https://console.anthropic.com/settings/keys'},
+  ],
+  chatbot: [
+    {key:'SLACK_BOT_TOKEN', label:'Slack Bot 토큰', guide:'api.slack.com → Your Apps → OAuth & Permissions', link:'https://api.slack.com/apps'},
+    {key:'KAKAO_REST_API_KEY', label:'카카오 REST API 키', guide:'developers.kakao.com → 내 애플리케이션', link:'https://developers.kakao.com/console/app'},
+  ],
+  data_pipeline: [
+    {key:'AWS_ACCESS_KEY_ID', label:'AWS Access Key', guide:'AWS Console → IAM → 사용자 → 보안 자격 증명', link:'https://console.aws.amazon.com/iam/'},
+    {key:'AWS_SECRET_ACCESS_KEY', label:'AWS Secret Key', guide:'위와 동일 — Access Key 생성 시 함께 발급', link:''},
+    {key:'S3_BUCKET', label:'S3 버킷 이름', guide:'AWS S3 → 버킷 생성', link:'https://s3.console.aws.amazon.com/'},
+  ],
+  mlops: [
+    {key:'DOCKER_REGISTRY', label:'Docker Registry URL', guide:'Docker Hub 또는 ECR/GCR 주소', link:'https://hub.docker.com/'},
+    {key:'K8S_CONFIG', label:'Kubernetes Config', guide:'kubectl config view --raw', link:''},
+  ],
+  vision: [
+    {key:'GPU_INSTANCE', label:'GPU 인스턴스 정보', guide:'AWS/GCP GPU 인스턴스 ID 또는 접속 정보', link:''},
+  ],
+  prediction: [
+    {key:'DATA_SOURCE_URL', label:'데이터 소스 URL', guide:'시계열 데이터 수집 대상 API/DB 접속 정보', link:''},
+  ],
+};
+
+async function openEnvVars(projectId) {
+  _envProjectId = projectId;
+  const token = localStorage.getItem('ai_si_token') || '';
+  try {
+    // 현재 등록된 환경변수
+    const r = await fetch(`/api/v1/projects/${projectId}/env-vars`, {
+      headers: {'Authorization': 'Bearer ' + token}
+    });
+    const d = r.ok ? await r.json() : {env_vars:[]};
+    const registered = new Set((d.env_vars||[]).map(v=>v.key));
+
+    // 프로젝트 scope 조회 (intake에서)
+    const engR = await fetch(`/api/v1/engagements/${ENGAGEMENT_ID}`, {
+      headers: {'Authorization': 'Bearer ' + token}
+    });
+    let scopes = [];
+    if (engR.ok) {
+      const engD = await engR.json();
+      if (engD.intake_submission_id) {
+        const subR = await fetch(`/api/v1/intake/submissions/${engD.intake_submission_id}`, {
+          headers: {'Authorization': 'Bearer ' + token}
+        });
+        if (subR.ok) {
+          const subD = await subR.json();
+          try { scopes = JSON.parse(subD.raw_json || '{}').scope || []; } catch(e) {}
+        }
+      }
+    }
+
+    // 해당 scope에 맞는 환경변수 템플릿
+    let templates = [...ENV_TEMPLATES._common];
+    scopes.forEach(s => { if (ENV_TEMPLATES[s]) templates.push(...ENV_TEMPLATES[s]); });
+
+    // UI 렌더
+    const list = document.getElementById('envVarsList');
+    let h = '';
+
+    // 등록된 변수
+    if (d.env_vars && d.env_vars.length) {
+      h += '<div style="font-size:.72rem;font-weight:600;color:var(--text);margin-bottom:.5rem;">등록됨</div>';
+      d.env_vars.forEach(v => {
+        h += `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid var(--border);">
+          <code style="font-size:.75rem;flex:1;">${v.key}</code>
+          <span style="font-size:.72rem;color:var(--success);">✓ 설정됨</span>
+          <button onclick="deleteEnvVar('${v.key}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.7rem;">삭제</button>
+        </div>`;
+      });
+    }
+
+    // 미등록 가이드
+    const unregistered = templates.filter(t => !registered.has(t.key));
+    if (unregistered.length) {
+      h += '<div style="font-size:.72rem;font-weight:600;color:var(--text);margin:1rem 0 .5rem;">필요한 환경 변수</div>';
+      unregistered.forEach(t => {
+        const linkBtn = t.link ? `<a href="${t.link}" target="_blank" style="font-size:.65rem;color:var(--accent);text-decoration:none;">발급 →</a>` : '';
+        h += `<div style="padding:.5rem 0;border-bottom:1px solid rgba(42,45,62,.4);">
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <code style="font-size:.75rem;color:var(--warning);">${t.key}</code>
+            <span style="font-size:.68rem;color:var(--text-muted);">${t.label}</span>
+            ${linkBtn}
+          </div>
+          <div style="font-size:.65rem;color:var(--text-muted);margin-top:2px;">${t.guide}</div>
+          <div style="display:flex;gap:.3rem;margin-top:4px;">
+            <input id="env-${t.key}" type="password" placeholder="값 입력" style="flex:1;padding:.3rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.75rem;">
+            <button onclick="quickAddEnv('${t.key}')" class="btn btn-primary" style="font-size:.68rem;padding:.2rem .5rem;">등록</button>
+          </div>
+        </div>`;
+      });
+    }
+
+    if (!h) h = '<div style="font-size:.78rem;color:var(--success);padding:1rem 0;text-align:center;">✅ 모든 환경 변수가 설정되어 있습니다.</div>';
+
+    // 자유 입력 (접이식)
+    h += `<details style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.5rem;">
+      <summary style="font-size:.72rem;color:var(--text-muted);cursor:pointer;">직접 입력</summary>
+      <div style="display:flex;gap:.3rem;margin-top:.5rem;">
+        <input id="envKey" placeholder="변수명" style="flex:1;padding:.3rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.75rem;font-family:monospace;">
+        <input id="envValue" type="password" placeholder="값" style="flex:2;padding:.3rem .5rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.75rem;">
+        <button class="btn btn-primary" style="font-size:.68rem;padding:.2rem .5rem;" onclick="addEnvVar()">추가</button>
+      </div>
+    </details>`;
+
+    list.innerHTML = h;
+    document.getElementById('envVarsModal').style.display = 'flex';
+  } catch(e) { alert('오류: ' + e.message); }
+}
+
+function closeEnvVars() {
+  document.getElementById('envVarsModal').style.display = 'none';
+}
+
+async function quickAddEnv(key) {
+  const input = document.getElementById('env-' + key);
+  if (!input || !input.value.trim()) return;
+  const token = localStorage.getItem('ai_si_token') || '';
+  const tmpl = [...ENV_TEMPLATES._common, ...Object.values(ENV_TEMPLATES).flat()].find(t=>t.key===key);
+  await fetch(`/api/v1/projects/${_envProjectId}/env-vars`, {
+    method: 'POST',
+    headers: {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
+    body: JSON.stringify({key, value: input.value.trim(), is_secret: true, description: tmpl ? tmpl.label : ''})
+  });
+  openEnvVars(_envProjectId);
+}
+
+async function addEnvVar() {
+  const key = document.getElementById('envKey').value.trim();
+  const value = document.getElementById('envValue').value;
+  if (!key) return;
+  const token = localStorage.getItem('ai_si_token') || '';
+  await fetch(`/api/v1/projects/${_envProjectId}/env-vars`, {
+    method: 'POST',
+    headers: {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
+    body: JSON.stringify({key, value, is_secret: true})
+  });
+  document.getElementById('envKey').value = '';
+  document.getElementById('envValue').value = '';
+  openEnvVars(_envProjectId);
+}
+
+async function deleteEnvVar(key) {
+  const token = localStorage.getItem('ai_si_token') || '';
+  await fetch(`/api/v1/projects/${_envProjectId}/env-vars/${key}`, {
+    method: 'DELETE',
+    headers: {'Authorization': 'Bearer ' + token}
+  });
+  openEnvVars(_envProjectId);
+}
+
+async function showFailureReason(nodeId, nodeName) {
+  const token = localStorage.getItem('ai_si_token') || '';
+  try {
+    const r = await fetch(`/api/v1/nodes/${nodeId}/failure-reasons`, {
+      headers: {'Authorization': 'Bearer ' + token}
+    });
+    if (!r.ok) { alert('조회 실패'); return; }
+    const d = await r.json();
+    const reasons = d.reasons || [];
+    if (!reasons.length) {
+      alert(`${nodeName}\n\n실패 사유가 기록되지 않았습니다.`);
+      return;
+    }
+    let msg = `${nodeName} — 실패 이력\n${'─'.repeat(40)}\n\n`;
+    reasons.forEach(r => {
+      msg += `시도 ${r.attempt}: ${r.reason || '(사유 없음)'}\n시간: ${(r.at||'').slice(0,19)}\n\n`;
+    });
+    alert(msg);
+  } catch(e) { alert('오류: ' + e.message); }
+}
+
+async function skipNode(nodeId, projectId, nodeName) {
+  if (!confirm(`"${nodeName}" 을(를) 건너뛰시겠습니까?\n\n이 산출물은 비해당(SKIPPED)으로 처리되며, 하위 노드에 영향을 주지 않습니다.`)) return;
+  try {
+    const token = localStorage.getItem('ai_si_token') || '';
+    const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/skip`, {
+      method: 'POST', headers: {'Authorization': 'Bearer ' + token}
+    });
+    if (!r.ok) { const d = await r.json().catch(()=>({})); alert('건너뛰기 실패: ' + (d.detail || r.status)); return; }
+    refreshLive();
+  } catch(e) { alert('오류: ' + e.message); }
+}
+
+async function retryNode(nodeId, projectId, nodeName) {
+  if (!confirm(`"${nodeName}" 재시도하시겠습니까?\n\nretry_count가 초기화되고 다시 실행됩니다.`)) return;
+  try {
+    const token = localStorage.getItem('ai_si_token') || '';
+    const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/retry`, {
+      method: 'POST', headers: {'Authorization': 'Bearer ' + token}
+    });
+    if (!r.ok) { const d = await r.json().catch(()=>({})); alert('재시도 실패: ' + (d.detail || r.status)); return; }
+    refreshLive();
+  } catch(e) { alert('오류: ' + e.message); }
+}
+
+async function doAddProject() {
+  const name = document.getElementById('ap-name').value.trim();
+  if (!name) { document.getElementById('ap-error').textContent = '프로젝트명을 입력해주세요.'; return; }
+  const btn = document.getElementById('ap-submit');
+  btn.disabled = true; btn.textContent = '생성 중...';
+  document.getElementById('ap-error').textContent = '';
+  try {
+    const token = localStorage.getItem('ai_si_token');
+    const r = await fetch(`/api/v1/engagements/${ENGAGEMENT_ID}/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        name,
+        project_type: document.getElementById('ap-type').value,
+        priority: parseInt(document.getElementById('ap-priority').value),
+        client_name: document.getElementById('ap-client').value.trim(),
+      }),
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail || '오류'); }
+    closeAddProject();
+    refreshLive();
+  } catch(e) {
+    document.getElementById('ap-error').textContent = `오류: ${e.message}`;
+    btn.disabled = false; btn.textContent = '프로젝트 생성';
+  }
+}
+
+// ── Auto-refresh ──────────────────────────────────────────────────────────
+function _setDagBtn(mode) {
+  const el = document.getElementById('dagActionBtn');
+  if (mode === 'start') {
+    el.innerHTML = '<button class="btn" style="background:var(--st-completed);color:#fff;border-color:var(--st-completed);" onclick="startDag()">▶ 프로젝트 시작</button>';
+  } else if (mode === 'pause') {
+    el.innerHTML = '<button class="btn" style="background:var(--st-awaiting);color:#000;border-color:var(--st-awaiting);" onclick="pauseDag()">⏸ 일시정지</button>';
+  }
+}
+
+async function startDag() {
+  try {
+    const token = localStorage.getItem('ai_si_token') || '';
+    const r = await fetch(`/api/v1/engagements/${ENGAGEMENT_ID}/dag/start`, {
+      method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.detail || '시작 실패'); return; }
+    refreshLive();
+  } catch(e) { alert('오류: '+e.message); }
+}
+async function pauseDag() {
+  try {
+    const token = localStorage.getItem('ai_si_token') || '';
+    const r = await fetch(`/api/v1/engagements/${ENGAGEMENT_ID}/dag/pause`, {
+      method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.detail || '일시정지 실패'); return; }
+    refreshLive();
+  } catch(e) { alert('오류: '+e.message); }
+}
+
+// ── 실시간 상태 갱신 (새로고침 없이) ──────────────────────────────────────
+
+const STATE_ICONS = {
+  COMPLETED:'✓', IN_PROGRESS:'▶', READY:'◆', AWAITING_APPROVAL:'●',
+  NEEDS_HUMAN:'!', FAILED:'✕', BLOCKED:'⊘', NOT_STARTED:'·', SUSPENDED:'⏸', SKIPPED:'—',
+  INVALID:'⟲'
+};
+const STATE_ICON_CLS = {
+  COMPLETED:'ni-completed', IN_PROGRESS:'ni-in_progress', READY:'ni-ready',
+  AWAITING_APPROVAL:'ni-awaiting', NEEDS_HUMAN:'ni-needs_human',
+  FAILED:'ni-failed', BLOCKED:'ni-blocked', NOT_STARTED:'ni-pending',
+  SUSPENDED:'ni-pending', INVALID:'ni-failed', SKIPPED:'ni-pending'
+};
+const STATE_LABELS = {
+  COMPLETED:'완료', IN_PROGRESS:'진행중', READY:'준비됨',
+  AWAITING_APPROVAL:'승인대기', NEEDS_HUMAN:'개입필요',
+  FAILED:'실패', BLOCKED:'선행대기', NOT_STARTED:'대기', SUSPENDED:'일시중단',
+  INVALID:'재실행 대기', SKIPPED:'비해당'
+};
+const _s = getComputedStyle(document.documentElement);
+const STATE_COLORS = {
+  COMPLETED:_s.getPropertyValue('--st-completed').trim(),
+  IN_PROGRESS:_s.getPropertyValue('--st-progress').trim(),
+  READY:_s.getPropertyValue('--st-ready').trim(),
+  AWAITING_APPROVAL:_s.getPropertyValue('--st-awaiting').trim(),
+  NEEDS_HUMAN:_s.getPropertyValue('--st-failed').trim(),
+  FAILED:_s.getPropertyValue('--st-failed').trim(),
+  BLOCKED:_s.getPropertyValue('--st-blocked').trim(),
+  NOT_STARTED:_s.getPropertyValue('--text-3').trim(),
+  SUSPENDED:'#d97706',
+  INVALID:'#f59e0b',
+  SKIPPED:_s.getPropertyValue('--text-3').trim()
+};
+
+function updateNodeInDOM(nodeId, newState) {
+  // 노드 아이콘/라벨 업데이트
+  document.querySelectorAll('.node-item, [data-node-id]').forEach(el => {
+    const nameEl = el.querySelector('.node-name');
+    if (!nameEl) return;
+    // data 속성이나 ID로 매칭 (현재 data-node-id 없으면 skip)
+  });
+}
+
+function refreshData() {
+  refreshLive();
+}
+
+// WebSocket — 이벤트 수신 시 DOM 부분 업데이트
+(function() {
+  const dot = document.getElementById('ws-dot');
+  const statusEl = document.getElementById('ws-status');
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  let reconnectDelay = 2000;
+
+  function connect() {
+    dot.className = 'ws-dot connecting';
+    const ws = new WebSocket(`${proto}//${location.host}/ws/engagements/${ENGAGEMENT_ID}/stream`);
+
+    ws.onopen = () => {
+      dot.className = 'ws-dot connected';
+      statusEl.textContent = '실시간';
+      reconnectDelay = 2000;
+      document.getElementById('refresh-info').textContent = '';
+    };
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === 'ping') { ws.send('ping'); return; }
+
+        if (msg.type === 'NodeStateChanged' && msg.payload) {
+          // DOM 부분 업데이트만 — 전체 새로고침 없음
+          refreshLive();
+        }
+        if (['GateApproved','GateRejected'].includes(msg.type)) {
+          refreshLive();
+        }
+      } catch {}
+    };
+
+    ws.onerror = () => {
+      dot.className = 'ws-dot error';
+      statusEl.textContent = '오류';
+    };
+
+    ws.onclose = () => {
+      dot.className = 'ws-dot';
+      statusEl.textContent = '재연결 중...';
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
+    };
+  }
+  connect();
+
+  // HTMX hx-trigger="every 10s"가 자동 부분 교체 담당
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,341 @@
+<!-- Top toolbar -->
+<div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
+  <span class="badge badge-info">{{ engagement.status }}</span>
+  <span style="color:var(--text-muted);font-size:.8rem;">{{ engagement.client_name }}</span>
+  <span style="color:var(--text-muted);font-size:.8rem;">우선순위 {{ engagement.priority }}</span>
+  <div style="margin-left:auto;display:flex;gap:.5rem;">
+    <span id="refresh-info" style="font-size:.7rem;color:var(--text-muted);align-self:center;"></span>
+    <a href="/engagements/{{ engagement.id }}/design-preview" class="btn">🎨 디자인</a>
+    {% if preview_url %}
+    <a href="{{ preview_url }}" target="_blank" class="btn" style="background:var(--st-completed);color:#fff;border-color:var(--st-completed);">🖥 빌드 미리보기</a>
+    {% endif %}
+    <a href="/engagements/{{ engagement.id }}/deliverables" class="btn">📦 산출물</a>
+    <a href="/engagements/{{ engagement.id }}/dag" class="btn">DAG 시각화</a>
+    <button class="btn btn-primary" onclick="document.getElementById('addProjectModal').style.display='flex'">+ 프로젝트</button>
+    <span id="dagActionBtn">
+    {% if dag_status in ('VALID', 'PENDING', 'PAUSED', 'INITIALIZING') %}
+    <button class="btn" style="background:var(--st-completed);color:#fff;border-color:var(--st-completed);" onclick="startDag()">▶ 프로젝트 시작</button>
+    {% elif dag_status == 'RUNNING' %}
+    <button class="btn" style="background:var(--st-awaiting);color:#000;border-color:var(--st-awaiting);" onclick="pauseDag()">⏸ 일시정지</button>
+    {% endif %}
+    </span>
+  </div>
+</div>
+
+<!-- Agent status bar -->
+<div class="agent-bar" id="agentBar">
+  {% set in_progress = active_nodes|selectattr('state', 'equalto', 'IN_PROGRESS')|list %}
+  {% set ready_nodes = active_nodes|selectattr('state', 'equalto', 'READY')|list %}
+  {% if in_progress %}
+    <span class="dot dot-running"></span>
+    <span style="font-weight:600;color:var(--st-completed);">에이전트 실행중</span>
+    <span style="color:var(--text-muted);">—</span>
+    {% for n in in_progress[:3] %}
+      <span style="background:var(--st-progress-dim);padding:2px 8px;border-radius:4px;font-size:.72rem;">▶ {{ n.name }}</span>
+    {% endfor %}
+    {% if in_progress|length > 3 %}
+      <span style="color:var(--text-muted);font-size:.7rem;">+{{ in_progress|length - 3 }}개</span>
+    {% endif %}
+  {% elif ready_nodes %}
+    <span class="dot dot-running"></span>
+    <span style="font-weight:600;color:var(--accent);">실행 대기중</span>
+    <span style="color:var(--text-muted);">— {{ ready_nodes|length }}개 노드 준비됨</span>
+  {% elif dag_status == 'RUNNING' %}
+    <span class="dot dot-idle"></span>
+    <span style="color:var(--text-muted);">에이전트 대기중 — 실행 가능한 노드 없음 (선행 작업 또는 게이트 승인 필요)</span>
+  {% elif dag_status == 'PAUSED' %}
+    <span class="dot dot-idle"></span>
+    <span style="color:var(--warning);">일시정지됨</span>
+  {% else %}
+    <span class="dot dot-idle"></span>
+    <span style="color:var(--text-muted);">미시작</span>
+  {% endif %}
+</div>
+
+<!-- Overall progress bar -->
+<div style="margin-bottom:.4rem;display:flex;justify-content:space-between;font-size:.75rem;color:var(--text-muted);">
+  <span>전체 진행률</span>
+  <span id="overall-label">{{ completed_nodes }}/{{ total_nodes }} 노드</span>
+</div>
+<div class="overall-bar">
+  <div class="overall-fill" id="overall-fill" style="width:{{ overall_pct }}%"></div>
+  <div class="overall-text" id="overall-pct">{{ overall_pct }}%</div>
+</div>
+
+<!-- Escalations alert -->
+{% if escalations %}
+<div style="background:var(--st-failed-subtle);border:1px solid var(--st-failed-dim);border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;">
+  <div style="font-size:.8rem;font-weight:600;color:var(--danger);margin-bottom:.5rem;">⚠ 에스컬레이션 {{ escalations|length }}건</div>
+  {% for esc in escalations %}
+  <div style="font-size:.78rem;color:var(--text-muted);padding:3px 0;">
+    <code style="font-size:.7rem;">{{ esc.node_id[:10] }}…</code> — {{ esc.reason or '(사유 없음)' }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Per-project sections -->
+{% for pd in projects_data %}
+<div class="project-section" id="proj-{{ pd.id }}">
+  <div class="project-section-header">
+    <h3>{{ pd.name }}</h3>
+    <span class="proj-pct">{{ pd.completed }}/{{ pd.total }} ({{ pd.pct }}%)</span>
+    <div style="flex:1;background:var(--border);border-radius:3px;height:5px;overflow:hidden;max-width:160px;">
+      <div style="height:100%;background:var(--accent);border-radius:3px;width:{{ pd.pct }}%;transition:width .5s;"></div>
+    </div>
+  </div>
+
+  <!-- 프로젝트 환경 설정 -->
+  <div style="padding:.5rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;">
+    <span style="font-size:.72rem;color:var(--text-muted);">환경 설정</span>
+    <button class="node-link" style="font-size:10px;cursor:pointer;background:none;" onclick="openEnvVars('{{ pd.id }}')">설정</button>
+  </div>
+
+  <!-- Phase timeline for this project -->
+  {% if pd.phase_list %}
+  <div class="phase-timeline" style="padding:1rem 1.5rem .5rem;">
+    {% for ph in pd.phase_list %}
+    {% set tl_class = ph.state %}
+    <div class="tl-col">
+      <div class="tl-node {{ tl_class }}" title="{{ ph.label }} — {{ ph.completed }}/{{ ph.total }}">
+        {{ loop.index }}
+      </div>
+      <div class="tl-label">{{ ph.label }}</div>
+      <div class="tl-status" style="color:{% if ph.state == 'completed' %}var(--st-completed){% elif ph.state == 'in_progress' %}var(--accent){% elif ph.state == 'awaiting' %}var(--st-awaiting){% elif ph.state == 'failed' %}var(--danger){% else %}var(--text-muted){% endif %};">
+        {{ ph.pct }}%
+      </div>
+    </div>
+    {% if not loop.last %}
+    <div class="tl-arrow {% if ph.state == 'completed' %}done{% endif %}"></div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Phase cards -->
+  <div class="phase-grid" style="padding:1rem;">
+    <!-- Filter bar -->
+    <div class="filter-bar" style="grid-column:1/-1;">
+      <span style="font-size:.75rem;color:var(--text-muted);">필터:</span>
+      <button class="filter-btn active" onclick="filterPhases(this,'all','{{ pd.id }}')">전체</button>
+      <button class="filter-btn" onclick="filterPhases(this,'in_progress','{{ pd.id }}')">진행중</button>
+      <button class="filter-btn" onclick="filterPhases(this,'ready','{{ pd.id }}')">준비됨</button>
+      <button class="filter-btn" onclick="filterPhases(this,'blocked','{{ pd.id }}')">선행대기</button>
+      <button class="filter-btn" onclick="filterPhases(this,'awaiting','{{ pd.id }}')">승인대기</button>
+      <button class="filter-btn" onclick="filterPhases(this,'completed','{{ pd.id }}')">완료</button>
+      <button class="filter-btn" onclick="filterPhases(this,'pending','{{ pd.id }}')">대기</button>
+      <button class="filter-btn" onclick="filterPhases(this,'skipped','{{ pd.id }}')">비해당</button>
+    </div>
+
+    {% for ph in pd.phase_list %}
+    <div class="phase-card {% if ph.state == 'in_progress' %}active-phase{% endif %}"
+         data-phase-state="{{ ph.state }}"
+         data-proj="{{ pd.id }}">
+      <div class="phase-header">
+        <div class="phase-title">
+          <span>{{ ph.label }}</span>
+        </div>
+        <span class="phase-badge pb-{{ ph.state }}">
+          {% if ph.state == 'completed' %}완료
+          {% elif ph.state == 'in_progress' %}진행중
+          {% elif ph.state == 'awaiting' %}승인대기
+          {% elif ph.state == 'failed' %}실패
+          {% elif ph.state == 'blocked' %}선행대기
+          {% else %}대기{% endif %}
+        </span>
+        <span style="font-size:.75rem;color:var(--text-muted);">{{ ph.pct }}%</span>
+      </div>
+      <!-- 상태 카운트 -->
+      <div style="display:flex;gap:.35rem;margin-bottom:.5rem;flex-wrap:wrap;">
+        {% set ns = namespace(ready=0, progress=0, done=0, blocked=0, skipped=0, wait=0, invalid=0, failed=0) %}
+        {% for t in ph.tasks %}
+          {% if t.state == 'READY' %}{% set ns.ready = ns.ready + 1 %}
+          {% elif t.state == 'IN_PROGRESS' %}{% set ns.progress = ns.progress + 1 %}
+          {% elif t.state == 'COMPLETED' %}{% set ns.done = ns.done + 1 %}
+          {% elif t.state == 'BLOCKED' %}{% set ns.blocked = ns.blocked + 1 %}
+          {% elif t.state == 'SKIPPED' %}{% set ns.skipped = ns.skipped + 1 %}
+          {% elif t.state == 'INVALID' %}{% set ns.invalid = ns.invalid + 1 %}
+          {% elif t.state == 'FAILED' %}{% set ns.failed = ns.failed + 1 %}
+          {% else %}{% set ns.wait = ns.wait + 1 %}{% endif %}
+        {% endfor %}
+        {% if ns.progress > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:var(--st-progress-dim);color:var(--st-progress);">진행 {{ ns.progress }}</span>{% endif %}
+        {% if ns.ready > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:var(--st-ready-dim);color:var(--st-ready);">준비 {{ ns.ready }}</span>{% endif %}
+        {% if ns.done > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:var(--st-completed-dim);color:var(--st-completed);">완료 {{ ns.done }}</span>{% endif %}
+        {% if ns.invalid > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:rgba(245,158,11,.15);color:#f59e0b;">재실행 대기 {{ ns.invalid }}</span>{% endif %}
+        {% if ns.failed > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:rgba(248,113,113,.12);color:var(--danger);">실패 {{ ns.failed }}</span>{% endif %}
+        {% if ns.blocked > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:var(--st-blocked-dim);color:var(--st-muted);">선행대기 {{ ns.blocked }}</span>{% endif %}
+        {% if ns.wait > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:var(--st-muted-dim);color:var(--text-muted);">대기 {{ ns.wait }}</span>{% endif %}
+        {% if ns.skipped > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:var(--st-muted-dim);color:var(--text-muted);opacity:.5;">비해당 {{ ns.skipped }}</span>{% endif %}
+        {% set phase_tokens = namespace(total=0) %}
+        {% for t in ph.tasks %}{% set phase_tokens.total = phase_tokens.total + (t.total_tokens or 0) %}{% endfor %}
+        {% for q in ph.qa %}{% set phase_tokens.total = phase_tokens.total + (q.total_tokens or 0) %}{% endfor %}
+        {% if phase_tokens.total > 0 %}<span style="font-size:.63rem;padding:1px 6px;border-radius:4px;background:rgba(139,92,246,.1);color:#8b5cf6;">{{ "%.1fK"|format(phase_tokens.total / 1000) }}t</span>{% endif %}
+      </div>
+      <div class="phase-bar">
+        <div class="phase-bar-fill pf-{{ ph.state }}" style="width:{{ ph.pct }}%"></div>
+      </div>
+
+      <!-- Gate nodes -->
+      {% for g in ph.gates %}
+      <div class="gate-row {% if g.state == 'COMPLETED' %}approved{% endif %}" style="flex-direction:column;align-items:stretch;gap:6px;">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span>🔒</span>
+          <span style="flex:1;">{{ g.name }}</span>
+          {% if g.preview_url %}
+          <a href="{{ g.preview_url }}" target="_blank" style="margin-right:8px;color:var(--accent);font-size:11px;text-decoration:underline;">🔗 미리보기</a>
+          {% endif %}
+          {% if g.state == 'AWAITING_APPROVAL' %}
+          <button class="gate-approve-btn" onclick="approveGate('{{ g.id }}','{{ pd.id }}')" style="margin-right:4px;">승인</button>
+          <button class="gate-approve-btn" style="background:var(--st-failed-dim);color:var(--st-failed);" onclick="showFeedbackModal('{{ g.id }}','{{ pd.id }}')">수정 요청</button>
+          {% elif g.state == 'COMPLETED' %}
+          <span style="font-size:10px;color:var(--st-completed);">✓ 승인됨</span>
+          {% endif %}
+        </div>
+        {% if g.verification_badges %}
+        <div style="display:flex;gap:4px;flex-wrap:wrap;padding-left:20px;font-size:.55rem;">
+          {% for b in g.verification_badges %}
+          <span title="{{ b.detail }}" style="display:inline-flex;align-items:center;gap:2px;padding:2px 6px;border-radius:4px;
+            {% if b.state == 'pass' %}background:var(--st-completed-dim);color:var(--st-completed);border:1px solid var(--st-completed-ring);
+            {% elif b.state == 'warn' %}background:var(--st-awaiting-dim);color:var(--st-awaiting);border:1px solid var(--st-awaiting-ring);
+            {% elif b.state == 'fail' %}background:var(--st-failed-dim);color:var(--st-failed);border:1px solid var(--st-failed);
+            {% else %}background:var(--st-progress-dim);color:var(--st-progress);border:1px solid var(--st-progress);{% endif %}">
+            {% if b.state == 'pass' %}✓{% elif b.state == 'warn' %}⚠{% elif b.state == 'fail' %}✗{% else %}⟳{% endif %}
+            {{ b.label }}
+            <span style="opacity:.7;">· {{ b.detail }}</span>
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <!-- Task nodes (실행 대상) -->
+      <ul class="node-list">
+        {% for task in ph.tasks %}{% if task.state != 'SKIPPED' %}
+        {% set icon_cls =
+          'ni-completed' if task.state == 'COMPLETED' else
+          'ni-in_progress' if task.state == 'IN_PROGRESS' else
+          'ni-ready' if task.state == 'READY' else
+          'ni-awaiting' if task.state == 'AWAITING_APPROVAL' else
+          'ni-needs_human' if task.state == 'NEEDS_HUMAN' else
+          'ni-failed' if task.state == 'FAILED' else
+          'ni-failed' if task.state == 'INVALID' else
+          'ni-blocked' if task.state == 'BLOCKED' else 'ni-pending'
+        %}
+        {% set icon_char =
+          '✓' if task.state == 'COMPLETED' else
+          '▶' if task.state == 'IN_PROGRESS' else
+          '◆' if task.state == 'READY' else
+          '●' if task.state == 'AWAITING_APPROVAL' else
+          '!' if task.state == 'NEEDS_HUMAN' else
+          '✕' if task.state == 'FAILED' else
+          '⟲' if task.state == 'INVALID' else
+          '⊘' if task.state == 'BLOCKED' else '·'
+        %}
+        {% set state_label =
+          '완료' if task.state == 'COMPLETED' else
+          '진행중' if task.state == 'IN_PROGRESS' else
+          '준비됨' if task.state == 'READY' else
+          '승인대기' if task.state == 'AWAITING_APPROVAL' else
+          '개입필요' if task.state == 'NEEDS_HUMAN' else
+          '실패' if task.state == 'FAILED' else
+          '재실행 대기' if task.state == 'INVALID' else
+          '선행대기' if task.state == 'BLOCKED' else '대기'
+        %}
+        <li class="node-item" data-node-id="{{ task.id }}">
+          <div class="node-icon {{ icon_cls }}" data-node-icon="{{ task.id }}">{{ icon_char }}</div>
+          <div class="node-name {% if task.state in ('NOT_STARTED', 'BLOCKED') %}dim{% endif %}" style="display:flex;flex-direction:column;gap:1px;">
+            <span>{{ task.name }}</span>
+            {% if task.state == 'BLOCKED' and task.blocking_reason %}
+            <span style="font-size:.55rem;color:var(--text-muted);">{{ task.blocking_reason }}</span>
+            {% endif %}
+            {% if task.upstream_refs %}
+            <span style="font-size:.55rem;color:var(--text-muted);opacity:.75;">
+              기반:
+              {% for ref in task.upstream_refs[:3] %}
+              <span style="display:inline-block;padding:0 4px;border:1px solid var(--border);border-radius:3px;margin-right:2px;
+                {% if ref.state == 'COMPLETED' %}color:var(--st-completed);border-color:var(--st-completed);opacity:.7{% endif %}">{{ ref.name[:18] }}</span>
+              {% endfor %}
+              {% if task.upstream_refs|length > 3 %}<span>+{{ task.upstream_refs|length - 3 }}</span>{% endif %}
+            </span>
+            {% endif %}
+          </div>
+          <span style="font-size:.6rem;margin-left:auto;margin-right:.5rem;white-space:nowrap;
+            color:{% if task.state == 'READY' %}var(--st-ready){% elif task.state == 'IN_PROGRESS' %}var(--st-progress){% elif task.state == 'COMPLETED' %}var(--st-completed){% else %}var(--text-muted){% endif %};">
+            {{ state_label }}
+            {% if task.total_tokens and task.total_tokens > 0 %}
+            <span style="color:var(--text-muted);font-size:.55rem;margin-left:4px;">{{ "%.1fK"|format(task.total_tokens / 1000) }}t</span>
+            {% endif %}
+          </span>
+          {% if task.state in ('FAILED', 'SUSPENDED') %}
+          <span style="display:inline-flex;gap:3px;">
+            <button class="node-link" style="border-color:var(--danger);color:var(--danger);cursor:pointer;background:none;" onclick="showFailureReason('{{ task.id }}','{{ task.name }}')">사유</button>
+            <button class="node-link" style="border-color:var(--danger);color:var(--danger);cursor:pointer;background:none;" onclick="retryNode('{{ task.id }}','{{ pd.id }}','{{ task.name }}')">재시도</button>
+            <button class="node-link" style="border-color:var(--accent);color:var(--accent);cursor:pointer;background:none;" onclick="viewAndEdit('{{ task.id }}','{{ pd.id }}','{{ task.name }}')">수정</button>
+            <button class="node-link" style="border-color:var(--text-muted);color:var(--text-muted);cursor:pointer;background:none;" onclick="skipNode('{{ task.id }}','{{ pd.id }}','{{ task.name }}')">건너뛰기</button>
+          </span>
+          {% elif task.state == 'COMPLETED' %}
+            {% for qa in ph.qa %}{% if qa.task_pair_node_id == task.id and qa.state in ('FAILED', 'SUSPENDED', 'BLOCKED') %}
+          <button class="node-link" style="border-color:var(--warning);color:var(--warning);cursor:pointer;background:none;" onclick="retryNode('{{ task.id }}','{{ pd.id }}','{{ task.name }}')">QA 재검증</button>
+            {% endif %}{% endfor %}
+          {% elif task.state in ('BLOCKED', 'NOT_STARTED') %}
+          <button class="node-link" style="border-color:var(--text-muted);color:var(--text-muted);cursor:pointer;background:none;font-size:10px;" onclick="skipNode('{{ task.id }}','{{ pd.id }}','{{ task.name }}')">건너뛰기</button>
+          {% endif %}
+          {% if task.state == 'COMPLETED' %}
+          <a class="node-link" href="#"
+             onclick="viewArtifact('{{ task.id }}','{{ pd.id }}','{{ task.name }}'); return false;">보기</a>
+          <button class="node-link" style="border-color:var(--accent);color:var(--accent);cursor:pointer;background:none;" onclick="viewAndEdit('{{ task.id }}','{{ pd.id }}','{{ task.name }}')">수정</button>
+          {% endif %}
+        </li>
+        {% for qa in ph.qa %}{% if qa.task_pair_node_id == task.id and qa.state != 'SKIPPED' %}
+        {% set qa_icon =
+          'ni-completed' if qa.state == 'COMPLETED' else
+          'ni-in_progress' if qa.state == 'IN_PROGRESS' else
+          'ni-awaiting' if qa.state == 'AWAITING_APPROVAL' else
+          'ni-blocked' if qa.state == 'BLOCKED' else
+          'ni-ready' if qa.state == 'READY' else 'ni-qa'
+        %}
+        <li class="node-item" style="padding-left:1.5rem;">
+          <div class="node-icon {{ qa_icon }}" style="width:14px;height:14px;font-size:8px;">
+            {% if qa.state == 'COMPLETED' %}✓{% elif qa.state == 'IN_PROGRESS' %}▶{% else %}Q{% endif %}
+          </div>
+          <span class="node-name dim" style="font-size:.78rem;">{{ qa.name }}</span>
+          <span class="node-type-tag">QA</span>
+          {% if qa.total_tokens and qa.total_tokens > 0 %}
+          <span style="font-size:.5rem;color:var(--text-muted);margin-left:4px;">{{ "%.1fK"|format(qa.total_tokens / 1000) }}t</span>
+          {% endif %}
+        </li>
+        {% endif %}{% endfor %}
+        {% endif %}{% endfor %}
+
+        {% if not ph.tasks and not ph.gates %}
+        <li style="padding:.5rem 0;color:var(--text-muted);font-size:.78rem;">노드 없음</li>
+        {% endif %}
+      </ul>
+
+      <!-- 비해당 산출물 (접이식) -->
+      {% set skipped_tasks = ph.tasks|selectattr('state', 'equalto', 'SKIPPED')|list %}
+      {% if skipped_tasks %}
+      <details style="margin-top:4px;border-top:1px dashed var(--border);padding-top:6px;">
+        <summary style="font-size:.7rem;color:var(--text-muted);cursor:pointer;padding:4px 0;user-select:none;opacity:.6;">
+          비해당 산출물 ({{ skipped_tasks|length }}개)
+        </summary>
+        <ul class="node-list" style="opacity:.45;">
+          {% for task in skipped_tasks %}
+          <li class="node-item">
+            <div class="node-icon ni-skipped" style="width:14px;height:14px;font-size:8px;">—</div>
+            <span class="node-name" style="text-decoration:line-through;font-size:.78rem;">{{ task.name }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div style="text-align:center;padding:3rem;color:var(--text-muted);">
+  프로젝트가 없습니다. + 프로젝트 버튼으로 추가하세요.
+</div>
+{% endfor %}

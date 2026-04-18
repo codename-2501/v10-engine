@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/splitting.py
+# hypothesis_version: 6.141.1
+
+['-', 'DESIGN', 'GRP-\\d+\\s*(.*)', 'NodeSnapshot', 'TASK', '_design_split_group', '_domain_profile_data', '_ungrouped', 'admin', 'assigned_model', 'bo', 'booking', 'caregiver', 'carer', 'cnt', 'community', 'component_categories', 'dag_id', 'description', 'dm', 'elder', 'family', 'from_node_id', 'global_context', 'health', 'hospital', 'id', 'name', 'page_slugs', 'pet', 'qa_pair_node_id', 'rating', 'shop', 'sitter', 'sonnet', 'split_categories', 'storage_path', 'to_node_id', 'type', 'url', '|｜ ', '건강관리', '관리자', '기타', '돌봄', '메시지', '반려동물', '백오피스', '병원', '보호자', '쇼핑', '어르신', '예약', '요양보호사', '커뮤니티', '컴포넌트 라이브러리', '평가']

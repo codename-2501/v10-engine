@@ -1,0 +1,49 @@
+name: "오류코드 정의서"
+phase: DEVELOPMENT
+type: document
+model_preference: sonnet
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **오류코드 체계** — 오류코드 분류 체계(시스템/비즈니스/외부연동)와 코드 테이블(오류코드/HTTP상태코드/메시지/상세설명/대응방안) 작성. 최소 20개.
+  2. **에러 응답 형식** — 표준 에러 응답 JSON 스키마 정의. 필드(code, message, detail, timestamp, traceId) 명세. 다국어 에러 메시지 지원 구조.
+  3. **로깅 정책** — 로그 레벨(DEBUG/INFO/WARN/ERROR/FATAL) 정의, 로그 포맷, 로그 저장/보존 정책, 민감정보 마스킹 규칙 서술.
+
+  ### 품질 기준
+  - 오류코드가 체계적 번호 체계(예: SYS-001, BIZ-001)
+  - 에러 응답 형식에 JSON 예시 포함
+  - 로깅 정책에 민감정보 마스킹 규칙 포함
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 3개 필수 섹션 모두 작성 완료
+  □ 테이블 1개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ 오류코드 20개 이상
+  □ JSON 에러 응답 예시 포함
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":3,"tables":1,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "오류코드 체계"
+      - "에러 응답 형식"
+      - "로깅 정책"
+    required_tables: 1
+    min_chars: 2000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "오류코드가 체계적 번호 체계를 일관되게 따르는지 검증"
+    - "에러 응답 형식이 모든 API에서 통일적으로 사용 가능한지 검증"
+    - "로깅 정책이 민감정보 보호와 디버깅 효율성을 모두 고려하는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

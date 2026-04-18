@@ -1,0 +1,73 @@
+name: "InstantDB 권한 정책 설계"
+phase: DESIGN
+type: document
+model_preference: opus
+backend_requirement: "instantdb"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  InstantDB의 CEL(Common Expression Language) 기반 permission rules를
+  활용하여 엔티티 단위/속성 단위 행 수준 보안(row-level security)을
+  설계하세요. 클라이언트가 직접 DB에 접근하는 특성상 정책 누락은
+  즉시 데이터 노출로 이어지므로 **기본값은 deny**로 둡니다.
+
+  ### InstantDB CEL 권한 특성 반영 (MANDATORY)
+  - 각 엔티티에 view / create / update / delete 네 가지 작업별 정책
+  - `auth.id`, `auth.email`, `auth.ref` 등 인증 컨텍스트 사용
+  - `data.xxx` (대상 레코드), `newData.xxx` (쓰기 값) 참조
+  - `ruleParams` 로 외부 파라미터 주입
+  - 기본값: 모든 작업 `false` (deny-by-default)
+
+  ### 필수 섹션 (순서 준수)
+  1. **권한 매트릭스** — 엔티티 × 작업(CRUD+view) × 역할(public/user/owner/admin)
+     표로 정리, 각 셀에 허용/거부 및 조건 요약
+  2. **역할 정의** — public/user/owner/admin 각각의 인증 요건과 범위
+  3. **엔티티별 CEL 규칙** — 모든 엔티티에 대해 allow 객체(view/create/
+     update/delete) CEL 식 완성본 (permissions.ts 형태)
+  4. **속성 수준 보호** — 민감 속성 (예: email, phone)에 대한
+     view 제한 또는 masking 전략
+  5. **테스트 시나리오** — 각 역할별 요청 → 기대 결과(허용/거부) 최소 8개
+  6. **위협 모델링** — 가능한 공격 경로(IDOR, privilege escalation 등)와 완화책
+
+  ### 품질 기준
+  - 모든 엔티티에 네 가지 작업(view/create/update/delete) 모두 명시
+  - `auth.id == data.userId` 같은 owner 검증을 소유 개념이 있는 모든 곳에 적용
+  - admin 역할은 `auth.ref.$users.isAdmin` 등 구체 조건으로만 true
+  - 공개 데이터도 create/update는 반드시 인증 요구 (anonymous 쓰기 금지)
+  - 새로운 엔티티 추가 시 반드시 정책부터 작성하는 원칙 명시
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 권한 매트릭스 표 완성 (모든 엔티티 × 모든 작업)
+  □ 모든 엔티티에 allow.{view,create,update,delete} CEL 식 존재
+  □ CEL 식이 문법적으로 유효 (== != && || 연산자, auth/data/newData 접근)
+  □ 테스트 시나리오 8개 이상
+  □ 공개 쓰기(anonymous create/update) 경로 없음
+
+  <!-- SELF_CHECK: {"entities":N,"cel_rules":M,"scenarios":K,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "권한 매트릭스"
+      - "역할 정의"
+      - "엔티티별 CEL 규칙"
+      - "속성 수준 보호"
+      - "테스트 시나리오"
+      - "위협 모델링"
+    has_code_blocks: true
+    min_chars: 5000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "모든 엔티티에 4개 작업(view/create/update/delete) 정책 존재 검증"
+    - "auth.id로 소유자 검증이 owner 기반 엔티티에 적용되는지 검증"
+    - "anonymous create/update 경로가 존재하지 않는지 (모든 쓰기는 auth 요구) 검증"
+    - "민감 속성(password, token, apiKey 등)이 view 허용되지 않는지 검증"
+    - "CEL 식이 문법 오류 없이 즉시 적용 가능한지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

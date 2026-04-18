@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+*.log
+dist/
+build/
+*.egg-info/
+.venv/
+venv/
+node_modules/
+.next/
+*.node
+workspaces/
+
+# engine/skills/specs/build/ — BUILD phase 스킬 YAML (빌드 산출물 아님)
+!engine/skills/specs/build/
+!engine/skills/specs/build/**

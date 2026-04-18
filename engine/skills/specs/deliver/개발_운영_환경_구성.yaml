@@ -1,0 +1,53 @@
+name: "개발 운영 환경 구성"
+phase: DELIVER
+type: document
+model_preference: opus
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **환경 목록** — dev/staging/prod 환경별 구성을 테이블(환경/용도/URL/서버구성/DB/접근권한)로 정리. 환경 간 차이점 명시.
+  2. **환경변수 정의** — 환경별 환경변수를 테이블(변수명/설명/dev값/staging값/prod값/민감여부)로 정리. 시크릿 관리 방안 포함.
+  3. **의존성 설치** — 런타임 환경, 패키지 매니저, 의존성 목록, 설치 스크립트 기술.
+  4. **DB 초기화** — DB 생성, 스키마 마이그레이션, 시드 데이터, 초기화 스크립트 절차 서술.
+  5. **설정 파일** — 환경별 설정 파일 구조, 설정 관리 도구(Vault/Parameter Store 등), 설정 변경 절차 서술.
+
+  ### 품질 기준
+  - 환경별 차이점이 명확히 구분
+  - 민감 정보(시크릿) 관리 방안 포함
+  - DB 초기화 절차가 재현 가능
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 5개 필수 섹션 모두 작성 완료
+  □ 테이블 2개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ dev/staging/prod 3개 환경 정의
+  □ 시크릿 관리 방안 존재
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":5,"tables":2,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "환경 목록"
+      - "환경변수 정의"
+      - "의존성 설치"
+      - "DB 초기화"
+      - "설정 파일"
+    required_tables: 2
+    min_chars: 2000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "dev/staging/prod 환경이 명확히 구분되고 각 환경의 용도가 정의되어 있는지 검증"
+    - "환경변수 중 민감 정보가 적절한 시크릿 관리 도구로 보호되는지 검증"
+    - "환경 구성이 재현 가능한 수준으로 상세히 기술되어 있는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

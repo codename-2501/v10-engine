@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ~/Library/LaunchAgents/com.ai-si-platform.engine.plist
+  macOS launchd 자동 재시작 설정.
+
+  설치:
+    cp infra/com.ai-si-platform.engine.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.ai-si-platform.engine.plist
+
+  제거:
+    launchctl unload ~/Library/LaunchAgents/com.ai-si-platform.engine.plist
+    rm ~/Library/LaunchAgents/com.ai-si-platform.engine.plist
+
+  수동 시작/중지:
+    launchctl start com.ai-si-platform.engine
+    launchctl stop  com.ai-si-platform.engine
+
+  로그 확인:
+    tail -f /tmp/ai-si-platform.stdout.log
+    tail -f /tmp/ai-si-platform.stderr.log
+-->
+<plist version="1.0">
+<dict>
+  <!-- 서비스 식별자 -->
+  <key>Label</key>
+  <string>com.ai-si-platform.engine</string>
+
+  <!-- 실행 명령: uvicorn api.server:app -->
+  <key>ProgramArguments</key>
+  <array>
+    <!-- Python 인터프리터 경로 (venv 사용 시 절대 경로로 수정) -->
+    <string>/usr/local/bin/python3</string>
+    <string>-m</string>
+    <string>uvicorn</string>
+    <string>api.server:app</string>
+    <string>--host</string>
+    <string>0.0.0.0</string>
+    <string>--port</string>
+    <string>8000</string>
+    <string>--workers</string>
+    <string>1</string>
+    <string>--log-level</string>
+    <string>info</string>
+  </array>
+
+  <!-- 작업 디렉토리 (프로젝트 루트로 수정) -->
+  <key>WorkingDirectory</key>
+  <string>/Users/codename/Downloads/v8</string>
+
+  <!-- 환경 변수 -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>ENV</key>
+    <string>production</string>
+    <key>DATABASE_URL</key>
+    <string>sqlite:///platform.db</string>
+    <!-- API 키는 보안상 별도 .env 파일 또는 macOS Keychain 사용 권장 -->
+    <!-- <key>ANTHROPIC_API_KEY</key> -->
+    <!-- <string>sk-ant-…</string> -->
+  </dict>
+
+  <!-- 부팅 시 자동 시작 -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- 프로세스 종료 시 자동 재시작 -->
+  <key>KeepAlive</key>
+  <dict>
+    <!-- 비정상 종료(exit code ≠ 0)만 재시작 -->
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <!-- 재시작 대기 시간(초): 연속 충돌 방지 -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <!-- 표준 출력/에러 로그 -->
+  <key>StandardOutPath</key>
+  <string>/tmp/ai-si-platform.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/ai-si-platform.stderr.log</string>
+
+  <!-- 프로세스 우선순위 (0=기본, -20=최고, 20=최저) -->
+  <key>Nice</key>
+  <integer>0</integer>
+
+  <!-- 소프트 리소스 제한 -->
+  <key>SoftResourceLimits</key>
+  <dict>
+    <!-- 열린 파일 디스크립터 최대값 -->
+    <key>NumberOfFiles</key>
+    <integer>4096</integer>
+  </dict>
+</dict>
+</plist>

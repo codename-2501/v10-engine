@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/visual/heuristics.py
+# hypothesis_version: 6.141.1
+
+[0.5, 100, 128, 200, '#', '<', '<a[^>]*>\\s*</a>', '<meta', 'absolute_overuse', 'low_contrast_text', 'no_viewport_meta', 'viewport', 'z-index\\s*:\\s*(\\d+)', 'z_index_war']

@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/executor_context.py
+# hypothesis_version: 6.141.1
+
+[200, 500, 1500, 2000, 2950, 3000, 3900, 4000, 5000, '\n... (생략)\n', '\n... (일부 생략)\n', '\n... (일부 생략) ...\n', ' → ', '### 감지된 결함:', '### 디자인 불일치:', '### 실패한 검증 항목:', '<[^>]+>', 'BUILD', 'FAIL', 'NodeSnapshot', 'Product Backlog', 'TASK', 'UI', 'User Flow', '\\s+', 'check', 'checks', 'claude-sonnet-4-6', 'description', 'design_issues', 'detail', 'failures', 'message', 'name', 'node_type', 'pass', 'phase', 'sample', 'storage_path', 'structural_failures', 'unknown', 'verdict', '기능 백로그', '디자인', '레시피', '비즈니스 규칙', '사용자 흐름도', '서비스 운영 정책서', '시안', '운영 정책', '조립', '주요 기능 요구사항', '컴포넌트', '페이지', '프론트엔드', '화면']

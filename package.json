@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@axe-core/playwright": "^4.11.1",
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.59.1",
+    "pngjs": "^7.0.0"
+  }
+}

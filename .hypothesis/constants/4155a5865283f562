@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/two_phase.py
+# hypothesis_version: 6.141.1
+
+[1000, 8000, '\\s*\\(.*?\\)\\s*', 'required_headings', 'semantic', 'structural', 'validation', '프론트엔드 공통 인프라', '프론트엔드 컴포넌트 구현']

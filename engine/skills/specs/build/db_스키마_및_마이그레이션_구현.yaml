@@ -1,0 +1,58 @@
+name: "DB 스키마 및 마이그레이션 구현"
+phase: BUILD
+type: code
+model_preference: sonnet
+backend_requirement: "sql"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  데이터 모델 설계서(ERD)를 기반으로 DB 스키마와 마이그레이션을 구현하세요.
+
+  ### 필수 섹션 (순서 준수)
+  1. **스키마 정의** — 전체 테이블 CREATE 문, 컬럼 타입, 제약조건 (전체 SQL)
+  2. **인덱스 전략** — 쿼리 패턴 기반 인덱스 정의, 복합 인덱스, 부분 인덱스
+  3. **마이그레이션 스크립트** — 버전별 UP/DOWN 마이그레이션 SQL
+  4. **시드 데이터** — 초기 데이터, 코드 테이블, 권한 테이블 시드 SQL
+  5. **쿼리 최적화** — 주요 쿼리 EXPLAIN 분석, 성능 고려사항
+
+  ### 품질 기준
+  - 정규화 3NF 이상 (의도적 비정규화 시 사유 명시)
+  - 외래키 제약조건 필수
+  - NOT NULL 기본, NULL 허용 시 사유 명시
+  - 타임스탬프 컬럼 (created_at, updated_at) 필수
+  - soft delete 패턴 (deleted_at) 적용
+  - 마이그레이션 롤백 가능 (DOWN 필수)
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 5개 필수 섹션 모두 작성 완료
+  □ 코드 블록 5개 이상 (SQL)
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ 모든 테이블에 PK, created_at, updated_at 존재
+  □ 외래키 제약조건 누락 없음
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":5,"code_blocks":5,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "스키마 정의"
+      - "인덱스 전략"
+      - "마이그레이션 스크립트"
+      - "시드 데이터"
+      - "쿼리 최적화"
+    has_code_blocks: true
+    min_chars: 5000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "모든 테이블에 PRIMARY KEY가 정의되어 있는지 검증"
+    - "외래키 관계가 ERD와 일치하는지 검증"
+    - "마이그레이션 DOWN 스크립트가 UP의 역연산인지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

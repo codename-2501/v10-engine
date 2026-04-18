@@ -1,0 +1,680 @@
+{% extends "base.html" %}
+{% block title %}Flow — {{ engagement.name }}{% endblock %}
+{% block page_title %}Flow — {{ engagement.name }}{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.11.4/dist/style.css">
+<style>
+  :root {
+    --flow-bg: #0f1218;
+    --flow-surface: rgba(255,255,255,0.03);
+    --flow-border: rgba(255,255,255,0.08);
+    --st-completed: #22c55e;
+    --st-in-progress: #3b82f6;
+    --st-ready: #06b6d4;
+    --st-awaiting: #f59e0b;
+    --st-needs-human: #ef4444;
+    --st-blocked: #6b7280;
+    --st-invalid: #b45309;
+    --st-suspended: #f97316;
+    --st-failed: #dc2626;
+    --st-skipped: #374151;
+    --st-not-started: #9ca3af;
+  }
+  #flow-wrap {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 12px;
+    height: calc(100vh - 56px - 1rem);
+  }
+  #flow-canvas {
+    background: var(--flow-bg);
+    border: 1px solid var(--flow-border);
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .react-flow__node { font-family: 'Pretendard', sans-serif; }
+  .node-card {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1.5px solid var(--flow-border);
+    min-width: 180px;
+    max-width: 240px;
+    background: var(--flow-surface);
+    color: #e8eaf0;
+    font-size: 12px;
+    transition: all 0.2s;
+  }
+  .node-card:hover { filter: brightness(1.2); border-color: rgba(255,255,255,0.2); }
+  .node-card .nc-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 4px;
+  }
+  .node-card .nc-type {
+    font-size: 9px; padding: 1px 6px; border-radius: 99px;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
+  }
+  .node-card .nc-state {
+    font-size: 9px; padding: 1px 6px; border-radius: 99px;
+    font-weight: 600;
+  }
+  .node-card .nc-name { font-weight: 600; font-size: 12px; line-height: 1.3; }
+  .node-card .nc-meta {
+    display: flex; gap: 8px; font-size: 10px;
+    color: rgba(255,255,255,0.5); margin-top: 6px;
+  }
+  .node-card[data-state="COMPLETED"] { border-color: var(--st-completed); }
+  .node-card[data-state="IN_PROGRESS"] {
+    border-color: var(--st-in-progress);
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.25);
+    animation: pulse-blue 1.5s ease-in-out infinite;
+  }
+  .node-card[data-state="READY"] { border-color: var(--st-ready); }
+  .node-card[data-state="AWAITING_APPROVAL"] {
+    border-color: var(--st-awaiting);
+    box-shadow: 0 0 0 2px rgba(245,158,11,0.25);
+  }
+  .node-card[data-state="NEEDS_HUMAN"] { border-color: var(--st-needs-human); }
+  .node-card[data-state="BLOCKED"] { border-color: var(--st-blocked); opacity: 0.65; }
+  .node-card[data-state="INVALID"] {
+    border-color: var(--st-invalid);
+    animation: pulse-red 1.5s ease-in-out infinite;
+  }
+  .node-card[data-state="SUSPENDED"] {
+    border-color: var(--st-suspended);
+    box-shadow: 0 0 0 2px rgba(249,115,22,0.2);
+  }
+  .node-card[data-state="FAILED"] { border-color: var(--st-failed); }
+  .node-card[data-state="SKIPPED"] { opacity: 0.4; }
+  .node-card[data-state="NOT_STARTED"] { border-color: var(--st-not-started); opacity: 0.8; }
+  .node-card[data-pending="1"] {
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.35);
+    animation: pulse-red 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse-blue {
+    0%,100% { box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
+    50%     { box-shadow: 0 0 0 5px rgba(59,130,246,0.45); }
+  }
+  @keyframes pulse-red {
+    0%,100% { box-shadow: 0 0 0 2px rgba(239,68,68,0.35); }
+    50%     { box-shadow: 0 0 0 5px rgba(239,68,68,0.55); }
+  }
+
+  #side-panel {
+    background: var(--flow-surface);
+    border: 1px solid var(--flow-border);
+    border-radius: 10px;
+    padding: 16px;
+    overflow-y: auto;
+    color: #e8eaf0;
+    font-size: 13px;
+  }
+  #side-panel h3 { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
+  #side-panel .sp-row {
+    display: flex; justify-content: space-between;
+    padding: 6px 0; border-bottom: 1px solid var(--flow-border);
+  }
+  #side-panel .sp-label { color: rgba(255,255,255,0.5); font-size: 11px; }
+  #side-panel .sp-value { font-weight: 500; }
+  #side-panel pre {
+    background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px;
+    font-size: 11px; max-height: 320px; overflow: auto;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .empty-panel {
+    color: rgba(255,255,255,0.4);
+    text-align: center; padding: 40px 20px; font-size: 12px;
+  }
+
+  #flow-toolbar {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 14px; background: var(--flow-surface);
+    border: 1px solid var(--flow-border); border-radius: 10px 10px 0 0;
+    border-bottom: none;
+  }
+  #flow-toolbar input[type="search"] {
+    padding: 5px 10px; border-radius: 6px;
+    background: rgba(0,0,0,0.3); color: #e8eaf0;
+    border: 1px solid var(--flow-border); min-width: 200px;
+  }
+  #flow-toolbar select {
+    padding: 5px 8px; border-radius: 6px;
+    background: rgba(0,0,0,0.3); color: #e8eaf0;
+    border: 1px solid var(--flow-border);
+  }
+  #flow-toolbar .tb-badge {
+    padding: 3px 8px; border-radius: 99px; font-size: 11px;
+    background: rgba(34,197,94,0.15); color: var(--st-completed);
+    border: 1px solid rgba(34,197,94,0.3);
+  }
+  #flow-toolbar .tb-badge.ws-off {
+    background: rgba(239,68,68,0.15); color: var(--st-failed);
+    border-color: rgba(239,68,68,0.3);
+  }
+</style>
+{% endblock %}
+
+{% block page_actions %}
+<a href="/engagements/{{ engagement.id }}/dag" class="btn">전통 SVG 뷰</a>
+<a href="/engagements/{{ engagement.id }}" class="btn">상세 대시보드</a>
+{% endblock %}
+
+{% block content %}
+<div id="flow-toolbar">
+  <input id="search" type="search" placeholder="노드 이름 검색...">
+  <select id="phase-filter">
+    <option value="">전체 Phase</option>
+    <option value="DEFINE">DEFINE</option>
+    <option value="DESIGN">DESIGN</option>
+    <option value="BUILD">BUILD</option>
+    <option value="VERIFY">VERIFY</option>
+    <option value="DELIVER">DELIVER</option>
+  </select>
+  <select id="state-filter">
+    <option value="">전체 상태</option>
+    <option value="IN_PROGRESS">IN_PROGRESS</option>
+    <option value="COMPLETED">COMPLETED</option>
+    <option value="SUSPENDED">SUSPENDED</option>
+    <option value="INVALID">INVALID</option>
+    <option value="FAILED">FAILED</option>
+    <option value="NEEDS_HUMAN">NEEDS_HUMAN</option>
+  </select>
+  <span class="tb-badge" id="ws-status">● 실시간 연결중...</span>
+  <span style="margin-left:auto;color:rgba(255,255,255,0.5);font-size:11px;">
+    마우스 휠 줌 · 드래그 패닝 · 노드 클릭 상세
+  </span>
+</div>
+
+<div id="flow-wrap">
+  <div id="flow-canvas"></div>
+  <div id="side-panel">
+    <div class="empty-panel">
+      왼쪽 그래프에서<br>노드를 클릭하면<br>상세 정보가 표시됩니다.
+    </div>
+  </div>
+</div>
+
+<!-- React Flow 의존성 (CDN UMD) -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script>
+  // Jinja → JS 데이터 주입
+  window.__ENGAGEMENT_ID__ = "{{ engagement.id }}";
+  window.__NODES__ = {{ nodes_json | safe }};
+  window.__EDGES__ = {{ edges_json | safe }};
+</script>
+
+{% raw %}
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+const {
+  ReactFlow, Background, Controls, MiniMap, Handle, Position,
+  useNodesState, useEdgesState, MarkerType,
+} = window.ReactFlow;
+
+// ────────────────────────────────────────────
+// 레이아웃: Phase 세로 컬럼, 노드는 Phase 안에서 세로 배치
+// ────────────────────────────────────────────
+const PHASE_ORDER = ["DEFINE", "DESIGN", "BUILD", "VERIFY", "DELIVER"];
+const PHASE_X = { DEFINE: 40, DESIGN: 380, BUILD: 720, VERIFY: 1060, DELIVER: 1400 };
+const PHASE_COLOR = {
+  DEFINE: "#a78bfa", DESIGN: "#60a5fa", BUILD: "#34d399",
+  VERIFY: "#fbbf24", DELIVER: "#f472b6"
+};
+const NODE_W = 240, ROW_H = 80;
+
+function layoutNodes(rawNodes) {
+  // Phase 별로 묶고 각 Phase 안에서 priority 순으로 세로 배치
+  const byPhase = {};
+  for (const n of rawNodes) {
+    if (n.state === "SKIPPED") continue;  // SKIPPED 는 기본 숨김
+    if (!byPhase[n.phase]) byPhase[n.phase] = [];
+    byPhase[n.phase].push(n);
+  }
+  const result = [];
+  PHASE_ORDER.forEach(phase => {
+    const list = byPhase[phase] || [];
+    list.forEach((n, idx) => {
+      result.push({
+        id: n.id,
+        type: "stateful",
+        position: { x: PHASE_X[phase] || 0, y: 60 + idx * ROW_H },
+        data: { ...n, phaseColor: PHASE_COLOR[phase] || "#888" },
+      });
+    });
+  });
+  return result;
+}
+
+// ────────────────────────────────────────────
+// 커스텀 노드 컴포넌트
+// ────────────────────────────────────────────
+function StatefulNode({ data }) {
+  const stateColor = {
+    COMPLETED: "#22c55e", IN_PROGRESS: "#3b82f6", READY: "#06b6d4",
+    AWAITING_APPROVAL: "#f59e0b", NEEDS_HUMAN: "#ef4444",
+    BLOCKED: "#6b7280", INVALID: "#b45309", SUSPENDED: "#f97316",
+    FAILED: "#dc2626", NOT_STARTED: "#9ca3af", SKIPPED: "#374151",
+  }[data.state] || "#888";
+  return (
+    <div className="node-card" data-state={data.state} data-pending={data.invalidation_pending || 0}>
+      <Handle type="target" position={Position.Left} style={{ background: "#555" }} />
+      <div className="nc-head">
+        <span className="nc-type" style={{ color: data.phaseColor }}>
+          {data.phase} · {data.node_type}
+        </span>
+        <span className="nc-state" style={{
+          background: stateColor + "22", color: stateColor
+        }}>{data.state}</span>
+      </div>
+      <div className="nc-name">{data.name}</div>
+      <div className="nc-meta">
+        {(data.retry_count > 0) && <span>retry {data.retry_count}</span>}
+        {(data.stall_count > 0) && <span>stall {data.stall_count}</span>}
+        {data.invalidation_pending ? <span style={{color:"#ef4444"}}>⚠ cascade</span> : null}
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: "#555" }} />
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// 사이드 패널 (실시간 상세 진행)
+// ────────────────────────────────────────────
+function SidePanel({ node }) {
+  const [detail, setDetail] = useState(null);
+  const [activity, setActivity] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // 노드 변경 시 상세 fetch + 진행 중이면 2초 polling (activity 포함)
+  useEffect(() => {
+    if (!node) { setDetail(null); setActivity(null); return; }
+    let stopped = false;
+    async function fetchAll() {
+      try {
+        setLoading(true);
+        const [r1, r2] = await Promise.all([
+          fetch(`/api/v1/nodes/${node.id}/progress`),
+          fetch(`/api/v1/nodes/${node.id}/activity`),
+        ]);
+        if (r1.ok) { const d = await r1.json(); if (!stopped) setDetail(d); }
+        if (r2.ok) { const a = await r2.json(); if (!stopped) setActivity(a); }
+      } catch (e) {} finally { setLoading(false); }
+    }
+    fetchAll();
+    const isActive = node?.data?.state === "IN_PROGRESS" || node?.data?.invalidation_pending;
+    const pollMs = isActive ? 2000 : 5000;
+    const poll = setInterval(() => {
+      if (stopped) return;
+      fetchAll();
+    }, pollMs);
+    return () => { stopped = true; clearInterval(poll); };
+  }, [node?.id, node?.data?.state]);
+
+  if (!node) {
+    return <div className="empty-panel">왼쪽 그래프에서<br/>노드를 클릭하면<br/>상세 정보가 표시됩니다.</div>;
+  }
+
+  const d = detail || {};
+  const progress = d.progress;
+  const verdict = d.verdict;
+  const events = d.recent_events || [];
+  const failures = d.failures || [];
+
+  return (
+    <div>
+      <h3 style={{marginBottom:6}}>{node.data.name}</h3>
+      <div style={{fontSize:"11px",color:"rgba(255,255,255,0.5)",marginBottom:12}}>
+        {node.data.phase} · {node.data.node_type} · {node.id.substring(0,8)}
+        {loading && <span style={{marginLeft:8,opacity:0.5}}>· 로딩</span>}
+      </div>
+
+      {/* 상태 */}
+      <div className="sp-row">
+        <span className="sp-label">State</span>
+        <span className="sp-value" style={{color: {
+          COMPLETED:"#22c55e",IN_PROGRESS:"#3b82f6",SUSPENDED:"#f97316",
+          INVALID:"#b45309",FAILED:"#dc2626",
+        }[node.data.state] || "#e8eaf0"}}>{node.data.state}</span>
+      </div>
+      {node.data.retry_count > 0 && (
+        <div className="sp-row"><span className="sp-label">Retry</span><span className="sp-value">{node.data.retry_count}/3</span></div>
+      )}
+      {node.data.stall_count > 0 && (
+        <div className="sp-row"><span className="sp-label">Stall</span><span className="sp-value">{node.data.stall_count}</span></div>
+      )}
+      {d.invalidation_pending && (
+        <div className="sp-row"><span className="sp-label">Cascade</span>
+          <span className="sp-value" style={{color:"#ef4444"}}>⚠ Pending</span></div>
+      )}
+
+      {/* 현재 작업 (자연어) */}
+      {activity && activity.current_action && (
+        <div style={{
+          padding:12, marginTop:12, marginBottom:4,
+          background:"linear-gradient(90deg,rgba(59,130,246,0.18),rgba(59,130,246,0.05))",
+          border:"1px solid rgba(59,130,246,0.35)", borderRadius:8, fontSize:13,
+        }}>
+          <div style={{color:"#60a5fa", marginBottom:4, fontSize:10,
+                       textTransform:"uppercase", letterSpacing:0.5, fontWeight:700}}>
+            지금 작업 중
+            {activity.last_activity_seconds !== null && (
+              <span style={{opacity:0.6, marginLeft:8, textTransform:"none", letterSpacing:0}}>
+                · {activity.last_activity_seconds}초 전
+              </span>
+            )}
+          </div>
+          <div style={{color:"#e8eaf0", fontWeight:500}}>
+            {activity.current_action}
+          </div>
+        </div>
+      )}
+
+      {/* 진행률 (chunked 작업) */}
+      {progress && (
+        <div style={{marginTop:14,padding:12,background:"rgba(59,130,246,0.08)",
+                     border:"1px solid rgba(59,130,246,0.25)",borderRadius:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:12}}>
+            <span style={{color:"rgba(255,255,255,0.7)"}}>진행률 ({progress.kind.replace("chunked_","")})</span>
+            <span style={{fontWeight:600,color:"#3b82f6"}}>
+              {progress.completed} / {progress.total}
+            </span>
+          </div>
+          <div style={{height:6,background:"rgba(255,255,255,0.08)",borderRadius:3,overflow:"hidden"}}>
+            <div style={{
+              height:"100%",
+              width:`${Math.min(100, 100*progress.completed/(progress.total||1))}%`,
+              background:"linear-gradient(90deg,#3b82f6,#60a5fa)",
+              transition:"width 0.3s"
+            }}/>
+          </div>
+          {progress.items_done && progress.items_done.length > 0 && (
+            <details style={{marginTop:8}}>
+              <summary style={{cursor:"pointer",fontSize:11,color:"rgba(255,255,255,0.5)"}}>
+                완료 항목 {progress.items_done.length}개 보기
+              </summary>
+              <div style={{marginTop:6,fontSize:10,color:"rgba(255,255,255,0.7)",
+                           maxHeight:120,overflow:"auto",
+                           display:"grid",gridTemplateColumns:"1fr 1fr",gap:3}}>
+                {progress.items_done.map((item, i) => (
+                  <span key={i} style={{padding:"2px 6px",background:"rgba(34,197,94,0.12)",
+                                         color:"#22c55e",borderRadius:3}}>
+                    ✓ {item.length > 20 ? item.substring(0,20)+"…" : item}
+                  </span>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* QA verdict 체크리스트 */}
+      {verdict && (verdict.categories || verdict.score !== undefined) && (
+        <div style={{marginTop:14}}>
+          <div style={{fontSize:12,fontWeight:600,marginBottom:6,
+                       color:"rgba(255,255,255,0.8)"}}>
+            QA 판정
+            {verdict.score !== undefined && (
+              <span style={{marginLeft:8,padding:"1px 8px",borderRadius:99,
+                background: verdict.score >= 50 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)",
+                color: verdict.score >= 50 ? "#22c55e" : "#ef4444"}}>
+                score {verdict.score}
+              </span>
+            )}
+            {verdict.summary && (
+              <span style={{marginLeft:6,fontSize:10,
+                color: verdict.summary === "PASS" ? "#22c55e" : "#ef4444"}}>
+                {verdict.summary}
+              </span>
+            )}
+          </div>
+          {(verdict.categories || []).map((cat, i) => (
+            <div key={i} style={{marginBottom:10,padding:8,background:"rgba(0,0,0,0.15)",
+                                  borderRadius:6,fontSize:11}}>
+              <div style={{fontWeight:600,marginBottom:4,
+                color: cat.result === "PASS" ? "#22c55e" : "#ef4444"}}>
+                {cat.result === "PASS" ? "✓" : "✗"} {cat.name}
+              </div>
+              {(cat.issues || []).slice(0, 5).map((iss, j) => (
+                <div key={j} style={{padding:"3px 0",display:"flex",gap:6,alignItems:"flex-start"}}>
+                  <span style={{
+                    fontSize:9,padding:"1px 5px",borderRadius:3,fontWeight:600,
+                    background: iss.severity==="CRITICAL" ? "rgba(239,68,68,0.2)" :
+                                 iss.severity==="HIGH" ? "rgba(245,158,11,0.2)" : "rgba(107,114,128,0.2)",
+                    color: iss.severity==="CRITICAL" ? "#ef4444" :
+                           iss.severity==="HIGH" ? "#f59e0b" : "#9ca3af"
+                  }}>{iss.severity}</span>
+                  <span style={{flex:1,color:"rgba(255,255,255,0.75)"}}>{iss.title}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 최근 실패 사유 */}
+      {failures.length > 0 && (
+        <div style={{marginTop:14}}>
+          <div style={{fontSize:12,fontWeight:600,marginBottom:6,color:"#ef4444"}}>
+            최근 실패 ({failures.length})
+          </div>
+          {failures.slice(-3).map((f, i) => (
+            <div key={i} style={{fontSize:10,padding:6,marginBottom:4,
+                                  background:"rgba(239,68,68,0.08)",borderRadius:4,
+                                  borderLeft:"2px solid rgba(239,68,68,0.4)"}}>
+              <span style={{opacity:0.6}}>#{f.attempt || i+1}</span>
+              {" "}{typeof f === "string" ? f : (f.reason || JSON.stringify(f)).substring(0,150)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 실시간 이벤트 로그 (logs/server.out tail) */}
+      {activity && activity.recent_events && activity.recent_events.length > 0 && (
+        <details style={{marginTop:14}} open>
+          <summary style={{cursor:"pointer", fontSize:12, fontWeight:600,
+                           color:"rgba(255,255,255,0.7)", userSelect:"none"}}>
+            이벤트 피드 ({activity.recent_events.length})
+          </summary>
+          <div style={{marginTop:8, maxHeight:280, overflow:"auto"}}>
+            {activity.recent_events.map((ev, i) => (
+              <div key={i} style={{padding:"5px 8px", marginBottom:4,
+                background:"rgba(0,0,0,0.25)", borderRadius:4,
+                borderLeft:`2px solid ${
+                  ev.event.includes("fail") || ev.event.includes("stall") ? "#ef4444" :
+                  ev.event.includes("pass") || ev.event.endsWith("_ok") || ev.event.includes("complete") ? "#22c55e" :
+                  ev.event.includes("retry") || ev.event.includes("transient") ? "#f59e0b" :
+                  "#60a5fa"
+                }`}}>
+                <div style={{fontSize:10, fontWeight:700, color:"#60a5fa", fontFamily:"monospace"}}>
+                  {ev.event}
+                </div>
+                <div style={{fontSize:10, color:"rgba(255,255,255,0.55)", marginTop:2,
+                             wordBreak:"break-all"}}>
+                  {ev.summary.substring(0, 160)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {/* 집계 이벤트 카운트 (event_counts 테이블) */}
+      {events.length > 0 && (
+        <details style={{marginTop:8}}>
+          <summary style={{cursor:"pointer", fontSize:11, color:"rgba(255,255,255,0.5)"}}>
+            집계 카운트 ({events.length})
+          </summary>
+          <div style={{marginTop:6}}>
+            {events.slice(0, 8).map((ev, i) => (
+              <div key={i} style={{fontSize:10,padding:"3px 0",
+                borderBottom:"1px dashed rgba(255,255,255,0.08)",
+                display:"flex",justifyContent:"space-between"}}>
+                <span style={{color:"rgba(255,255,255,0.65)"}}>{ev.event_name}</span>
+                <span style={{color:"rgba(255,255,255,0.35)"}}>×{ev.count}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {/* 연결된 노드 */}
+      {(node.data.task_pair_node_id || node.data.qa_pair_node_id) && (
+        <div className="sp-row" style={{marginTop:12}}>
+          <span className="sp-label">Pair 노드</span>
+          <span className="sp-value" style={{fontSize:10,fontFamily:"monospace"}}>
+            {(node.data.task_pair_node_id || node.data.qa_pair_node_id || "").substring(0,8)}
+          </span>
+        </div>
+      )}
+
+      <div style={{marginTop:16,display:"flex",gap:8,flexWrap:"wrap"}}>
+        <a href={`/engagements/${window.__ENGAGEMENT_ID__}?node=${node.id}`}
+           className="btn" style={{fontSize:"11px",padding:"4px 10px"}}>대시보드 보기</a>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// App
+// ────────────────────────────────────────────
+function App({ onNodeSelect }) {
+  const initialNodes = useMemo(() => layoutNodes(window.__NODES__), []);
+  const initialEdges = useMemo(() => window.__EDGES__.map((e, i) => {
+    // cascade 대상 엣지는 빨간 애니메이션
+    const toNode = window.__NODES__.find(n => n.id === e.to_node_id);
+    const isCascade = toNode?.invalidation_pending === 1;
+    return {
+      id: `e-${i}`,
+      source: e.from_node_id, target: e.to_node_id,
+      animated: isCascade || false,
+      style: {
+        stroke: isCascade ? "#ef4444" : "rgba(255,255,255,0.3)",
+        strokeWidth: isCascade ? 2 : 1.2,
+      },
+      markerEnd: { type: MarkerType.ArrowClosed, color: isCascade ? "#ef4444" : "rgba(255,255,255,0.4)" },
+    };
+  }), []);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [search, setSearch] = useState("");
+  const [phaseFilter, setPhaseFilter] = useState("");
+  const [stateFilter, setStateFilter] = useState("");
+  const wsRef = useRef(null);
+
+  const nodeTypes = useMemo(() => ({ stateful: StatefulNode }), []);
+
+  // WebSocket 실시간 업데이트
+  useEffect(() => {
+    const wsProto = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${wsProto}://${window.location.host}/ws/engagements/${window.__ENGAGEMENT_ID__}/stream`);
+    wsRef.current = ws;
+    const statusEl = document.getElementById("ws-status");
+    ws.onopen = () => { if (statusEl) { statusEl.textContent = "● 실시간"; statusEl.classList.remove("ws-off"); } };
+    ws.onclose = () => { if (statusEl) { statusEl.textContent = "● 연결 끊김"; statusEl.classList.add("ws-off"); } };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "NodeStateChanged") {
+          const { node_id, to } = msg.payload || {};
+          if (!node_id || !to) return;
+          setNodes(prev => prev.map(n =>
+            n.id === node_id ? { ...n, data: { ...n.data, state: to } } : n
+          ));
+        }
+      } catch (e) { /* ignore */ }
+    };
+    return () => ws.close();
+  }, [setNodes]);
+
+  // 필터 적용
+  useEffect(() => {
+    setNodes(prev => prev.map(n => ({
+      ...n,
+      hidden: (
+        (search && !n.data.name.toLowerCase().includes(search.toLowerCase())) ||
+        (phaseFilter && n.data.phase !== phaseFilter) ||
+        (stateFilter && n.data.state !== stateFilter)
+      )
+    })));
+  }, [search, phaseFilter, stateFilter, setNodes]);
+
+  // 툴바 이벤트 바인딩 (DOM 직접 — Babel 없이 간단히)
+  useEffect(() => {
+    const s = document.getElementById("search");
+    const p = document.getElementById("phase-filter");
+    const st = document.getElementById("state-filter");
+    if (s) s.oninput = (e) => setSearch(e.target.value);
+    if (p) p.onchange = (e) => setPhaseFilter(e.target.value);
+    if (st) st.onchange = (e) => setStateFilter(e.target.value);
+  }, []);
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onNodeClick={(_, node) => onNodeSelect && onNodeSelect(node)}
+      onPaneClick={() => onNodeSelect && onNodeSelect(null)}
+      nodeTypes={nodeTypes}
+      fitView
+      minZoom={0.15}
+      maxZoom={2.5}
+      proOptions={{ hideAttribution: true }}
+    >
+      <Background color="rgba(255,255,255,0.05)" gap={24} />
+      <Controls />
+      <MiniMap
+        nodeColor={(n) => ({
+          COMPLETED:"#22c55e",IN_PROGRESS:"#3b82f6",READY:"#06b6d4",
+          SUSPENDED:"#f97316",INVALID:"#b45309",FAILED:"#dc2626",
+        })[n.data?.state] || "#555"}
+        maskColor="rgba(0,0,0,0.6)"
+      />
+    </ReactFlow>
+  );
+}
+
+// ────────────────────────────────────────────
+// 루트 컴포넌트 — App + SidePanel 동시 마운트
+// ────────────────────────────────────────────
+function Root() {
+  const [selected, setSelected] = useState(null);
+  // App 에 selected setter 전달하려고 context 대신 단순 ref 방식
+  return (
+    <>
+      <div id="flow-inner" style={{width:"100%",height:"100%"}}>
+        <App onNodeSelect={setSelected} />
+      </div>
+    </>
+  );
+}
+
+// App 수정: setSelectedNode 대신 props.onNodeSelect 사용
+// (중복 정의 대신 클로저로 주입)
+window.__renderApp = function() {
+  const root = ReactDOM.createRoot(document.getElementById("flow-canvas"));
+  const panelRoot = ReactDOM.createRoot(document.getElementById("side-panel"));
+  let currentSelected = null;
+  function AppRoot() {
+    const [sel, setSel] = useState(null);
+    useEffect(() => {
+      // 패널 render
+      panelRoot.render(<SidePanel node={sel} />);
+    }, [sel]);
+    // App 에 onNodeSelect 주입
+    return <App onNodeSelect={setSel} />;
+  }
+  root.render(<AppRoot />);
+};
+window.__renderApp();
+</script>
+{% endraw %}
+{% endblock %}

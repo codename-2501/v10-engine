@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/qa/harness_auto_fix.py
+# hypothesis_version: 6.141.1
+
+[' |', ' | ', '(자동 삽입)', '; ', '<!--[\\s\\S]*?-->', '\\[[^\\]]*\\]\\([^)]*\\)', '^#+\\s.*$', '`[^`\\n]*`', 'all_present', 'empty_content', 'exceeds_max', 'https?://\\S+', 'min_rows', 'no_ids_available', 'no_input', 'no_matches', 'no_table', 'outline_ids', 'project_name', 'required_headings', 'table_sufficient', 'too_many_missing', '|', '| ', '|--', '|---', '다음 단계 진행 예정', '다음 단계에서 진행', '다음 단계에서 진행: ', '미지정', '미지정으로', '미지정은', '미지정을', '미지정의', '미지정이', '본문 (자동 보강 필요)', '수정 필요', '수정 필요: ', '향후 정책 확정 시 반영']

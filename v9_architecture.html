@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V9 엔진 아키텍처</title>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.24.0/dist/cytoscape.cjs.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; }
+        #cy { width: 100vw; height: 100vh; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+
+        .legend {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            z-index: 100;
+            max-width: 350px;
+            font-size: 13px;
+            line-height: 1.6;
+            backdrop-filter: blur(10px);
+        }
+        .legend h3 { font-size: 16px; margin-bottom: 12px; color: #333; }
+        .legend p { color: #666; margin: 6px 0; }
+        .legend strong { color: #667eea; }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .controls button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .controls button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="cy"></div>
+
+    <div class="legend">
+        <h3>🏗️ V9 엔진 아키텍처</h3>
+        <p><strong>📊 노드:</strong> 각 모듈 (크기 = 코드량)</p>
+        <p><strong>🔗 화살표:</strong> 의존성 (A → B = B를 임포트)</p>
+        <p><strong>🎮 조작:</strong></p>
+        <p style="margin-left: 12px;">• 드래그: 노드 이동</p>
+        <p style="margin-left: 12px;">• 휠: 줌인/아웃</p>
+        <p style="margin-left: 12px;">• 우클릭 드래그: 화면 이동</p>
+        <p><strong>🔴 빨강:</strong> 핵심 모듈 (core)</p>
+        <p><strong>🟣 보라:</strong> 스킬 실행기</p>
+        <p><strong>🟠 주황:</strong> AI/모델</p>
+    </div>
+
+    <div class="stats">
+        <span id="stats">노드: 15개 | 엣지: 23개</span>
+    </div>
+
+    <div class="controls">
+        <button onclick="fitGraph()">📍 전체 보기</button>
+        <button onclick="centerGraph()">🎯 중심</button>
+        <button onclick="resetGraph()">🔄 초기화</button>
+    </div>
+
+    <script>
+        // V9 엔진 구조
+        const elements = [
+            // 노드 (Core)
+            { data: { id: 'executor', label: 'executor\n4,772줄', type: 'skill' } },
+            { data: { id: 'executor_gotcha', label: 'executor_gotcha\n77줄', type: 'skill' } },
+            { data: { id: 'executor_heartbeat', label: 'executor_heartbeat\n76줄', type: 'skill' } },
+            { data: { id: 'css_tokens', label: 'css_tokens\n47줄', type: 'skill' } },
+            { data: { id: 'executor_cascade', label: 'executor_cascade\n800줄', type: 'skill' } },
+            { data: { id: 'model_adapter', label: 'model_adapter\n600줄', type: 'ai' } },
+            { data: { id: 'account_router', label: 'account_router\n300줄', type: 'ai' } },
+            { data: { id: 'context_assembler', label: 'context_assembler\n500줄', type: 'ai' } },
+            { data: { id: 'dag_advancer', label: 'dag_advancer\n1,200줄', type: 'core' } },
+            { data: { id: 'state_machine', label: 'state_machine\n800줄', type: 'core' } },
+            { data: { id: 'cascade', label: 'cascade\n500줄', type: 'core' } },
+            { data: { id: 'budget_enforcer', label: 'budget_enforcer\n400줄', type: 'core' } },
+            { data: { id: 'startup', label: 'startup\n600줄', type: 'lifecycle' } },
+            { data: { id: 'saver', label: 'saver\n350줄', type: 'artifact' } },
+            { data: { id: 'thresholds', label: 'thresholds\n상수화', type: 'config' } },
+
+            // 엣지 (의존성)
+            { data: { source: 'executor', target: 'executor_gotcha', weight: 1 } },
+            { data: { source: 'executor', target: 'executor_heartbeat', weight: 1 } },
+            { data: { source: 'executor', target: 'css_tokens', weight: 1 } },
+            { data: { source: 'executor', target: 'executor_cascade', weight: 1 } },
+            { data: { source: 'executor', target: 'model_adapter', weight: 1 } },
+            { data: { source: 'executor', target: 'thresholds', weight: 1 } },
+            { data: { source: 'executor_gotcha', target: 'thresholds', weight: 1 } },
+            { data: { source: 'executor_heartbeat', target: 'thresholds', weight: 1 } },
+            { data: { source: 'executor_cascade', target: 'cascade', weight: 1 } },
+            { data: { source: 'executor_cascade', target: 'budget_enforcer', weight: 1 } },
+            { data: { source: 'model_adapter', target: 'account_router', weight: 1 } },
+            { data: { source: 'model_adapter', target: 'thresholds', weight: 1 } },
+            { data: { source: 'context_assembler', target: 'model_adapter', weight: 1 } },
+            { data: { source: 'context_assembler', target: 'startup', weight: 1 } },
+            { data: { source: 'dag_advancer', target: 'state_machine', weight: 1 } },
+            { data: { source: 'dag_advancer', target: 'budget_enforcer', weight: 1 } },
+            { data: { source: 'dag_advancer', target: 'cascade', weight: 1 } },
+            { data: { source: 'state_machine', target: 'cascade', weight: 1 } },
+            { data: { source: 'saver', target: 'executor', weight: 1 } },
+            { data: { source: 'startup', target: 'model_adapter', weight: 1 } },
+            { data: { source: 'startup', target: 'budget_enforcer', weight: 1 } },
+            { data: { source: 'startup', target: 'cascade', weight: 1 } },
+            { data: { source: 'account_router', target: 'thresholds', weight: 1 } },
+        ];
+
+        // Cytoscape 초기화
+        const cy = cytoscape({
+            container: document.getElementById('cy'),
+            elements: elements,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'content': 'data(label)',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': 11,
+                        'font-weight': 'bold',
+                        'color': '#fff',
+                        'text-wrap': 'wrap',
+                        'width': 'mapData(id, 0, 1, 50, 150)',
+                        'height': 'mapData(id, 0, 1, 50, 150)',
+                        'border-width': 2,
+                        'border-color': '#fff',
+                    }
+                },
+                {
+                    selector: 'node[type="core"]',
+                    style: { 'background-color': '#e74c3c', 'width': 120, 'height': 120 }
+                },
+                {
+                    selector: 'node[type="skill"]',
+                    style: { 'background-color': '#9b59b6', 'width': 100, 'height': 100 }
+                },
+                {
+                    selector: 'node[type="ai"]',
+                    style: { 'background-color': '#e67e22', 'width': 90, 'height': 90 }
+                },
+                {
+                    selector: 'node[type="lifecycle"]',
+                    style: { 'background-color': '#3498db', 'width': 85, 'height': 85 }
+                },
+                {
+                    selector: 'node[type="artifact"]',
+                    style: { 'background-color': '#1abc9c', 'width': 80, 'height': 80 }
+                },
+                {
+                    selector: 'node[type="config"]',
+                    style: { 'background-color': '#f39c12', 'width': 70, 'height': 70 }
+                },
+                {
+                    selector: 'node:hover',
+                    style: {
+                        'box-shadow': '0 0 30px rgba(0,0,0,0.3)',
+                        'background-color': '#fff'
+                    }
+                },
+                {
+                    selector: 'node:selected',
+                    style: {
+                        'border-width': 3,
+                        'border-color': '#fff',
+                        'box-shadow': '0 0 40px rgba(255,255,255,0.8)'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'target-arrow-shape': 'triangle',
+                        'target-arrow-color': '#667eea',
+                        'line-color': '#667eea',
+                        'width': 2,
+                        'curve-style': 'bezier',
+                        'arrow-scale': 1.2,
+                    }
+                },
+                {
+                    selector: 'edge:hover',
+                    style: {
+                        'line-color': '#764ba2',
+                        'target-arrow-color': '#764ba2',
+                        'width': 3,
+                    }
+                }
+            ],
+            layout: {
+                name: 'cose',
+                directed: true,
+                animate: true,
+                animationDuration: 500,
+                nodeSpacing: 50,
+                edgeElasticity: 0.5,
+                gravity: 0.5,
+                cooling: 0.01,
+            }
+        });
+
+        // 레이아웃 실행
+        const layout = cy.layout({ name: 'cose' });
+        layout.run();
+
+        function fitGraph() {
+            cy.fit(cy.elements(), 50);
+        }
+
+        function centerGraph() {
+            const executor = cy.$('#executor');
+            if (executor.length) {
+                cy.center(executor);
+            }
+        }
+
+        function resetGraph() {
+            location.reload();
+        }
+
+        // 초기 줌
+        setTimeout(() => {
+            cy.fit(cy.elements(), 50);
+        }, 300);
+
+        // 노드 클릭 이벤트
+        cy.on('tap', 'node', function(e){
+            const node = e.target;
+            cy.$().removeClass('highlighted');
+            node.addClass('highlighted');
+            node.outgoers().edges().target().addClass('highlighted');
+            node.incomers().edges().source().addClass('highlighted');
+        });
+
+        cy.on('tap', function(e){
+            if(e.target === cy){
+                cy.$().removeClass('highlighted');
+            }
+        });
+    </script>
+</body>
+</html>

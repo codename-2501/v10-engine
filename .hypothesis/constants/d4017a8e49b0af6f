@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/codegen/db_schema.py
+# hypothesis_version: 6.141.1
+
+[');', ',\n', '-', '?', '@default(now())', '@id', '@updatedAt', 'Id', 'Int', 'NOT NULL', 'PRIMARY KEY', 'TEXT', '_', '_id', 'columns', 'createdAt', 'created_at', 'datasource db {', 'es', 'fk', 'generator client {', 'id', 'migration', 'name', 'nullable', 'pk', 'prisma-schema', 's', 'tables', 'type', 'updatedAt', 'updated_at', '}']

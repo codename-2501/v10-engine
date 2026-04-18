@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/composition/registry.py
+# hypothesis_version: 6.141.1
+
+[-100, 9000, 9100, '%Y-%m-%dT%H:%M:%SZ', '-', ':root {', '_', 'bindings', 'body_size', 'breakpoints', 'category', 'children_allowed', 'colors', 'component_name', 'condition', 'content_hash', 'css', 'data', 'description', 'effects', 'empty_state', 'error_boundary', 'font_family', 'heading_scale', 'html_template', 'id', 'if _data_empty', 'if _page_error', 'if _page_loading', 'layout', 'line_height', 'loading_indicator', 'meta', 'modal_container', 'name', 'order', 'page_css', 'page_js', 'page_name', 'page_slug', 'placements', 'project_id', 'repeat', 'responsive_css', 'single-column', 'slot_name', 'slots', 'source_artifact', 'source_path', 'spacing', 'title', 'toast_container', 'transform', 'typography', 'value', 'version', 'wrapper_css_class', '}', '데이터 없음 상태 표시', '에러 바운더리 (폴백 UI)', '페이지 로딩 스피너/스켈레톤']

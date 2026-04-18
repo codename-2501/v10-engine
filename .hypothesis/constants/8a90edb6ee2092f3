@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/core/advisor.py
+# hypothesis_version: 6.141.1
+
+[0.0, 100, 120, 200, 500, '\n- ', '0', '1', '300', '5', '800', 'V8_ADVISOR', 'V8_ADVISOR_MODEL', 'V8_SEMANTIC_ADVISOR', 'accept', 'active_breakers', 'circuit_breaker_open', 'colors', 'content', 'cooldown_remaining_s', 'design_tokens', 'disabled', 'empty_checklist', 'engagement_id', 'info', 'key', 'no-json-object', 'reason', 'reject_streaks', 'severity', 'typography', 'typography_keys', '{', '}']

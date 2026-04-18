@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} — 디자인 시스템 정의서</title>
+<style>/* __INJECT_BASE_CSS__ */
+.showcase { background: var(--bg-raised); border-radius: var(--r); padding: 24px; margin: 12px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn-primary { background: var(--accent); color: var(--bg); border: none; padding: 10px 20px; border-radius: 99px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s ease-out; }
+.btn-primary:hover { box-shadow: 0 0 0 3px var(--accent-dim); }
+.btn-secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 10px 20px; border-radius: 99px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s ease-out; }
+.btn-secondary:hover { background: var(--accent-dim); }
+.input-field { background: var(--bg); border: 1px solid var(--border); border-radius: 99px; padding: 10px 14px; font-size: 14px; color: var(--text); width: 220px; transition: all .15s ease-out; }
+.input-field::placeholder { color: var(--text-3); }
+.input-field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.component-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; margin: 12px 0; }
+.component-card h3 { margin: 0 0 8px; font-size: 14px; }
+.token-var { font-family: monospace; font-size: 12px; color: var(--purple); }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a class="back" href="javascript:history.back()">← 돌아가기</a>
+  <span style="flex:1"></span>
+  <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+</div>
+
+<h1>{{PROJECT_NAME}} — 디자인 시스템 정의서</h1>
+<div class="meta">
+  <span>작성일: {{DATE}}</span>
+  <span>프로젝트 ID: {{PROJECT_ID}}</span>
+</div>
+
+<div class="summary">
+  <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">토큰</div></div>
+  <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">컴포넌트</div></div>
+  <div class="summary-item"><div class="summary-num amber">0</div><div class="summary-label">패턴</div></div>
+</div>
+
+<div class="section">
+  <h2>1. 디자인 토큰</h2>
+  <!-- CONTENT: CSS 변수 토큰 정의. 아래 테이블 패턴 사용 -->
+  <table>
+    <thead><tr><th>토큰</th><th>값</th><th>용도</th></tr></thead>
+    <tbody>
+      <tr><td><span class="token-var">--color-primary</span></td><td>#1B2A4A</td><td>주요 액션, CTA 버튼</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>2. 컴포넌트 라이브러리</h2>
+  <!-- CONTENT: 실제 렌더링된 UI 컴포넌트. 아래 패턴 반복 -->
+  <div class="component-card">
+    <h3>Buttons</h3>
+    <div class="showcase">
+      <button class="btn-primary">Primary</button>
+      <button class="btn-secondary">Secondary</button>
+    </div>
+  </div>
+  <div class="component-card">
+    <h3>Inputs</h3>
+    <div class="showcase">
+      <input class="input-field" type="text" placeholder="입력해주세요">
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>3. 패턴 라이브러리</h2>
+  <!-- CONTENT: 폼 레이아웃, 리스트 패턴, 네비게이션 패턴 등 -->
+</div>
+
+<div class="section">
+  <h2>4. 버전 정보</h2>
+  <!-- CONTENT: 디자인 시스템 버전 및 변경 이력 -->
+  <table>
+    <thead><tr><th>버전</th><th>날짜</th><th>변경 내용</th></tr></thead>
+    <tbody>
+      <tr><td>1.0.0</td><td>{{DATE}}</td><td>초기 디자인 시스템 정의</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

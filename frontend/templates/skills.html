@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% block title %}스킬 관리 — AX FACTORY{% endblock %}
+{% block page_title %}스킬 관리{% endblock %}
+
+{% block head_extra %}
+<style>
+  .skill-grid { display: grid; grid-template-columns: 260px 1fr; gap: 1rem; min-height: calc(100vh - 140px); }
+  @media (max-width: 900px) { .skill-grid { grid-template-columns: 1fr; min-height: auto; } .skill-sidebar { max-height: 300px; } }
+  .skill-sidebar { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow-y: auto; }
+  .skill-main { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; overflow-y: auto; }
+
+  .phase-group { border-bottom: 1px solid var(--border); }
+  .phase-group:last-child { border-bottom: none; }
+  .phase-header {
+    padding: .6rem 1rem; font-size: .75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .05em;
+    color: var(--text-muted); cursor: pointer; display: flex;
+    justify-content: space-between; align-items: center;
+    transition: background .15s;
+  }
+  .phase-header:hover { background: var(--surface-hover); }
+  .phase-header .cnt { font-size: .65rem; background: var(--border); padding: 1px 6px; border-radius: 4px; }
+
+  .skill-item {
+    padding: .45rem 1rem .45rem 1.5rem; font-size: .8rem;
+    cursor: pointer; border-left: 3px solid transparent;
+    transition: all .15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .skill-item:hover { background: var(--accent-dim); }
+  .skill-item.active { background: var(--accent-dim); border-left-color: var(--accent); color: var(--accent); }
+  .skill-item .type-tag {
+    font-size: .6rem; padding: 0 4px; border-radius: 3px;
+    background: var(--border); color: var(--text-muted);
+    margin-left: 4px; vertical-align: middle;
+  }
+
+  .detail-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .detail-title { font-size: 1.1rem; font-weight: 700; flex: 1; }
+  .detail-meta { font-size: .7rem; color: var(--text-muted); display: flex; gap: .75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .detail-meta span { background: var(--border); padding: 2px 8px; border-radius: 4px; }
+
+  .section-title {
+    font-size: .75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--text-muted);
+    margin: 1.5rem 0 .5rem; padding-bottom: .4rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .prompt-editor {
+    width: 100%; min-height: 200px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: .75rem; font-family: 'SF Mono', monospace; font-size: .78rem;
+    color: var(--text); resize: vertical; line-height: 1.6;
+  }
+  .prompt-editor:focus { border-color: var(--accent); outline: none; }
+
+  .validation-list { list-style: none; }
+  .validation-item {
+    padding: .4rem 0; border-bottom: 1px solid var(--border);
+    font-size: .8rem; display: flex; align-items: center; gap: .5rem;
+  }
+  .validation-item .v-type {
+    font-size: .6rem; padding: 1px 6px; border-radius: 3px;
+    font-weight: 600;
+  }
+  .v-structural { background: var(--ok-dim); color: var(--ok); }
+  .v-semantic { background: var(--accent-dim); color: var(--accent); }
+
+  .qa-prompt-box {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: .75rem; font-size: .78rem;
+    color: var(--text-muted); white-space: pre-wrap; line-height: 1.5;
+  }
+
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; color: var(--text-muted); text-align: center; padding: 3rem;
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+  .action-bar { display: flex; gap: .5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+  /* Add skill modal */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    display: none; align-items: center; justify-content: center; z-index: var(--z-overlay);
+  }
+  .modal-bg.show { display: flex; }
+  .modal-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; width: 90%; max-width: 500px;
+  }
+  .modal-box h3 { font-size: 1rem; margin-bottom: 1rem; }
+  .modal-box input, .modal-box select {
+    width: 100%; padding: .5rem; margin-bottom: .75rem;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-size: .85rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:.75rem;margin-bottom:1rem;align-items:center;">
+  <span style="color:var(--text-muted);font-size:.8rem;">{{ total_skills }}개 스킬 · {{ total_phases }}개 Phase</span>
+  <div style="margin-left:auto;display:flex;gap:.5rem;">
+    <button class="btn" onclick="refreshSkills()">새로고침</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ 스킬 추가</button>
+  </div>
+</div>
+
+<div class="skill-grid">
+  <!-- 좌측: Phase별 스킬 목록 -->
+  <div class="skill-sidebar" id="skillSidebar"></div>
+
+  <!-- 우측: 스킬 상세 -->
+  <div class="skill-main" id="detail">
+    <div class="empty-state">
+      <div class="icon">🧩</div>
+      <div>좌측에서 스킬을 선택하세요</div>
+      <div style="font-size:.75rem;margin-top:.5rem;">각 산출물의 프롬프트, 검증 규칙, QA 기준을 관리할 수 있습니다</div>
+    </div>
+  </div>
+</div>
+
+<!-- 추가 모달 -->
+<div class="modal-bg" id="addModal">
+  <div class="modal-box">
+    <h3>새 스킬 추가</h3>
+    <label style="font-size:.75rem;color:var(--text-muted);">Phase</label>
+    <select id="add-phase">
+      <option value="define">정의 (DEFINE)</option>
+      <option value="design">설계 (DESIGN)</option>
+      <option value="build">구현 (BUILD)</option>
+      <option value="verify">검증 (VERIFY)</option>
+      <option value="deliver">납품·운영 (DELIVER)</option>
+    </select>
+    <label style="font-size:.75rem;color:var(--text-muted);">스킬 이름</label>
+    <input id="add-name" placeholder="예: AI_윤리_보고서">
+    <label style="font-size:.75rem;color:var(--text-muted);">유형</label>
+    <select id="add-type">
+      <option value="document">문서 (document)</option>
+      <option value="code">코드 (code)</option>
+    </select>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem;">
+      <button class="btn" onclick="closeAddModal()">취소</button>
+      <button class="btn btn-primary" onclick="createSkill()">생성</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('ai_si_token') || '';
+const HEADERS = {'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json'};
+const PHASE_LABELS = {
+  planning:'기획', design:'설계', development:'개발',
+  testing:'테스트', infrastructure:'인프라', delivery:'납품'
+};
+const _cs = getComputedStyle(document.documentElement);
+const PHASE_COLORS = {
+  planning: _cs.getPropertyValue('--info').trim() || '#3b82f6',
+  design: '#06b6d4',
+  development: _cs.getPropertyValue('--ok').trim() || '#10b981',
+  testing: _cs.getPropertyValue('--warn').trim() || '#f59e0b',
+  infrastructure: _cs.getPropertyValue('--err').trim() || '#ef4444',
+  delivery: _cs.getPropertyValue('--accent').trim() || '#00d4ff'
+};
+const PHASE_ORDER = ['planning','design','development','testing','infrastructure','delivery'];
+
+let allSkills = [];
+let activeSkill = null;
+
+async function loadSkills() {
+  const r = await fetch('/api/v1/skills', {headers: HEADERS});
+  const d = await r.json();
+  allSkills = d.skills || [];
+  renderSidebar();
+}
+
+function renderSidebar() {
+  const groups = {};
+  PHASE_ORDER.forEach(p => { groups[p] = []; });
+  allSkills.forEach(s => {
+    const p = (s.phase || 'planning').toLowerCase();
+    if (!groups[p]) groups[p] = [];
+    groups[p].push(s);
+  });
+
+  let h = '';
+  PHASE_ORDER.forEach(p => {
+    const items = groups[p] || [];
+    const color = PHASE_COLORS[p] || '#6b7280';
+    h += `<div class="phase-group">`;
+    h += `<div class="phase-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="border-left:3px solid ${color};">`;
+    h += `<span>${PHASE_LABELS[p] || p}</span><span class="cnt">${items.length}</span></div>`;
+    h += `<div>`;
+    items.forEach(s => {
+      const fname = s._filename || s.name;
+      const isActive = activeSkill && activeSkill._filename === fname && activeSkill.phase?.toLowerCase() === p;
+      const typeTag = s.type === 'code' ? '<span class="type-tag">CODE</span>' : '';
+      h += `<div class="skill-item ${isActive?'active':''}" onclick="selectSkill('${p}','${fname}')">${s.name || fname}${typeTag}</div>`;
+    });
+    if (!items.length) {
+      h += `<div style="padding:.5rem 1.5rem;font-size:.7rem;color:var(--text-muted);">스킬 없음</div>`;
+    }
+    h += `</div></div>`;
+  });
+  document.getElementById('skillSidebar').innerHTML = h;
+}
+
+async function selectSkill(phase, name) {
+  const r = await fetch(`/api/v1/skills/${phase}/${name}`, {headers: HEADERS});
+  if (!r.ok) { alert('스킬 로드 실패'); return; }
+  activeSkill = await r.json();
+  activeSkill._phase = phase;
+  activeSkill._filename = name;
+  renderDetail();
+  renderSidebar();
+}
+
+function renderDetail() {
+  const s = activeSkill;
+  if (!s) return;
+  const phase = s._phase || (s.phase || '').toLowerCase();
+  const color = PHASE_COLORS[phase] || '#6b7280';
+  const val = s.validation || {};
+  const structural = val.structural || {};
+  const semantic = val.semantic || [];
+
+  let h = '';
+  // Header
+  h += `<div class="detail-header">`;
+  h += `<div class="detail-title">${esc(s.name || s._filename)}</div>`;
+  h += `<button class="btn btn-primary" onclick="saveSkill()">저장</button>`;
+  h += `<button class="btn btn-danger" onclick="deleteSkill()">삭제</button>`;
+  h += `</div>`;
+
+  // Meta
+  h += `<div class="detail-meta">`;
+  h += `<span style="border-left:3px solid ${color};padding-left:6px;">${PHASE_LABELS[phase] || phase}</span>`;
+  h += `<span>유형: ${s.type || 'document'}</span>`;
+  h += `<span>모델: ${s.model_preference || 'sonnet'}</span>`;
+  if (structural.min_chars) h += `<span>최소 ${structural.min_chars}자</span>`;
+  if (structural.required_tables) h += `<span>테이블 ${structural.required_tables}개</span>`;
+  h += `</div>`;
+
+  // Prompt
+  h += `<div class="section-title">프롬프트 (TASK에 주입)</div>`;
+  h += `<textarea class="prompt-editor" id="ed-prompt">${esc(s.prompt || '')}</textarea>`;
+
+  // Validation - Structural
+  h += `<div class="section-title">검증 규칙 — 프로그래밍 (비용 0)</div>`;
+  h += `<ul class="validation-list">`;
+  if (structural.required_headings) {
+    structural.required_headings.forEach(hd => {
+      h += `<li class="validation-item"><span class="v-type v-structural">구조</span> 필수 섹션: "${esc(hd)}"</li>`;
+    });
+  }
+  if (structural.required_tables) {
+    h += `<li class="validation-item"><span class="v-type v-structural">구조</span> 테이블 ${structural.required_tables}개 이상</li>`;
+  }
+  if (structural.min_chars) {
+    h += `<li class="validation-item"><span class="v-type v-structural">구조</span> 최소 ${structural.min_chars}자</li>`;
+  }
+  if (structural.forbidden) {
+    h += `<li class="validation-item"><span class="v-type v-structural">구조</span> 금지어: ${structural.forbidden.join(', ')}</li>`;
+  }
+  h += `</ul>`;
+
+  // Validation - Semantic (AI QA)
+  h += `<div class="section-title">검증 규칙 — AI QA (내용 품질)</div>`;
+  if (semantic.length) {
+    h += `<ul class="validation-list">`;
+    semantic.forEach(crit => {
+      h += `<li class="validation-item"><span class="v-type v-semantic">AI</span> ${esc(crit)}</li>`;
+    });
+    h += `</ul>`;
+  } else {
+    h += `<div style="font-size:.78rem;color:var(--text-muted);padding:.5rem 0;">AI QA 기준 없음 (프로그래밍 검증만 사용)</div>`;
+  }
+
+  // QA Prompt
+  h += `<div class="section-title">QA 프롬프트 (AI QA 호출 시 사용)</div>`;
+  h += `<textarea class="prompt-editor" id="ed-qa" style="min-height:100px;">${esc(s.qa_prompt || '')}</textarea>`;
+
+  // Raw YAML (접기)
+  h += `<div class="section-title" style="cursor:pointer;" onclick="document.getElementById('raw-yaml').style.display=document.getElementById('raw-yaml').style.display==='none'?'block':'none'">원본 YAML ▸</div>`;
+  h += `<pre id="raw-yaml" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.75rem;font-size:.7rem;overflow-x:auto;max-height:300px;">${esc(JSON.stringify(s, null, 2))}</pre>`;
+
+  document.getElementById('detail').innerHTML = h;
+}
+
+async function saveSkill() {
+  if (!activeSkill) return;
+  const updated = {...activeSkill};
+  updated.prompt = document.getElementById('ed-prompt').value;
+  updated.qa_prompt = document.getElementById('ed-qa').value;
+  delete updated._phase;
+  delete updated._filename;
+
+  const r = await fetch(`/api/v1/skills/${activeSkill._phase}/${activeSkill._filename}`, {
+    method: 'PUT', headers: HEADERS, body: JSON.stringify(updated)
+  });
+  if (r.ok) {
+    alert('저장 완료');
+    await loadSkills();
+    await selectSkill(activeSkill._phase, activeSkill._filename);
+  } else {
+    alert('저장 실패');
+  }
+}
+
+async function deleteSkill() {
+  if (!activeSkill || !confirm(`"${activeSkill.name}" 스킬을 삭제하시겠습니까?`)) return;
+  const r = await fetch(`/api/v1/skills/${activeSkill._phase}/${activeSkill._filename}`, {
+    method: 'DELETE', headers: HEADERS
+  });
+  if (r.ok) {
+    activeSkill = null;
+    document.getElementById('detail').innerHTML = '<div class="empty-state"><div class="icon">🧩</div><div>스킬이 삭제되었습니다</div></div>';
+    await loadSkills();
+  }
+}
+
+function openAddModal() { document.getElementById('addModal').classList.add('show'); }
+function closeAddModal() { document.getElementById('addModal').classList.remove('show'); }
+
+async function createSkill() {
+  const phase = document.getElementById('add-phase').value;
+  const name = document.getElementById('add-name').value.trim();
+  const type = document.getElementById('add-type').value;
+  if (!name) { alert('이름을 입력하세요'); return; }
+
+  const body = {
+    name: name,
+    phase: phase.toUpperCase(),
+    type: type,
+    model_preference: 'sonnet',
+    prompt: `## 산출물: ${name}\n프로젝트 "{{project_name}}" ({{client_name}})\n\n### 필수 섹션\n1. 개요\n2. 상세 내용\n3. 결론\n\n### 출력 전 자가검증 (MANDATORY)\n□ 필수 섹션 존재\n□ TODO/TBD 없음\n<!-- SELF_CHECK: {"sections":3,"pass":true} -->`,
+    validation: {
+      structural: {
+        required_headings: ['개요', '상세 내용', '결론'],
+        required_tables: 0,
+        min_chars: 1000,
+        forbidden: ['TODO', 'TBD', '미정']
+      },
+      semantic: []
+    },
+    qa_prompt: `위 산출물을 검토하세요.\n판정: PASS 또는 FAIL + 구체적 사유`
+  };
+
+  const r = await fetch(`/api/v1/skills/${phase}`, {
+    method: 'POST', headers: HEADERS, body: JSON.stringify(body)
+  });
+  if (r.ok) {
+    closeAddModal();
+    await loadSkills();
+    const d = await r.json();
+    await selectSkill(phase, d.name);
+  } else {
+    alert('생성 실패');
+  }
+}
+
+function refreshSkills() { loadSkills(); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadSkills();
+</script>
+{% endblock %}

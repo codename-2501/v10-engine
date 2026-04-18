@@ -1,0 +1,90 @@
+name: 이커머스 / 쇼핑몰
+keywords:
+  - 쇼핑몰
+  - 이커머스
+  - ecommerce
+  - 커머스
+  - 마켓플레이스
+  - 상품
+  - 주문
+  - 결제
+  - 장바구니
+  - cart
+  - checkout
+
+terminology:
+  - 셀러: 판매자/입점사
+  - 바이어: 구매자/회원
+  - SKU: 상품 식별 단위
+  - PG: 결제 대행사 (KG이니시스/토스페이먼츠 등)
+  - CS: 고객 서비스/문의
+
+regulations:
+  - 전자상거래법
+  - 개인정보보호법(PIPA)
+  - 표시광고법
+  - 신용정보법(결제 시)
+  - PCI-DSS(카드 정보)
+
+screen_estimate:
+  small: 40
+  medium: 70
+  large: 120  # 셀러센터·관리자·모바일 분리
+
+spec_overrides:
+  보안_설계서:
+    extra_required:
+      - PG 토큰화 흐름
+      - 카드 정보 비저장 원칙
+      - 주문 변조 방지
+  api_설계서:
+    extra_required:
+      - 재고 동시성 처리
+      - 결제 idempotency key
+  화면_목록_정의서:
+    group_prefix_examples:
+      - "SC-SH: 쇼핑(상품/카테고리)"
+      - "SC-CT: 카트/결제"
+      - "SC-OD: 주문/배송조회"
+      - "SC-MY: 마이페이지"
+      - "SC-SL: 셀러센터"
+
+design_tone:
+  palette: "브랜드 색 + 명확한 CTA"
+  conversion_focus: true
+  forbidden:
+    - "구매 동선 방해 요소"
+
+# S13 도메인 컴포넌트 카테고리 override
+component_categories:
+  - name: "layout"
+    chunk_items:
+      - shop_header
+      - shop_footer
+      - category_nav
+      - breadcrumb
+  - name: "content"
+    chunk_items:
+      - product_card
+      - product_grid
+      - promotion_banner
+      - review_card
+  - name: "form"
+    chunk_items:
+      - search_bar
+      - filter_panel
+      - address_form
+      - payment_form
+  - name: "commerce"  # 이커머스 전용
+    chunk_items:
+      - cart_item
+      - checkout_summary
+      - order_tracker
+      - wishlist_item
+      - coupon_badge
+  - name: "feedback"
+    chunk_items:
+      - toast
+      - modal
+      - out_of_stock_banner
+      - review_rating

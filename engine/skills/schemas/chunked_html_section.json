@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chunked_html_section.json",
+  "title": "Chunked HTML Section Output",
+  "description": "Schema for a single <section>...</section> HTML chunk produced by _chunked_html_items_generate. 메타 검증용.",
+  "type": "object",
+  "required": ["item_key", "html", "length"],
+  "properties": {
+    "item_key": {
+      "type": "string",
+      "pattern": "^(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4}|[A-Z]{2,5}-[A-Z]{2,4}-\\d{3,4})$",
+      "description": "고유 chunk item ID"
+    },
+    "html": {
+      "type": "string",
+      "minLength": 500,
+      "description": "<section>...</section> HTML. 최소 길이로 placeholder 감지"
+    },
+    "length": {
+      "type": "integer",
+      "minimum": 500
+    },
+    "has_incomplete_marker": {
+      "type": "boolean",
+      "const": false,
+      "description": "data-incomplete='true' 는 placeholder → 실패로 간주"
+    }
+  },
+  "additionalProperties": false
+}

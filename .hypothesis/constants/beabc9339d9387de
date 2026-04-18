@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/validators/plugins/markdown_table.py
+# hypothesis_version: 6.141.1
+
+['markdown_table', 'min_rows', 'patch', 'required_headers', 'validator_config', '|', '| - |', '| |', '||', "빈 셀을 '-' 로 채움"]

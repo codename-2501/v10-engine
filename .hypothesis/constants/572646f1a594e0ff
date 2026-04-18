@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/composition/renderer.py
+# hypothesis_version: 6.141.1
+
+[' != ', ' < ', ' <= ', ' == ', ' > ', ' >= ', '!=', '"', '&', '&#x27;', '&amp;', '&gt;', '&lt;', '&quot;', "'", ', ', '...', '1024px', '480px', '768px', ':', '<', '</p><p>', '<=', '<em>\\1</em>', '<h1>\\1</h1>', '<h2>\\1</h2>', '<h3>\\1</h3>', '<li>\\1</li>', '<strong>\\1</strong>', '==', '>', '>=', '\\*(.+?)\\*', '\\*\\*(.+?)\\*\\*', '\\.|\\[(\\d+)\\]', '^# (.+)$', '^## (.+)$', '^### (.+)$', '^- (.+)$', '_index', '_item', 'date_format', 'grid', 'if ', 'ko', 'lang', 'lower', 'markdown_to_html', 'mobile', 'number_format', 'sidebar-left', 'single-column', 'tablet', 'tokens', 'truncate:', 'two-column', 'unless ', 'upper', '}']

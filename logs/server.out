@@ -1,0 +1,46 @@
+INFO:     Started server process [97897]
+INFO:     Waiting for application startup.
+migrations_up_to_date
+{"positional_args": [16, 8, 8], "event": "startup_garbage_cleanup skipped=%d nodes (task=%d + qa_pairs=%d)", "level": "info", "logger": "engine.lifecycle.startup", "timestamp": "2026-04-17T12:54:04.132390Z"}
+{"positional_args": [16, 0, 0, 0, 0, 0, 0], "event": "startup_recovery_complete garbage_deleted=%s pair_links_healed=%s zombies_suspended=%s shutdown_drain_resumed=%s transient_resumed=%s qa_unblocked=%s cascade_pending_processed=%s", "level": "info", "logger": "engine.lifecycle.startup", "timestamp": "2026-04-17T12:54:04.146171Z"}
+shutdown_signal_handlers_registered
+ws_outbox_worker_started last_id=0
+{"positional_args": ["Max (enjoyfigma)", "max"], "event": "dag_advancer_started auth=cli_proxy account=%s tier=%s", "level": "info", "logger": "api.server", "timestamp": "2026-04-17T12:54:04.146896Z"}
+DAGAdvancer started
+{"positional_args": [2], "event": "dag_auto_resumed count=%d", "level": "info", "logger": "api.server", "timestamp": "2026-04-17T12:54:04.147170Z"}
+{"event": "retroactive_validation_scheduled", "level": "info", "logger": "api.server", "timestamp": "2026-04-17T12:54:04.149156Z"}
+{"positional_args": ["sqlite:"], "event": "app_started db_url=%s", "level": "info", "logger": "api.server", "timestamp": "2026-04-17T12:54:04.149198Z"}
+{"positional_args": [300], "event": "watchdog_started interval=%ds", "level": "info", "logger": "engine.lifecycle.watchdog", "timestamp": "2026-04-17T12:54:04.149264Z"}
+workspace_deploy_worker_started
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+alter_table_add_column_failed col=deploy_step error=duplicate column name: deploy_step
+alter_table_add_column_failed col=retry_count error=duplicate column name: retry_count
+retroactive_check_skipped last_run=2026-04-17T12:15:04.242729+00:00 hours_ago=0.6
+alter_table_add_column_failed col=warnings error=duplicate column name: warnings
+node_state_changed node_id=f565c1ee-cabd-4d43-b885-239dfed2f878 from=NodeState.IN_PROGRESS to=NodeState.IN_PROGRESS
+output_size_preempt node=f565c1ee retry=0 mult=1.3 prev_tokens=2440004 max=16000→64000
+chunk_items_extracted node=f565c1ee from='화면 목록 정의서' pattern='(SC-[A-Z]{2,4}-\d{3,4}|SCR-\d{3,4})' count=62
+chunked_html_dispatch node=f565c1ee items=62
+html_style_from_tokens node=f565c1ee vars=76
+chunked_html_item_cached node=f565c1ee item=SC-AD-001
+chunked_html_item_cached node=f565c1ee item=SC-AD-024
+chunked_html_item_cached node=f565c1ee item=SC-AU-001
+chunked_html_item_cached node=f565c1ee item=SC-AU-006
+chunked_html_item_cached node=f565c1ee item=SC-CB-001
+chunked_html_item_cached node=f565c1ee item=SC-CB-004
+chunked_html_item_cached node=f565c1ee item=SC-CW-001
+chunked_html_item_cached node=f565c1ee item=SC-CW-015
+INFO:     ('127.0.0.1', 60306) - "WebSocket /ws/stream" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 60320) - "WebSocket /ws/engagements/c620f0a5-c913-4bf7-a8a3-775a85ec6e5e/stream" [accepted]
+ws_client_connected engagement_id=c620f0a5-c913-4bf7-a8a3-775a85ec6e5e total=1
+INFO:     connection open
+INFO:     127.0.0.1:60325 - "GET /engagements/c620f0a5-c913-4bf7-a8a3-775a85ec6e5e/live HTTP/1.1" 200 OK
+health_restart_exhausted project=ac9a3c45-3c3e-487a-9e08-3f6417d16b0f label=backend port=4200 count=3
+health_restart_exhausted project=ac9a3c45-3c3e-487a-9e08-3f6417d16b0f label=frontend port=3300 count=3
+shutdown_initiated active_tasks=0
+shutdown_stage1_new_tasks_blocked
+shutdown_stage3_agents_handled completed=0 suspended=0
+shutdown_stage4_db_drained
+shutdown_complete

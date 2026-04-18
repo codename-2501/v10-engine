@@ -1,0 +1,52 @@
+name: "페이지 조립"
+phase: DESIGN
+type: html
+model_preference: none
+composition_role: assembly
+assembly_mode: true
+
+prompt: |
+  ## 자동 조립 노드 (AI 호출 없음)
+  이 노드는 executor에서 CompositionRenderer를 호출하여
+  토큰 + 컴포넌트 + 레시피 → HTML을 자동 조립합니다.
+  AI가 이 프롬프트를 보는 경우는 없어야 합니다.
+
+  fallback: 이 프롬프트가 AI에게 전달되었다면 executor 분기 오류입니다.
+  "assembly_mode 노드는 AI가 아닌 CompositionRenderer가 처리합니다." 라고 응답하세요.
+
+metadata:
+  skip_ai_call: true
+  renderer_entry: "engine.composition.renderer.CompositionRenderer.render_all_pages"
+  input_dependencies:
+    - "디자인 토큰"
+    - "컴포넌트 라이브러리"
+    - "페이지 레시피"
+  output: "프로젝트의 모든 페이지를 HTML로 조립하여 artifact에 저장"
+  description: |
+    executor가 이 노드를 만나면:
+    1. composition_role == "assembly" 감지
+    2. AI 호출 건너뜀
+    3. CompositionRegistry에서 토큰/컴포넌트/레시피 로드
+    4. CompositionRenderer.render_all_pages() 호출
+    5. 각 페이지 HTML을 개별 artifact로 저장
+    6. 노드 COMPLETED 처리
+
+    소요 시간: 수백 페이지도 수 초 이내 (AI 0회)
+    토큰 비용: 0
+
+validation:
+  structural:
+    min_chars: 100
+  semantic:
+    - "렌더링된 HTML이 유효한 문서인지 검증"
+    - "모든 레시피 페이지가 렌더링되었는지 검증"
+    - "토큰 CSS 변수가 올바르게 적용되었는지 검증"
+
+qa_prompt: |
+  조립된 HTML 페이지를 검토하세요.
+  검증 기준:
+  - HTML 문서가 유효한가 (<!DOCTYPE html> ~ </html>)
+  - 모든 CSS 변수가 :root에 정의되어 있는가
+  - 반응형 미디어쿼리가 포함되어 있는가
+  - 컴포넌트 슬롯이 모두 채워졌는가 ({{미치환}} 잔존 없음)
+  판정: PASS 또는 FAIL + 구체적 사유

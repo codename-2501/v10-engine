@@ -1,0 +1,155 @@
+name: "페이지 레시피"
+phase: DESIGN
+type: json
+model_preference: sonnet
+composition_role: recipe
+
+# S9: upstream 화면 목록 정의서에서 페이지 ID 자동 추출 → 페이지당 1회 LLM 호출.
+chunk_items_source:
+  from_spec: "화면 목록 정의서"
+  extract_pattern: "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙 (엄수):
+  1. 순수 JSON 배열만 출력. 마크다운 코드 블록(```)으로 감싸지 마세요.
+  2. 도구 호출(function_calls, invoke 등) 절대 금지.
+  3. JSON 문자열 값 안에 따옴표 중첩("") 금지 — 필요하면 작은따옴표(') 사용.
+  4. JSON 값에 JavaScript 표현식("값" + "변수") 절대 금지 — 정적 문자열만.
+  5. 바인딩 value에 변수 삽입 필요 시: "{변수명}" 형태의 플레이스홀더 사용. "값" + "변수" 표현식 금지.
+  6. 자가검증 체크리스트를 출력에 포함시키지 마세요 (내부 확인만).
+
+  ★★★ 최상위 구조 필수 (이것을 반드시 지키세요) ★★★
+  출력은 [페이지1, 페이지2, ...] 배열이며, 각 요소는 반드시 아래 형태입니다:
+  {"page_name": "...", "page_slug": "...", "title": "...", "layout": "...", "placements": [...]}
+
+  절대 금지: component_name을 최상위에 두지 마세요.
+  component_name은 반드시 placements 배열 안에 들어갑니다.
+
+  올바른 예시:
+  [
+    {"page_name": "홈", "page_slug": "home", "title": "홈", "layout": "single-column",
+     "placements": [
+       {"component_name": "hero_banner", "order": 1, "bindings": [{"slot_name": "title", "value": "환영합니다"}]}
+     ]}
+  ]
+
+  잘못된 예시 (이렇게 하면 안 됩니다):
+  [
+    {"component_name": "hero_banner", "order": 1, "bindings": [...]}
+  ]
+
+  컴포넌트 레지스트리의 매핑을 기반으로,
+  각 페이지의 **정밀한 조립 레시피**를 JSON 배열로 생성하세요.
+  이 레시피를 렌더러에 넘기면 AI 호출 없이 완성 HTML이 조립됩니다.
+
+  ### 출력 JSON 스키마
+  **중요 — page_slug는 반드시 화면목록의 SCR-XXX를 접두사로 포함해야 합니다.**
+  예: "scr-001-main-landing", "scr-012-service-request". 이 태그로 preview HTML 파일과
+  Next.js 라우트가 1:1 매칭되어 커버리지 검증이 자동화됩니다. SCR 태그가 빠진 slug는
+  QA에서 FAIL 처리됩니다.
+  ```
+  [
+    {
+      "page_name": "화면 이름",
+      "page_slug": "scr-001-url-safe-name",
+      "scr_id": "SCR-001",
+      "title": "HTML <title> 텍스트",
+      "description": "meta description",
+      "layout": "single-column|sidebar-left|two-column|grid",
+      "placements": [
+        {
+          "component_name": "라이브러리 컴포넌트 이름",
+          "order": 1,
+          "bindings": [
+            {
+              "slot_name": "title",
+              "value": "정적 값 (문자열, 숫자 등)"
+            },
+            {
+              "slot_name": "items",
+              "value": [
+                {"name": "항목1", "desc": "설명1"},
+                {"name": "항목2", "desc": "설명2"}
+              ]
+            },
+            {
+              "slot_name": "content",
+              "source_artifact": "",
+              "source_path": "sections[0].content",
+              "transform": "markdown_to_html"
+            }
+          ],
+          "condition": "",
+          "repeat": "",
+          "wrapper_css_class": ""
+        }
+      ],
+      "page_css": "페이지 전용 추가 CSS (선택)",
+      "page_js": "페이지 전용 JS (선택)"
+    }
+  ]
+  ```
+
+  ### 바인딩 규칙
+
+  **정적 바인딩 (value):**
+  - 프로젝트 맥락에 맞는 실제 데이터 사용 (Lorem ipsum 금지)
+  - 리스트 데이터는 JSON 배열로 (최소 3~5개 항목)
+  - 통계 수치는 현실적인 더미 데이터
+
+  **동적 바인딩 (source_path):**
+  - 다른 산출물의 데이터를 참조할 때 사용
+  - source_artifact: 참조할 산출물 ID (비어있으면 현재 프로젝트 컨텍스트)
+  - source_path: JSON 경로 (예: "stats.total_users")
+
+  **변환 (transform):**
+  - markdown_to_html: 마크다운 → HTML
+  - truncate:N: N자로 자르기
+  - number_format: 천 단위 콤마
+  - date_format: ISO → "YYYY년 M월 D일"
+  - upper / lower
+
+  **조건부 렌더링 (condition):**
+  - "if data.items": 데이터가 있을 때만 표시
+  - "unless data.empty": 비어있지 않을 때 표시
+  - "if data.count > 0": 비교 조건
+
+  **반복 렌더링 (repeat):**
+  - "data.items": items 배열을 순회하며 컴포넌트 반복
+  - 각 아이템은 {{_item.field}}, {{_index}}로 접근
+
+  ### 페이지별 규칙
+  - 모든 FO 페이지: page_header(order=0) + 콘텐츠 + page_footer(order=999)
+  - 모든 BO 페이지: sidebar(order=0) + page_header(order=1) + 콘텐츠
+  - 대시보드: stat_card 반복 + data_table 조합
+  - 상세 페이지: breadcrumb + section_wrapper + content_card 조합
+  - 목록 페이지: search_bar + data_table + pagination
+
+  ### 출력 전 자가검증 (확인만 하고 체크리스트를 출력에 포함시키지 마세요)
+  - 각 요소에 page_name, page_slug, placements가 있는가
+  - placements 안에 component_name, order, bindings가 있는가
+  - JSON이 유효한가
+
+validation:
+  structural:
+    min_chars: 10000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "Lorem ipsum"]
+  semantic:
+    - "JSON 배열로 파싱 가능한지 검증"
+    - "컴포넌트 레지스트리의 모든 페이지가 레시피로 변환되었는지 검증"
+    - "모든 컴포넌트의 필수 슬롯에 바인딩이 존재하는지 검증"
+    - "정적 데이터가 프로젝트 맥락에 맞는지 검증 (Lorem ipsum 금지)"
+    - "order 값이 각 페이지 내에서 순차적인지 검증"
+
+qa_prompt: |
+  위 페이지 레시피 JSON을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  추가 검증:
+  - 모든 슬롯 바인딩이 유효한가?
+  - 페이지 구성이 사용자 경험 측면에서 합리적인가?
+  - 반복/조건부 렌더링이 올바르게 설정되었는가?
+  판정: PASS 또는 FAIL + 구체적 사유

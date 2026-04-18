@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/validators/plugins/erd.py
+# hypothesis_version: 6.141.1
+
+['(', '---', 'FK', 'PK', '\\s|\\(', '^##+\\s+', 'erd', 'fk', 'id', 'name', 'pk', 'type', '|', '컬럼']

@@ -1,0 +1,54 @@
+name: "데이터 모델 설계서"
+phase: DESIGN
+type: document
+model_preference: opus
+
+# Stage 9: Dynamic Layer Selection
+context_layers:
+  - prd
+  - current_task
+  - db_schema
+  - data_flow
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **개념 모델 (ERD)** — 핵심 엔티티와 관계를 Mermaid erDiagram으로 표현. 엔티티 설명, 주요 속성, 관계 유형(1:1, 1:N, N:M) 명시
+  2. **논리 모델** — 개념 모델을 정규화(3NF 이상)한 논리적 테이블 구조. 각 테이블의 속성, 데이터 타입, PK/FK, NOT NULL 제약조건을 표 형태로 정리
+  3. **물리 모델** — DBMS별 최적화된 물리 테이블 구조. 파티셔닝 전략, 스토리지 엔진, 문자셋, 콜레이션을 명시
+  4. **테이블 정의** — 각 테이블별 컬럼 상세(컬럼명, 타입, 길이, 기본값, 설명, 제약조건)를 표 형태로 정리
+  5. **인덱스 전략** — 각 테이블별 인덱스 목록, 유형(B-Tree/Hash/GIN 등), 대상 컬럼, 사용 목적, 예상 성능 영향을 표 형태로 정리
+  6. **마이그레이션 계획** — 데이터 마이그레이션 순서, 변환 규칙, 롤백 전략, 검증 방법을 단계별로 기술
+
+  ### 품질 기준
+  - ERD는 Mermaid 문법으로 렌더링 가능할 것
+  - 논리 모델은 최소 3NF를 충족할 것
+  - 테이블 정의는 모든 컬럼의 데이터 타입과 길이를 명시할 것
+  - 인덱스 전략은 주요 쿼리 패턴을 기반으로 설계할 것
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ ERD가 모든 핵심 엔티티를 포함하는가
+  □ 논리 모델이 3NF를 충족하는가
+  □ 테이블 정의에 누락된 컬럼이 없는가
+  □ 인덱스 전략이 주요 쿼리 패턴을 커버하는가
+  □ 마이그레이션 계획에 롤백 전략이 포함되어 있는가
+  <!-- SELF_CHECK: {"sections":6,"tables":3,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings: ["개념 모델 (ERD)", "논리 모델", "물리 모델", "테이블 정의", "인덱스 전략", "마이그레이션 계획"]
+    required_tables: 3
+    min_chars: 3000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "ERD가 프로젝트의 모든 핵심 도메인 엔티티를 포괄하는가"
+    - "논리 모델이 정규화 원칙을 준수하는가"
+    - "인덱스 전략이 실제 쿼리 패턴에 기반하는가"
+    - "마이그레이션 계획이 안전하고 롤백 가능한가"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준: {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

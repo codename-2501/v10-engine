@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/codegen/vue.py
+# hypothesis_version: 6.141.1
+
+[' || ', '!', '!data', ', ', 'if ', 'unless ']

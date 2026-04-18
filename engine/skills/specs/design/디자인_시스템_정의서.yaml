@@ -1,0 +1,134 @@
+name: "디자인 시스템 정의서"
+phase: DESIGN
+type: html
+model_preference: opus
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  아래 HTML 템플릿 구조에 맞춰 완전한 HTML 문서를 출력하세요.
+  {{PROJECT_NAME}}은 프로젝트명으로, {{DATE}}는 오늘 날짜로, {{PROJECT_ID}}는 프로젝트 ID로 대체하세요.
+  <!-- CONTENT: --> 주석이 있는 위치에 실제 콘텐츠를 채우세요.
+  예시 항목의 패턴을 따라 실제 프로젝트에 맞는 항목들로 채우세요.
+
+  ### HTML 템플릿:
+  ```html
+  <!DOCTYPE html>
+  <html lang="ko">
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{PROJECT_NAME}} — 디자인 시스템 정의서</title>
+  <style>/* __INJECT_BASE_CSS__ */
+  .showcase { background: #f0f2f5; border-radius: var(--radius); padding: 24px; margin: 12px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn-primary { background: var(--blue); color: #fff; border: none; padding: 10px 20px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-secondary { background: transparent; color: var(--blue); border: 1px solid var(--blue); padding: 10px 20px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; }
+  .input-field { background: #fff; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); padding: 10px 14px; font-size: 14px; color: #1a1a1a; width: 220px; }
+  .input-field::placeholder { color: #98a2b3; }
+  .component-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 12px 0; }
+  .component-card h3 { margin: 0 0 8px; font-size: 14px; }
+  .token-var { font-family: monospace; font-size: 12px; color: var(--purple); }
+  </style>
+  </head>
+  <body>
+  <div class="toolbar">
+    <a class="back" href="javascript:history.back()">← 돌아가기</a>
+    <span style="flex:1"></span>
+    <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+  </div>
+
+  <h1>{{PROJECT_NAME}} — 디자인 시스템 정의서</h1>
+  <div class="meta">
+    <span>작성일: {{DATE}}</span>
+    <span>프로젝트 ID: {{PROJECT_ID}}</span>
+  </div>
+
+  <div class="summary">
+    <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">토큰</div></div>
+    <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">컴포넌트</div></div>
+    <div class="summary-item"><div class="summary-num amber">0</div><div class="summary-label">패턴</div></div>
+  </div>
+
+  <div class="section">
+    <h2>1. 디자인 토큰</h2>
+    <!-- CONTENT: CSS 변수 토큰 정의. 아래 테이블 패턴 사용 -->
+    <table>
+      <thead><tr><th>토큰</th><th>값</th><th>용도</th></tr></thead>
+      <tbody>
+        <tr><td><span class="token-var">--color-primary</span></td><td>#1B2A4A</td><td>주요 액션, CTA 버튼</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>2. 컴포넌트 라이브러리</h2>
+    <!-- CONTENT: 실제 렌더링된 UI 컴포넌트. 아래 패턴 반복 -->
+    <div class="component-card">
+      <h3>Buttons</h3>
+      <div class="showcase">
+        <button class="btn-primary">Primary</button>
+        <button class="btn-secondary">Secondary</button>
+      </div>
+    </div>
+    <div class="component-card">
+      <h3>Inputs</h3>
+      <div class="showcase">
+        <input class="input-field" type="text" placeholder="입력해주세요">
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>3. 패턴 라이브러리</h2>
+    <!-- CONTENT: 폼 레이아웃, 리스트 패턴, 네비게이션 패턴 등 -->
+  </div>
+
+  <div class="section">
+    <h2>4. 버전 정보</h2>
+    <!-- CONTENT: 디자인 시스템 버전 및 변경 이력 -->
+    <table>
+      <thead><tr><th>버전</th><th>날짜</th><th>변경 내용</th></tr></thead>
+      <tbody>
+        <tr><td>1.0.0</td><td>{{DATE}}</td><td>초기 디자인 시스템 정의</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  </body>
+  </html>
+  ```
+
+  ### 품질 기준
+  - 토큰 네이밍은 일관된 규칙(예: color-primary-500)을 따를 것
+  - 컴포넌트는 Atomic Design 원칙에 따라 분류할 것
+  - 사용법에 Do/Don't 사례를 최소 2개씩 포함할 것
+  - 버전 관리는 SemVer 원칙을 준수할 것
+
+  ### 디자인 퀄리티 규칙
+  - 반드시 다크 테마: 배경 #111318, 카드 #1a1d24, 텍스트 #eaedf2. 라이트 테마(흰 배경/밝은 배경) 절대 금지
+  - body background는 반드시 #111318 계열 다크 톤. #f로 시작하는 밝은 배경색 사용 시 검증 실패
+  - Pretendard Variable 웹폰트 사용: font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif
+  - @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+  - 보라색 그라디언트, 기본 시스템 폰트(Segoe UI), AI스러운 정형화 레이아웃 금지
+  - pure black(#000) 금지 — dark grey (#111318~#1c1f27) 사용
+  - 넉넉한 여백: 섹션 간 40px 이상, 카드 padding 24px 이상
+  - 대담한 타이포 계층: 제목 weight 700~800, letter-spacing -.02em
+  - 프로젝트 맥락에 맞는 독창적 톤 적용
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 토큰 네이밍이 일관된 규칙을 따르는가
+  □ 모든 컴포넌트가 적절한 레벨로 분류되어 있는가
+  □ 사용법이 Do/Don't 사례를 포함하는가
+  □ 패턴 라이브러리가 주요 UI 패턴을 포괄하는가
+  □ 버전 관리 정책이 명확한가
+
+validation:
+  structural:
+    min_chars: 5000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성", "Segoe UI", "background: #f", "background:#f"]
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준: {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

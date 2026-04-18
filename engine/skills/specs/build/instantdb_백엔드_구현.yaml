@@ -1,0 +1,78 @@
+name: "InstantDB 백엔드 구현"
+phase: BUILD
+type: code
+model_preference: opus
+backend_requirement: "instantdb"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  InstantDB SDK를 기반으로 백엔드(클라이언트-서버 연결 포함) 전체를
+  구현하세요. 전통적 REST API 서버를 구축하는 것이 아니라, InstantDB의
+  `useQuery`/`transact` 모델 위에서 **비즈니스 로직은 서버
+  (admin SDK) + 권한**, **데이터 흐름은 SDK**로 분리합니다.
+
+  ### InstantDB 특성 반영 (MANDATORY)
+  - 클라이언트는 InstantDB SDK로 직접 read/write — 백엔드 없어도 동작
+  - 복잡한 비즈니스 로직, 외부 API 호출 등은 `@instantdb/admin` SDK로 구현
+  - 실시간성은 기본 내장 (subscribeQuery)
+  - Optimistic updates + 오프라인 Pending Queue 자동 처리
+  - 권한은 CEL 규칙(permissions.ts)이 강제 — 서버 검증 로직 중복 불필요
+
+  ### 필수 섹션 (순서 준수)
+  1. **프로젝트 구조** — 디렉토리 레이아웃 (db/, server/, hooks/, lib/)
+  2. **InstantDB 초기화 및 설정** — `instant.config.ts`, 앱 ID,
+     환경변수(.env.local, .env.production), 클라이언트 초기화 코드
+  3. **스키마 & 권한 배포 스크립트** — `npx instant-cli push schema`와
+     `push perms` 자동화 script, CI 통합 (package.json scripts)
+  4. **비즈니스 로직 서버 (Admin SDK)** — `@instantdb/admin` 사용한
+     서버 엔드포인트 (외부 API 호출, 결제, 이메일 발송 등),
+     Next.js Route Handler 또는 Express 라우트 완성 코드
+  5. **트랜잭션 패턴** — `db.transact()` 예시 (단일/복합/링크),
+     optimistic 실패 시 롤백 처리
+  6. **에러 핸들링 및 로깅** — InstantDB 에러 타입별 처리,
+     admin 로직 실패 시 재시도/알림
+
+  ### 품질 기준
+  - 앱 ID는 환경변수 — 하드코딩 금지
+  - admin token 은 server only, 클라이언트 번들에 노출 금지
+  - 모든 transact 는 try/catch + 실패 시 사용자 알림
+  - 스키마 배포는 CI에서 실행되어 환경 불일치 방지
+  - TypeScript strict mode, `import type { InstantSchemaDef }`로 타입 안정성
+  - 환경별(local/staging/prod) 앱 ID 분리
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 6개 필수 섹션 모두 작성 완료
+  □ 코드 블록 8개 이상 (TypeScript)
+  □ 환경변수 이름 명시 (NEXT_PUBLIC_INSTANT_APP_ID, INSTANT_ADMIN_TOKEN 등)
+  □ @instantdb/react, @instantdb/admin 두 패키지 모두 사용
+  □ schema.ts, permissions.ts 파일 참조 경로 정확
+  □ TODO/TBD/미정 키워드 없음
+
+  <!-- SELF_CHECK: {"sections":6,"code_blocks":N,"admin_endpoints":M,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "프로젝트 구조"
+      - "InstantDB 초기화"
+      - "스키마"
+      - "비즈니스 로직"
+      - "트랜잭션"
+      - "에러 핸들링"
+    has_code_blocks: true
+    min_chars: 7000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "InstantDB 앱 ID가 환경변수로만 참조되고 하드코딩되지 않았는지 검증"
+    - "admin token이 서버 전용 환경변수(NEXT_PUBLIC_ 접두사 금지)에 저장되는지 검증"
+    - "db.transact() 호출이 try/catch 로 감싸져 optimistic 실패를 처리하는지 검증"
+    - "스키마 변경 배포가 CI 파이프라인에 포함되어 환경 간 일치가 보장되는지 검증"
+    - "@instantdb/react 는 클라이언트, @instantdb/admin 은 서버 전용으로 분리되는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

@@ -1,0 +1,19 @@
+name: "에이전트 브라우저 참조"
+type: reference
+description: |
+  브라우저 자동화 도구. 리서치/데이터 수집 및 테스트 자동화에 활용.
+  Navigate → Snapshot → Interact → Re-snapshot 워크플로우.
+modes:
+  - headless Chromium
+  - real Chrome with profiles
+  - cloud-hosted remote browsers
+capabilities:
+  - web navigation and data extraction
+  - form interaction and submission
+  - cookie/session management
+  - JavaScript execution
+  - screenshot capture
+security:
+  - domain allowlists
+  - action policies
+  - encrypted auth vaults

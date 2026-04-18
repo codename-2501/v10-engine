@@ -1,0 +1,75 @@
+name: "Firebase 백엔드 구현"
+phase: BUILD
+type: code
+model_preference: opus
+backend_requirement: "firebase"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  Firebase(Firestore + Authentication + Cloud Functions + Storage)를
+  백엔드로 사용해 앱 전체 데이터/인증/서버 로직을 구현하세요.
+
+  ### Firebase 특성 반영 (MANDATORY)
+  - Firestore: 문서 기반 NoSQL, collection/document 계층
+  - Firebase Auth: 이메일/비밀번호, OAuth, 익명, 전화번호 등
+  - Cloud Functions: HTTPS callable 또는 트리거 기반 (onWrite, onCreate 등)
+  - Security Rules: firestore.rules 로 행 수준 접근 제어
+  - Storage: Cloud Storage for Firebase (이미지/파일)
+  - Emulator Suite: 로컬 개발/테스트
+
+  ### 필수 섹션 (순서 준수)
+  1. **프로젝트 구조 및 초기화** — firebase.json, 환경별 config,
+     SDK 초기화 코드 (client + admin)
+  2. **Firestore 데이터 모델** — collection/document 스키마,
+     하위 컬렉션 전략, 인덱스 정의 (firestore.indexes.json)
+  3. **Security Rules** — firestore.rules 완성본, storage.rules,
+     테스트 시나리오
+  4. **Cloud Functions** — HTTPS callable, 트리거(onWrite/onCall),
+     환경변수 관리, 배포 스크립트
+  5. **Authentication 통합** — 로그인 UI, 세션 관리, 커스텀 claims
+  6. **에러 핸들링 및 모니터링** — Crashlytics, 로깅, 비용 모니터링
+
+  ### 품질 기준
+  - API 키는 클라이언트 노출 OK (Firebase Config), 보안은 Rules로
+  - Security Rules 테스트 (emulator) 포함
+  - Cloud Functions 타임아웃 / 메모리 설정 명시
+  - Firestore 쿼리는 인덱스 필요 여부 사전 확인
+  - 대규모 컬렉션은 pagination 필수
+  - 비용 제어: Functions concurrency, Firestore read 최소화 패턴
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 6개 필수 섹션 모두 작성 완료
+  □ 코드 블록 8개 이상
+  □ firestore.rules 파일 완성본 포함
+  □ Cloud Functions 최소 2개 예시
+  □ Emulator 사용 명시
+  □ TODO/TBD 키워드 없음
+
+  <!-- SELF_CHECK: {"sections":6,"rules":true,"functions":N,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "프로젝트 구조"
+      - "Firestore 데이터 모델"
+      - "Security Rules"
+      - "Cloud Functions"
+      - "Authentication"
+      - "에러 핸들링"
+    has_code_blocks: true
+    min_chars: 7000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "firestore.rules에서 모든 컬렉션에 접근 제어 규칙이 존재하는지 검증"
+    - "Cloud Functions에 타임아웃과 메모리 한계가 명시되는지 검증"
+    - "Firestore 쿼리의 인덱스 필요 여부가 사전 확인되는지 검증"
+    - "Security Rules 테스트가 Emulator로 작성되는지 검증"
+    - "비용 제어 전략(read 최소화, pagination)이 구현되는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

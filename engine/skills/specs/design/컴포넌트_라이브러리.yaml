@@ -1,0 +1,213 @@
+name: "컴포넌트 라이브러리"
+phase: DESIGN
+type: json
+model_preference: sonnet
+composition_role: library
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙 (엄수):
+  1. 순수 JSON 배열만 출력. 마크다운 코드 블록(```)으로 감싸지 마세요.
+  2. 도구 호출(function_calls, invoke 등) 절대 금지.
+  3. JSON 문자열 값 안에 따옴표 중첩("") 금지 — 필요하면 작은따옴표(') 사용.
+  4. JSON 값에 JavaScript 표현식("값" + "변수") 절대 금지 — 정적 문자열만.
+  5. 자가검증 체크리스트를 출력에 포함시키지 마세요 (내부 확인만).
+
+  이 프로젝트에 필요한 **재사용 가능한 UI 컴포넌트 라이브러리**를 JSON 배열로 정의하세요.
+  각 컴포넌트는 HTML 템플릿 + CSS + 슬롯 정의로 구성됩니다.
+  이 컴포넌트들을 조합하여 모든 페이지를 만들 수 있어야 합니다.
+
+  ### 필수 컴포넌트 카테고리
+  최소 아래 카테고리에서 컴포넌트를 정의하세요:
+
+  **layout** (레이아웃):
+  - page_header: 페이지 상단 헤더 (로고, 네비게이션, 사용자 메뉴)
+  - page_footer: 페이지 하단 푸터
+  - sidebar: 사이드바 네비게이션
+  - section_wrapper: 섹션 컨테이너 (제목 + 콘텐츠)
+
+  **content** (콘텐츠):
+  - hero_banner: 히어로 배너 (제목, 부제, CTA)
+  - content_card: 일반 카드 (제목, 본문, 아이콘/이미지)
+  - stat_card: 통계 카드 (라벨, 수치, 변동률)
+  - feature_card: 기능 소개 카드
+  - info_panel: 안내/알림 패널
+
+  **data** (데이터 표시):
+  - data_table: 데이터 테이블 (컬럼 헤더 + 행)
+  - list_item: 리스트 아이템 (아이콘, 제목, 설명, 상태)
+  - timeline_item: 타임라인 항목
+
+  **form** (입력):
+  - form_group: 폼 그룹 (라벨 + 입력 + 에러)
+  - button: 버튼 (primary, secondary, ghost 변형)
+  - search_bar: 검색바
+
+  **navigation** (네비게이션):
+  - breadcrumb: 브레드크럼
+  - tab_bar: 탭 바
+  - pagination: 페이지네이션
+
+  **feedback** (피드백) — ★ 인터랙션 프리미티브 필수 포함:
+  - toast: 토스트 알림 (success/error/warning/info 변형)
+  - modal: 모달 다이얼로그 (오버레이 + 중앙 컨테이너, ESC/외부 클릭 닫기)
+  - confirm_dialog: 확인/취소 다이얼로그 (삭제/위험 동작용 danger 변형 포함)
+  - bottom_sheet: 바텀 시트 (모바일 하단 슬라이드업, 드래그 핸들)
+  - snackbar: 스낵바 알림 (하단 고정, 자동 dismiss, 액션 버튼)
+  - badge: 상태 뱃지
+  - progress_bar: 진행률 바
+  - empty_state: 데이터 없음 상태
+  - loading_spinner: 로딩 인디케이터
+
+  ### 각 컴포넌트 JSON 스키마
+  ```
+  {
+    "name": "component_name",
+    "category": "layout|content|data|form|navigation|feedback",
+    "description": "컴포넌트 설명",
+    "html_template": "<div class=\"comp-name\">{{slot_name}}</div>",
+    "css": ".comp-name { ... var(--color-xxx) ... }",
+    "slots": {
+      "slot_name": {
+        "type": "text|html|list|number|boolean",
+        "required": true,
+        "description": "슬롯 설명",
+        "default": "기본값 (선택)"
+      }
+    },
+    "responsive_css": {
+      "mobile": "@media CSS",
+      "tablet": "@media CSS"
+    },
+    "children_allowed": ["child_component_name"]
+  }
+  ```
+
+  ### 프로젝트 전용 컴포넌트 (필수)
+  위 범용 컴포넌트 외에, **이 프로젝트의 글로벌 컨텍스트(핵심 기능, 화면 설계서, 사용자 흐름도)를 분석**하여
+  프로젝트에 특화된 전용 컴포넌트를 추가로 정의하세요.
+
+  예시 (프로젝트마다 다름):
+  - 챗봇 위젯, GPS 체크인 카드, 지도 뷰, 차트(라인/바), 캘린더 위젯, 사진 갤러리/업로드
+  - 모달 폼, 로그인 폼, 리뷰 폼, 파일 업로드, 알림 배너, 바텀 네비게이션
+  - 도메인 특화 카드 (예: 돌봄 일지 카드, 일정 카드, 결제 상태 카드)
+
+  category는 "domain"으로 지정하세요. 범용 + 전용을 합쳐 **최소 40개** 이상 정의해야 합니다.
+  하위 단계(페이지 레시피)에서 이 컴포넌트들을 참조하므로, 프로젝트 기능에 필요한 컴포넌트를 빠짐없이 만드세요.
+
+  최종 출력: `[{컴포넌트1}, {컴포넌트2}, ...]` JSON 배열
+
+  ### HTML 템플릿 규칙
+  - 슬롯 플레이스홀더: `{{slot_name}}` (Mustache 형식)
+  - 조건부 블록: `{{#if slot_name}}...{{/if}}`
+  - 반복 블록: `{{#each items}}<li>{{_item.field}}</li>{{/each}}`
+  - CSS는 반드시 토큰 변수(var(--color-xxx)) 참조. 하드코딩 색상 금지
+  - 클래스명: BEM 스타일 권장 (comp-name, comp-name__element, comp-name--modifier)
+
+  ### 디자인 규칙
+  - 다크 테마 전용 (모든 색상을 토큰 변수 참조: var(--color-bg), var(--color-surface-1) 등)
+  - 하드코딩 hex/rgb 금지 — 반드시 var(--token) 사용
+  - 버튼: border-radius var(--radius-pill) (pill), hover 시 focus ring (box-shadow: var(--focus-ring))
+  - 카드: border var(--color-border), radius var(--radius-lg). glassmorphism(backdrop-filter: blur) 금지 — 서피스 레이어 계층으로 깊이 표현
+  - 카드 중첩 금지 — 간격·타이포·구분선으로 계층 구분
+  - 테이블 th: text-transform: uppercase, font-size: var(--font-xs), letter-spacing: var(--ls-uppercase)
+  - 모션: transform + opacity만 애니메이트. var(--ease-out) 사용. bounce/elastic 금지
+  - 즉시 응답(hover/toggle): var(--motion-fast, 150ms). 상태 전환: var(--motion-normal, 250ms)
+  - hover: translateY(-2px) + 서피스 밝기 1단계 상승 (그림자 증가 대신)
+  - 터치 타겟 최소 44px (padding/pseudo-element로 확보)
+  - :focus-visible 포커스 링 필수
+  - prefers-reduced-motion 대응 (모션 → crossfade 또는 즉시 전환)
+  - Pretendard Variable 폰트 참조, max-width: 65ch (본문 영역)
+
+  ### 출력 전 자가검증 (확인만 하고 체크리스트를 출력에 포함시키지 마세요)
+  - 최소 40개 컴포넌트가 정의되었는가 (범용 ~20 + 프로젝트 전용 ~20)
+  - 7개 카테고리 모두 커버되는가 (layout, content, data, form, navigation, feedback, domain)
+  - 모든 CSS가 토큰 변수를 참조하는가 (하드코딩 색상 없음)
+  - JSON이 유효한가 (파서로 검증 가능한 상태인가)
+
+split_categories:
+  - name: "layout"
+    description: "페이지 레이아웃 컴포넌트 (header, footer, sidebar, section_wrapper, hero_banner 등)"
+    chunk_items:
+      - page_header
+      - page_footer
+      - sidebar
+      - section_wrapper
+      - hero_banner
+  - name: "content"
+    description: "콘텐츠 표시 컴포넌트 (content_card, stat_card, info_panel, data_table, list_item 등)"
+    chunk_items:
+      - content_card
+      - stat_card
+      - feature_card
+      - info_panel
+      - list_item
+      - timeline_item
+  - name: "data"
+    description: "데이터 시각화 컴포넌트 (chart, progress_bar, timeline, stat_counter 등)"
+    chunk_items:
+      - data_table
+      - stat_counter
+      - chart_line
+      - chart_bar
+      - timeline
+  - name: "form"
+    description: "입력/폼 컴포넌트 (input_field, select_box, checkbox, radio, date_picker, form_group, textarea 등)"
+    chunk_items:
+      - form_group
+      - input_field
+      - select_box
+      - checkbox
+      - radio
+      - textarea
+      - date_picker
+      - button
+      - search_bar
+  - name: "navigation"
+    description: "내비게이션 컴포넌트 (nav_menu, tab_bar, breadcrumb, pagination, sidebar_nav 등)"
+    chunk_items:
+      - breadcrumb
+      - tab_bar
+      - pagination
+      - nav_menu
+  - name: "feedback"
+    description: "피드백/인터랙션 컴포넌트 — ★ 필수: modal, confirm_dialog, bottom_sheet, toast, snackbar, loading_spinner, empty_state, badge, progress_bar"
+    chunk_items:
+      - toast
+      - modal
+      - confirm_dialog
+      - bottom_sheet
+      - snackbar
+      - badge
+      - progress_bar
+      - empty_state
+      - loading_spinner
+  - name: "domain"
+    description: "이 프로젝트 전용 도메인 컴포넌트 (프로젝트 비즈니스 특화 UI)"
+    # domain 은 프로젝트마다 다름 → chunk_items 미지정, 기존 단일 호출 경로 유지
+
+validation:
+  structural:
+    min_chars: 15000
+    min_items: 30
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "Lorem ipsum"]
+  semantic:
+    - "JSON 배열로 파싱 가능한지 검증"
+    - "최소 40개 컴포넌트가 정의되었는지 검증 (범용 + 프로젝트 전용)"
+    - "layout, content, data, form, navigation, feedback, domain 7개 카테고리 커버 검증"
+    - "프로젝트 전용 컴포넌트(domain)가 최소 15개 이상인지 검증"
+    - "CSS에 하드코딩 색상(#xxx)이 없고 var(--) 변수만 사용하는지 검증"
+    - "html_template에 슬롯({{...}})이 올바르게 정의되었는지 검증"
+    - "feedback 카테고리에 인터랙션 필수 컴포넌트(modal, confirm_dialog, bottom_sheet, toast, snackbar) 포함 검증"
+
+qa_prompt: |
+  위 컴포넌트 라이브러리 JSON을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  추가 검증:
+  - 모든 컴포넌트가 조합 가능한 단위인가? (페이지 전체가 아닌 컴포넌트 단위)
+  - slots 정의가 명확하고 재사용에 충분한가?
+  - CSS가 다크 테마 토큰 변수를 올바르게 참조하는가?
+  판정: PASS 또는 FAIL + 구체적 사유

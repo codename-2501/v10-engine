@@ -1,0 +1,141 @@
+name: "UI/UX 디자인 가이드"
+phase: DESIGN
+type: html
+model_preference: opus
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  아래 HTML 템플릿 구조에 맞춰 완전한 HTML 문서를 출력하세요.
+  {{PROJECT_NAME}}은 프로젝트명으로, {{DATE}}는 오늘 날짜로, {{PROJECT_ID}}는 프로젝트 ID로 대체하세요.
+  <!-- CONTENT: --> 주석이 있는 위치에 실제 콘텐츠를 채우세요.
+  예시 항목의 패턴을 따라 실제 프로젝트에 맞는 항목들로 채우세요.
+
+  ### HTML 템플릿:
+  ```html
+  <!DOCTYPE html>
+  <html lang="ko">
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{PROJECT_NAME}} — UI/UX 디자인 가이드</title>
+  <style>/* __INJECT_BASE_CSS__ */
+  .grid-demo { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin: 12px 0; }
+  .grid-col { background: rgba(88,166,255,0.15); border: 1px solid rgba(88,166,255,0.3); border-radius: 3px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--blue); }
+  .spacing-bar { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+  .spacing-bar .bar { background: var(--blue); border-radius: 3px; height: 12px; opacity: 0.7; }
+  .spacing-bar .label { font-size: 12px; color: var(--text-muted); min-width: 60px; }
+  .principle-card { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .principle-card:last-child { border-bottom: none; }
+  .principle-card h3 { margin: 0 0 4px; }
+  .principle-card p { margin: 0; color: var(--text-muted); font-size: 13px; }
+  </style>
+  </head>
+  <body>
+  <div class="toolbar">
+    <a class="back" href="javascript:history.back()">← 돌아가기</a>
+    <span style="flex:1"></span>
+    <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+  </div>
+
+  <h1>{{PROJECT_NAME}} — UI/UX 디자인 가이드</h1>
+  <div class="meta">
+    <span>작성일: {{DATE}}</span>
+    <span>프로젝트 ID: {{PROJECT_ID}}</span>
+  </div>
+
+  <div class="summary">
+    <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">디자인 원칙</div></div>
+    <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">접근성 규칙</div></div>
+    <div class="summary-item"><div class="summary-num amber">0</div><div class="summary-label">인터랙션</div></div>
+  </div>
+
+  <div class="section">
+    <h2>1. 디자인 원칙</h2>
+    <!-- CONTENT: 핵심 디자인 원칙. 아래 패턴 반복 -->
+    <div class="principle-card">
+      <h3>일관성 (Consistency)</h3>
+      <p>동일한 기능에는 동일한 UI 패턴을 적용하여 사용자 학습 비용을 최소화한다.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>2. 그리드 시스템</h2>
+    <!-- CONTENT: 그리드 규격 설명 -->
+    <p style="font-size:13px;color:var(--text-muted);">12열 그리드 / Gutter 16px / Margin 24px</p>
+    <div class="grid-demo">
+      <div class="grid-col">1</div><div class="grid-col">2</div><div class="grid-col">3</div>
+      <div class="grid-col">4</div><div class="grid-col">5</div><div class="grid-col">6</div>
+      <div class="grid-col">7</div><div class="grid-col">8</div><div class="grid-col">9</div>
+      <div class="grid-col">10</div><div class="grid-col">11</div><div class="grid-col">12</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>3. 간격 규칙</h2>
+    <!-- CONTENT: 간격 체계. 아래 패턴 반복 -->
+    <div class="spacing-bar"><span class="label">4px (xs)</span><div class="bar" style="width:16px"></div></div>
+    <div class="spacing-bar"><span class="label">8px (sm)</span><div class="bar" style="width:32px"></div></div>
+    <div class="spacing-bar"><span class="label">16px (md)</span><div class="bar" style="width:64px"></div></div>
+    <div class="spacing-bar"><span class="label">24px (lg)</span><div class="bar" style="width:96px"></div></div>
+  </div>
+
+  <div class="section">
+    <h2>4. 접근성 가이드라인</h2>
+    <!-- CONTENT: WCAG 기준, 색상 대비, 키보드 네비게이션 등 -->
+  </div>
+
+  <div class="section">
+    <h2>5. 반응형 규칙</h2>
+    <!-- CONTENT: 브레이크포인트별 레이아웃 변경 규칙 -->
+    <table>
+      <thead><tr><th>구간</th><th>너비</th><th>동작</th></tr></thead>
+      <tbody>
+        <tr><td>모바일</td><td>&le; 640px</td><td>단일 열, 터치 최적화</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>6. 인터랙션 패턴</h2>
+    <!-- CONTENT: 호버, 클릭, 스와이프 등 인터랙션 정의 -->
+  </div>
+
+  </body>
+  </html>
+  ```
+
+  ### 품질 기준
+  - 컬러 명도 대비는 WCAG 2.1 AA 기준(4.5:1)을 충족할 것
+  - 타이포그래피 스케일은 일관된 비율(예: 1.25 Major Third)을 사용할 것
+  - 간격 시스템은 일관된 기본 단위를 기반으로 할 것
+  - 접근성 가이드는 WCAG 2.1 AA 레벨 이상을 목표로 할 것
+
+  ### 디자인 퀄리티 규칙
+  - 반드시 다크 테마: 배경 #111318, 카드 #1a1d24, 텍스트 #eaedf2. 라이트 테마(흰 배경/밝은 배경) 절대 금지
+  - body background는 반드시 #111318 계열 다크 톤. #f로 시작하는 밝은 배경색 사용 시 검증 실패
+  - Pretendard Variable 웹폰트 사용: font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif
+  - @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+  - 보라색 그라디언트, 기본 시스템 폰트(Segoe UI), AI스러운 정형화 레이아웃 금지
+  - pure black(#000) 금지 — dark grey (#111318~#1c1f27) 사용
+  - 넉넉한 여백: 섹션 간 40px 이상, 카드 padding 24px 이상
+  - 대담한 타이포 계층: 제목 weight 700~800, letter-spacing -.02em
+  - 프로젝트 맥락에 맞는 독창적 톤 적용
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 컬러 팔레트가 충분한 명도 대비를 제공하는가
+  □ 타이포그래피 스케일이 일관된 비율을 따르는가
+  □ 아이콘 체계가 통일된 스타일을 유지하는가
+  □ 간격 시스템이 일관된 기본 단위를 사용하는가
+  □ 접근성 가이드가 WCAG 2.1 AA 기준을 충족하는가
+
+validation:
+  structural:
+    min_chars: 5000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성", "Segoe UI", "background: #f", "background:#f"]
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준: {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

@@ -1,0 +1,76 @@
+name: "API 설계서"
+phase: DESIGN
+type: document
+model_preference: opus
+
+# Stage 9: Dynamic Layer Selection — API 는 PRD + DB schema + data flow 필요
+context_layers:
+  - prd
+  - current_task
+  - db_schema
+  - data_flow
+  - sibling_artifacts
+
+# F4 섹션 분할 — 엔드포인트 다수 + 스키마 상세로 장문이 되기 쉬운 문서.
+sections:
+  - name: "API 목록"
+    outline: "전체 API 엔드포인트를 도메인별로 분류. 테이블(API ID/메서드/경로/설명/인증필요)"
+    target_tokens: 5000
+  - name: "엔드포인트 상세"
+    outline: "각 API의 URL·HTTP 메서드·경로 파라미터·쿼리 파라미터·헤더·설명"
+    target_tokens: 10000
+  - name: "요청/응답 스키마"
+    outline: "각 API의 Request/Response Body JSON 스키마. 테이블(필드명/타입/필수/설명/예시)"
+    target_tokens: 10000
+  - name: "인증 및 권한"
+    outline: "인증 방식(JWT/OAuth/API Key), 토큰 구조, 갱신, API별 Role/Permission 테이블"
+    target_tokens: 5000
+  - name: "에러 코드 체계"
+    outline: "HTTP 상태 코드별 커스텀 에러 코드·메시지·원인·해결 테이블. 공통 에러 응답 포맷"
+    target_tokens: 5000
+  - name: "API 버전 관리"
+    outline: "버저닝 전략(URL/Header), 하위 호환성, Deprecation, 마이그레이션 가이드"
+    target_tokens: 3000
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **API 목록** — 전체 API 엔드포인트를 도메인별로 분류. API ID, 메서드, 경로, 설명, 인증 필요 여부를 표 형태로 정리
+  2. **엔드포인트 상세** — 각 API별 URL, HTTP 메서드, 경로 파라미터, 쿼리 파라미터, 헤더, 설명을 상세히 기술
+  3. **요청/응답 스키마** — 각 API별 Request Body와 Response Body의 JSON 스키마를 정의. 필드명, 타입, 필수 여부, 설명, 예시 값을 표 형태로 정리
+  4. **인증 및 권한** — 인증 방식(JWT/OAuth/API Key 등), 토큰 구조, 갱신 메커니즘, API별 필요 권한(Role/Permission)을 표 형태로 정리
+  5. **에러 코드 체계** — HTTP 상태 코드별 커스텀 에러 코드, 에러 메시지, 원인, 해결 방법을 표 형태로 정리. 에러 응답 공통 포맷 정의
+  6. **API 버전 관리** — 버저닝 전략(URL/Header), 하위 호환성 정책, Deprecation 절차, 마이그레이션 가이드를 기술
+
+  ### 품질 기준
+  - API 설계는 RESTful 원칙을 준수할 것
+  - 요청/응답 스키마에 모든 필드의 타입과 제약조건을 명시할 것
+  - 에러 코드는 체계적 넘버링(예: AUTH-001, DATA-001)을 사용할 것
+  - 인증 방식은 보안 모범 사례를 따를 것
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 모든 API 엔드포인트가 목록에 포함되어 있는가
+  □ 요청/응답 스키마가 빠짐없이 정의되어 있는가
+  □ 에러 코드가 모든 주요 실패 상황을 포괄하는가
+  □ 인증/권한 체계가 보안 요구사항을 충족하는가
+  □ API 버전 관리 정책이 명확한가
+  <!-- SELF_CHECK: {"sections":6,"tables":4,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings: ["API 목록", "엔드포인트 상세", "요청/응답 스키마", "인증 및 권한", "에러 코드 체계", "API 버전 관리"]
+    required_tables: 4
+    min_chars: 3000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "API 설계가 RESTful 원칙을 준수하는가"
+    - "요청/응답 스키마가 완전하고 일관된가"
+    - "에러 코드 체계가 디버깅에 유용한 정보를 제공하는가"
+    - "인증 방식이 보안 모범 사례를 따르는가"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준: {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

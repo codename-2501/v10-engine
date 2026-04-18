@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/qa/verdict_reconciler.py
+# hypothesis_version: 6.141.1
+
+[0.8, 100, 'CRITICAL', 'FAIL', 'HIGH', 'PASS', '^#{1,4}\\s+(.+?)\\s*$', 'actual', 'categories', 'changed', 'description', 'filtered_count', 'headers_found', 'issues', 'matched_header', 'missing', 'raw_original', 'removed_issues', 'required_headings', 'result', 'score', 'score_after', 'score_before', 'severity', 'structural', 'summary', 'title', 'validation', '누락', '부재', '없음', '작성되지 않', '전무', '포함되지 않']

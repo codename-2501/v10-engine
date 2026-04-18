@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/core/content_cache.py
+# hypothesis_version: 6.141.1
+
+['0', '1', 'V8_CONTENT_CACHE', 'cache_key', 'entries', 'total_hits', 'total_input_saved', 'total_output_saved', 'utf-8']

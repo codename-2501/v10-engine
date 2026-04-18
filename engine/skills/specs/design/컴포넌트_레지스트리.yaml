@@ -1,0 +1,104 @@
+name: "컴포넌트 레지스트리"
+phase: DESIGN
+type: json
+model_preference: sonnet
+composition_role: registry
+
+# S9: upstream 화면 목록 정의서에서 페이지 ID 자동 추출 → 페이지당 1회 LLM 호출.
+# 프로젝트 도메인 무관 (실버케어 SC-XX, 이커머스 SC-SH, 금융 SC-AC 등 모두 동작).
+chunk_items_source:
+  from_spec: "화면 목록 정의서"
+  extract_pattern: "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙 (엄수):
+  1. 순수 JSON만 출력. 마크다운 코드 블록(```)으로 감싸지 마세요.
+  2. 도구 호출(function_calls, invoke 등) 절대 금지.
+  3. JSON 문자열 값 안에 따옴표 중첩("") 금지 — 필요하면 작은따옴표(') 사용.
+  4. JSON 값에 JavaScript 표현식("값" + "변수") 절대 금지 — 정적 문자열만.
+  5. slots_mapping 값은 순수 문자열 경로(예: "user.name") 또는 설명 텍스트만.
+  6. 자가검증 체크리스트를 출력에 포함시키지 마세요 (내부 확인만).
+
+  화면 설계서와 컴포넌트 라이브러리를 분석하여,
+  **각 페이지에 필요한 컴포넌트와 슬롯 바인딩을 매핑**하세요.
+
+  이 산출물은 페이지 레시피 생성의 중간 단계입니다.
+  화면 설계서의 모든 화면(SCR-XXX)에 대해 어떤 컴포넌트가 필요한지 정리합니다.
+
+  ### 출력 JSON 스키마
+  ```
+  {
+    "pages": [
+      {
+        "page_name": "화면 이름",
+        "page_slug": "url-safe-name",
+        "screen_ids": ["SCR-001", "SCR-002"],
+        "area": "FO|BO",
+        "layout": "single-column|sidebar-left|two-column|grid",
+        "components": [
+          {
+            "component_name": "라이브러리에 정의된 컴포넌트 이름",
+            "order": 1,
+            "purpose": "이 위치에서 컴포넌트의 역할",
+            "data_source": "어떤 데이터를 바인딩할지 설명",
+            "slots_mapping": {
+              "slot_name": "바인딩할 값 또는 데이터 경로 설명"
+            },
+            "condition": "조건부 렌더링 조건 (선택)",
+            "repeat": "반복 렌더링 데이터 소스 (선택)"
+          }
+        ]
+      }
+    ],
+    "shared_components": {
+      "header": "page_header — 모든 페이지 공통",
+      "footer": "page_footer — 모든 페이지 공통",
+      "sidebar": "sidebar — BO 페이지 공통"
+    },
+    "missing_components": [
+      {
+        "name": "필요하지만 라이브러리에 없는 컴포넌트",
+        "reason": "필요한 이유",
+        "suggested_category": "카테고리"
+      }
+    ]
+  }
+  ```
+
+  ### 규칙
+  - 화면 설계서의 모든 화면(SCR-XXX)을 빠짐없이 매핑
+  - FO + BO 양쪽 모두 포함
+  - 컴포넌트 이름은 라이브러리에 정의된 이름을 정확히 사용
+  - 라이브러리에 없는 컴포넌트가 필요하면 missing_components에 기록
+  - 공통 컴포넌트(헤더, 푸터, 사이드바)는 shared_components로 분리
+  - page_slug는 URL-safe 영문 소문자+하이픈
+
+  ### 출력 전 자가검증 (확인만 하고 체크리스트를 출력에 포함시키지 마세요)
+  - 모든 SCR-XXX가 매핑되었는가
+  - FO + BO 양쪽 포함
+  - 컴포넌트 이름이 라이브러리와 일치
+  - JSON이 유효한가
+
+validation:
+  structural:
+    min_chars: 5000
+    min_items: 10
+    forbidden: ["TODO", "TBD", "미정", "작성 예정"]
+  semantic:
+    - "JSON 파싱이 가능한 유효한 형식인지 검증"
+    - "화면 설계서의 모든 화면이 매핑되었는지 검증"
+    - "FO + BO 양쪽 페이지가 포함되었는지 검증"
+    - "컴포넌트 이름이 라이브러리에 존재하는 이름인지 검증"
+
+qa_prompt: |
+  위 컴포넌트 레지스트리 JSON을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  추가 검증:
+  - 각 페이지에 충분한 컴포넌트가 배치되어 있는가?
+  - slots_mapping이 합리적인가?
+  - missing_components가 있다면 라이브러리 보완이 필요한가?
+  판정: PASS 또는 FAIL + 구체적 사유

@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/core/state_machine.py
+# hypothesis_version: 6.141.1
+
+['AWAITING_APPROVAL', 'BLOCKED', 'BUDGET_EXCEEDED', 'BUILD', 'CIRCUIT_BREAKER', 'COMPLETED', 'DEFINE', 'DELIVER', 'DESIGN', 'FAILED', 'GATE', 'INVALID', 'IN_PROGRESS', 'NEEDS_HUMAN', 'NOT_STARTED', 'QA', 'READY', 'SHUTDOWN_DRAIN', 'SKIPPED', 'SUSPENDED', 'TASK', 'VERIFY']

@@ -1,0 +1,70 @@
+name: "인터페이스 명세서"
+phase: DESIGN
+type: document
+model_preference: opus
+
+# F4 섹션 분할 (S1-1) — API 목록이 장문이 되는 대형 문서. outline-first가
+# 전체 API 리스트를 먼저 확정한 뒤 각 섹션이 동일 리스트 강제.
+sections:
+  - name: "API 목록"
+    outline: "모든 API를 테이블(#/Method/Endpoint/요청 파라미터/응답 형식/인증 방식/설명)로 정리. 프로젝트 범위 따라 중형 30~60개, 대형 60~100+"
+    target_tokens: 10000
+    min_items: 20
+  - name: "외부 연동 인터페이스"
+    outline: "외부 시스템 연동 테이블(시스템명/프로토콜/데이터형식/인증/용도) + 연동 시퀀스 다이어그램(텍스트)"
+    target_tokens: 5000
+    min_items: 3
+  - name: "에러 처리 표준"
+    outline: "HTTP 상태코드별 에러 응답 형식·에러 코드 체계·재시도 정책"
+    target_tokens: 4000
+    min_items: 8
+  - name: "인증/인가 방식"
+    outline: "JWT/OAuth/API Key 상세 설계·토큰 생명주기·RBAC/ABAC 권한 체계"
+    target_tokens: 5000
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **API 목록** — 모든 API를 테이블(#/Method/Endpoint/요청 파라미터/응답 형식/인증 방식/설명)로 정리. RESTful 규칙 준수.
+  2. **외부 연동 인터페이스** — 외부 시스템과의 연동 인터페이스를 테이블(시스템명/프로토콜/데이터형식/인증/용도)로 정리. 연동 시퀀스 다이어그램(텍스트 기반) 포함.
+  3. **에러 처리 표준** — HTTP 상태코드별 에러 응답 형식, 에러 코드 체계, 재시도 정책 서술.
+  4. **인증/인가 방식** — 인증 방식(JWT/OAuth/API Key 등) 상세 설계, 토큰 생명주기, 권한 체계(RBAC/ABAC) 서술.
+
+  ### 품질 기준
+  - API Endpoint 네이밍이 RESTful 규칙 준수
+  - 모든 API에 요청/응답 예시 포함
+  - 에러 처리 표준이 일관된 형식
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 4개 필수 섹션 모두 작성 완료
+  □ 테이블 2개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ API 네이밍 RESTful 규칙 준수
+  □ 인증 방식 상세 설계 포함
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":4,"tables":2,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "API 목록"
+      - "외부 연동 인터페이스"
+      - "에러 처리 표준"
+      - "인증/인가 방식"
+    required_tables: 2
+    min_chars: 2500
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "API 엔드포인트가 RESTful 네이밍 규칙을 일관되게 따르는지 검증"
+    - "모든 API에 요청/응답 형식과 인증 방식이 명시되어 있는지 검증"
+    - "에러 처리 표준이 모든 API에 일관되게 적용 가능한지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

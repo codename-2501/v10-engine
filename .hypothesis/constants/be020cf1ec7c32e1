@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/validators/structure.py
+# hypothesis_version: 6.141.1
+
+['[^\\w가-힣\\n#]', '[^\\w가-힣]', '\\s*\\(.*?\\)\\s*', '^##\\s+', '^#{1,6}\\s*.*', '^#{1,6}\\s+.*', '^\\|[\\s\\-:|]+\\|', 'min_sections', 'required_headings', 'required_tables']

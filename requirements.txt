@@ -1,0 +1,26 @@
+# ========== 핵심 의존성 (필수) ==========
+fastapi>=0.111.0
+jinja2>=3.1.0
+python-multipart>=0.0.9
+uvicorn[standard]>=0.29.0
+aiohttp>=3.9.0
+PyJWT>=2.8.0
+cryptography>=42.0.0
+bcrypt>=4.0.1
+structlog>=24.1.0
+prometheus_client>=0.20.0
+
+# ========== Phase F (선택 — fallback 있음) ==========
+# Vector Episode Memory: 설치 시 sentence-transformers 사용,
+# 미설치 시 engine/ai/embedding_adapter.py 의 TFIDFHash fallback 자동 동작.
+sentence-transformers>=2.7.0
+
+# ========== PostgreSQL 백엔드 (선택) ==========
+# DATABASE_URL=postgresql://... 사용 시 아래 주석 해제.
+# 기본은 SQLite (sqlite:///platform.db) — 추가 설치 불필요.
+# asyncpg>=0.29.0
+
+# ========== 테스트 의존성 ==========
+hypothesis>=6.100.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

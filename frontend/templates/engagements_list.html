@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}인게이지먼트 — AX FACTORY{% endblock %}
+{% block page_title %}인게이지먼트{% endblock %}
+
+{% block head_extra %}
+<style>
+  .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  @media (max-width: 1100px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 768px)  { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px)  { .stat-grid { grid-template-columns: 1fr; } }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.25rem; }
+  .stat-num  { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+  .stat-lbl  { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem; }
+  .toolbar   { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+  .search-input {
+    flex: 1; max-width: 320px;
+    padding: 0.45rem 0.75rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 0.85rem;
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .priority-HIGH    { color: var(--danger); }
+  .priority-MEDIUM  { color: var(--warning); }
+  .priority-LOW     { color: var(--text-muted); }
+  .empty-row td { text-align: center; padding: 3rem; color: var(--text-muted); }
+  .action-btns { display: flex; gap: .3rem; flex-wrap: nowrap; }
+  .action-btns .btn { font-size: .72rem; padding: .22rem .55rem; white-space: nowrap; }
+  .btn-reset { color: var(--warning); border-color: var(--warning); }
+  .btn-reset:hover { background: rgba(245,158,11,.1); }
+  .btn-purge { color: var(--danger); border-color: var(--danger); }
+  .btn-purge:hover { background: rgba(239,68,68,.1); }
+
+  .toast {
+    position: fixed; top: 1.5rem; right: 1.5rem; z-index: 200;
+    padding: .75rem 1.25rem; border-radius: 8px; font-size: .85rem; font-weight: 600;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15); animation: slideIn .3s ease-out; max-width: 400px;
+  }
+  .toast.success { background: #065f46; color: #a7f3d0; border: 1px solid var(--st-completed); }
+  .toast.error   { background: #7f1d1d; color: #fca5a5; border: 1px solid var(--st-failed); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 통계 -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-num">{{ stats.get('total', 0) or 0 }}</div>
+    <div class="stat-lbl">전체</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:var(--success)">{{ stats.get('active', 0) or 0 }}</div>
+    <div class="stat-lbl">진행 중</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:var(--warning)">{{ stats.get('paused', 0) or 0 }}</div>
+    <div class="stat-lbl">일시정지</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:var(--info)">{{ stats.get('completed', 0) or 0 }}</div>
+    <div class="stat-lbl">완료</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:var(--text-muted)">{{ stats.get('closed', 0) or 0 }}</div>
+    <div class="stat-lbl">종료</div>
+  </div>
+</div>
+
+<!-- 툴바 -->
+<div class="toolbar">
+  <input class="search-input" id="searchInput" type="text" placeholder="이름 또는 고객사 검색..."
+         oninput="filterTable(this.value)">
+  <a href="/intake" class="btn btn-primary" style="text-decoration:none">+ 새 인테이크 접수</a>
+</div>
+
+<!-- 테이블 -->
+<div class="card" style="padding:0;overflow:hidden;">
+  <table class="table" id="engTable">
+    <thead>
+      <tr>
+        <th>이름</th>
+        <th>고객사</th>
+        <th>우선순위</th>
+        <th>상태</th>
+        <th>생성일</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="engBody">
+      {% if engagements %}
+        {% for e in engagements %}
+        <tr data-name="{{ e.name|lower }}" data-client="{{ (e.client_name or '')|lower }}">
+          <td><a href="/engagements/{{ e.id }}" style="color:var(--text);font-weight:500">{{ e.name }}</a></td>
+          <td style="color:var(--text-muted)">{{ e.client_name or '—' }}</td>
+          <td class="priority-{{ e.priority or 'MEDIUM' }}">{{ e.priority or 'MEDIUM' }}</td>
+          <td>
+            {% if e.status == 'INTAKE' %}
+              <span class="badge badge-accent">접수완료</span>
+            {% elif e.status == 'ACTIVE' %}
+              <span class="badge badge-success">진행중</span>
+            {% elif e.status == 'PAUSED' %}
+              <span class="badge badge-warning">일시정지</span>
+            {% elif e.status == 'COMPLETED' %}
+              <span class="badge badge-info">완료</span>
+            {% elif e.status == 'ARCHIVED' %}
+              <span class="badge badge-muted">보관</span>
+            {% elif e.status == 'FORCE_CLOSED' %}
+              <span class="badge badge-danger">강제종료</span>
+            {% else %}
+              <span class="badge badge-muted">{{ e.status }}</span>
+            {% endif %}
+          </td>
+          <td style="color:var(--text-muted);font-size:0.8rem">{{ e.created_at[:10] if e.created_at else '—' }}</td>
+          <td>
+            <div class="action-btns">
+              <a href="/engagements/{{ e.id }}" class="btn">상세</a>
+              {% if e.status in ('ACTIVE', 'COMPLETED', 'PAUSED') %}
+                <a href="/engagements/{{ e.id }}/deliverables" class="btn">산출물</a>
+                <a href="/engagements/{{ e.id }}/dag" class="btn">DAG</a>
+              {% endif %}
+              {% if e.status == 'INTAKE' %}
+                <button class="btn" style="background:var(--st-completed);color:#fff;border-color:var(--st-completed);" onclick="startProject('{{ e.id }}', '{{ e.name }}')">▶ 착수</button>
+              {% endif %}
+              {% if e.status in ('ACTIVE', 'PAUSED', 'FORCE_CLOSED') %}
+                <button class="btn btn-reset" onclick="resetEngagement('{{ e.id }}', '{{ e.name }}')">초기화</button>
+              {% endif %}
+              {% if e.status in ('INTAKE', 'ARCHIVED', 'FORCE_CLOSED') %}
+                <button class="btn btn-purge" onclick="purgeEngagement('{{ e.id }}', '{{ e.name }}')">삭제</button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr class="empty-row"><td colspan="6">아직 인게이지먼트가 없습니다.<br><a href="/intake">인테이크 폼</a>에서 새 프로젝트를 접수하세요.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<div id="toastContainer"></div>
+<script>
+const TOKEN   = localStorage.getItem('ai_si_token') || '';
+const HEADERS = {'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json'};
+
+function filterTable(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#engBody tr[data-name]').forEach(tr => {
+    const match = tr.dataset.name.includes(q) || tr.dataset.client.includes(q);
+    tr.style.display = match ? '' : 'none';
+  });
+}
+
+function showToast(msg, type) {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'all .3s'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+async function resetEngagement(id, name) {
+  if (!confirm(`"${name}" 프로젝트를 처음부터 다시 시작하시겠습니까?\n\n모든 산출물과 진행 상태가 초기화됩니다.`)) return;
+  try {
+    const r = await fetch('/api/v1/engagements/' + id + '/reset', {method:'POST', headers:HEADERS});
+    const d = await r.json();
+    if (r.ok) {
+      showToast(`"${name}" 초기화 완료 — DAG ${d.deleted_dags}개 삭제`, 'success');
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      showToast('초기화 실패: ' + (d.detail || r.status), 'error');
+    }
+  } catch(e) { showToast('오류: ' + e.message, 'error'); }
+}
+
+async function startProject(id, name) {
+  if (!confirm(`"${name}" 프로젝트를 착수하시겠습니까?`)) return;
+  try {
+    const r = await fetch('/api/v1/engagements/' + id + '/dag/start', {method:'POST', headers:HEADERS});
+    const d = await r.json();
+    if (r.ok) {
+      showToast(`"${name}" 착수 완료`, 'success');
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showToast('착수 실패: ' + (d.detail || r.status), 'error');
+    }
+  } catch(e) { showToast('오류: ' + e.message, 'error'); }
+}
+
+async function purgeEngagement(id, name) {
+  if (!confirm(`"${name}" 인게이지먼트를 완전히 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+  if (!confirm(`정말로 삭제하시겠습니까? 모든 데이터가 영구 삭제됩니다.`)) return;
+  try {
+    const r = await fetch('/api/v1/engagements/' + id + '/purge', {method:'DELETE', headers:HEADERS});
+    if (r.ok || r.status === 204) {
+      showToast(`"${name}" 삭제 완료`, 'success');
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      const d = await r.json().catch(()=>({}));
+      showToast('삭제 실패: ' + (d.detail || r.status), 'error');
+    }
+  } catch(e) { showToast('오류: ' + e.message, 'error'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} — UI/UX 디자인 가이드</title>
+<style>/* __INJECT_BASE_CSS__ */
+.grid-demo { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin: 12px 0; }
+.grid-col { background: rgba(0,212,255,.12); border: 1px solid rgba(0,212,255,.25); border-radius: 3px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--accent); }
+.spacing-bar { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+.spacing-bar .bar { background: var(--accent); border-radius: 3px; height: 12px; opacity: 0.7; }
+.spacing-bar .label { font-size: 12px; color: var(--text-3); min-width: 60px; }
+.principle-card { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.principle-card:last-child { border-bottom: none; }
+.principle-card h3 { margin: 0 0 4px; }
+.principle-card p { margin: 0; color: var(--text-2); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a class="back" href="javascript:history.back()">← 돌아가기</a>
+  <span style="flex:1"></span>
+  <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+</div>
+
+<h1>{{PROJECT_NAME}} — UI/UX 디자인 가이드</h1>
+<div class="meta">
+  <span>작성일: {{DATE}}</span>
+  <span>프로젝트 ID: {{PROJECT_ID}}</span>
+</div>
+
+<div class="summary">
+  <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">디자인 원칙</div></div>
+  <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">접근성 규칙</div></div>
+  <div class="summary-item"><div class="summary-num amber">0</div><div class="summary-label">인터랙션</div></div>
+</div>
+
+<div class="section">
+  <h2>1. 디자인 원칙</h2>
+  <!-- CONTENT: 핵심 디자인 원칙. 아래 패턴 반복 -->
+  <div class="principle-card">
+    <h3>일관성 (Consistency)</h3>
+    <p>동일한 기능에는 동일한 UI 패턴을 적용하여 사용자 학습 비용을 최소화한다.</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2>2. 그리드 시스템</h2>
+  <!-- CONTENT: 그리드 규격 설명 -->
+  <p style="font-size:13px;color:var(--text-2);">12열 그리드 / Gutter 16px / Margin 24px</p>
+  <div class="grid-demo">
+    <div class="grid-col">1</div><div class="grid-col">2</div><div class="grid-col">3</div>
+    <div class="grid-col">4</div><div class="grid-col">5</div><div class="grid-col">6</div>
+    <div class="grid-col">7</div><div class="grid-col">8</div><div class="grid-col">9</div>
+    <div class="grid-col">10</div><div class="grid-col">11</div><div class="grid-col">12</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>3. 간격 규칙</h2>
+  <!-- CONTENT: 간격 체계. 아래 패턴 반복 -->
+  <div class="spacing-bar"><span class="label">4px (xs)</span><div class="bar" style="width:16px"></div></div>
+  <div class="spacing-bar"><span class="label">8px (sm)</span><div class="bar" style="width:32px"></div></div>
+  <div class="spacing-bar"><span class="label">16px (md)</span><div class="bar" style="width:64px"></div></div>
+  <div class="spacing-bar"><span class="label">24px (lg)</span><div class="bar" style="width:96px"></div></div>
+</div>
+
+<div class="section">
+  <h2>4. 접근성 가이드라인</h2>
+  <!-- CONTENT: WCAG 기준, 색상 대비, 키보드 네비게이션 등 -->
+</div>
+
+<div class="section">
+  <h2>5. 반응형 규칙</h2>
+  <!-- CONTENT: 브레이크포인트별 레이아웃 변경 규칙 -->
+  <table>
+    <thead><tr><th>구간</th><th>너비</th><th>동작</th></tr></thead>
+    <tbody>
+      <tr><td>모바일</td><td>&le; 640px</td><td>단일 열, 터치 최적화</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>6. 인터랙션 패턴</h2>
+  <!-- CONTENT: 호버, 클릭, 스와이프 등 인터랙션 정의 -->
+</div>
+
+</body>
+</html>

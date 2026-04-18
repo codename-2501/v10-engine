@@ -1,0 +1,55 @@
+name: "RAG 파이프라인 구축"
+phase: DEVELOPMENT
+type: document
+model_preference: opus
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **문서 처리** — 문서 소스, 파싱(PDF/HTML/DOC), 청킹 전략(크기/오버랩/의미 기반), 메타데이터 추출을 테이블(소스/포맷/청크크기/오버랩/전략)로 정리.
+  2. **임베딩** — 임베딩 모델 선택(OpenAI/Cohere/오픈소스), 차원 수, 벤치마크, 배치 처리, 캐싱 전략을 테이블(모델/차원/성능/비용/속도)로 정리.
+  3. **벡터DB** — 벡터 데이터베이스 선택(Pinecone/Weaviate/Milvus/Chroma 등), 인덱스 설정, 스케일링, 백업, 메타데이터 필터링 서술.
+  4. **검색** — 검색 전략(유사도/하이브리드/리랭킹), top-k 설정, 필터링, 검색 품질 최적화, 쿼리 변환 서술.
+  5. **생성** — LLM 연동, 컨텍스트 주입 전략, 프롬프트 구성, 소스 인용, 답변 품질 제어 서술.
+  6. **평가** — RAG 파이프라인 평가 메트릭(Context Relevancy/Faithfulness/Answer Relevancy), 평가 데이터셋, 평가 결과를 테이블(메트릭/점수/기준/판정)로 정리.
+
+  ### 품질 기준
+  - 청킹 전략에 비교 실험 결과 포함
+  - 검색 전략에 하이브리드/리랭킹 고려
+  - 평가에 RAGAS 메트릭 포함
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 6개 필수 섹션 모두 작성 완료
+  □ 테이블 3개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ 청킹 전략 상세 명시
+  □ 평가 메트릭 및 결과 존재
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":6,"tables":3,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "문서 처리"
+      - "임베딩"
+      - "벡터DB"
+      - "검색"
+      - "생성"
+      - "평가"
+    required_tables: 3
+    min_chars: 3000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "청킹 전략에 비교 실험 결과가 포함되어 있는지 검증"
+    - "검색 전략에 하이브리드/리랭킹이 고려되어 있는지 검증"
+    - "평가에 RAGAS 메트릭이 포함되어 있는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

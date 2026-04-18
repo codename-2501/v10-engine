@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/composition/registry.py
+# hypothesis_version: 6.141.1
+
+['%Y-%m-%dT%H:%M:%SZ', '-', ':root {', '_', 'bindings', 'body_size', 'breakpoints', 'category', 'children_allowed', 'colors', 'component_name', 'condition', 'content_hash', 'css', 'data', 'description', 'effects', 'font_family', 'heading_scale', 'html_template', 'id', 'layout', 'line_height', 'meta', 'name', 'order', 'page_css', 'page_js', 'page_name', 'page_slug', 'placements', 'project_id', 'repeat', 'responsive_css', 'single-column', 'slot_name', 'slots', 'source_artifact', 'source_path', 'spacing', 'title', 'transform', 'typography', 'value', 'version', 'wrapper_css_class', '}']

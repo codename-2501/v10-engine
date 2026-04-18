@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}시스템 상태 — AX FACTORY{% endblock %}
+{% block page_title %}시스템 상태{% endblock %}
+
+{% block head_extra %}
+<style>
+  .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  @media (max-width: 900px)  { .status-grid { grid-template-columns: repeat(2, 1fr); } .row-2 { grid-template-columns: 1fr; } }
+  @media (max-width: 480px)  { .status-grid { grid-template-columns: 1fr; } }
+  .status-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.25rem; }
+  .status-num  { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+  .status-lbl  { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem; }
+  .section-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+                   letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.75rem; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .event-row { display: flex; justify-content: space-between; padding: 0.45rem 0;
+               border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+  .event-row:last-child { border-bottom: none; }
+  .event-type { color: var(--accent); font-family: monospace; font-size: 0.75rem; }
+  .event-time { color: var(--text-muted); font-size: 0.72rem; }
+  .shutdown-banner {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px; padding: 0.9rem 1.25rem; margin-bottom: 1rem;
+    color: var(--danger); font-weight: 600;
+  }
+  .node-bar { margin-bottom: 0.6rem; }
+  .node-bar-label { display: flex; justify-content: space-between;
+                    font-size: 0.78rem; margin-bottom: 0.2rem; }
+  .bar-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 4px; transition: width 0.4s; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if shutting_down %}
+<div class="shutdown-banner">⚠️ 서버 종료 진행 중 — 신규 작업 중단됨</div>
+{% endif %}
+
+<!-- 노드 상태 요약 -->
+<div class="section-title">노드 상태</div>
+<div class="status-grid">
+  <div class="status-card">
+    <div class="status-num">{{ nodes.get('total', 0) or 0 }}</div>
+    <div class="status-lbl">전체 노드</div>
+  </div>
+  <div class="status-card">
+    <div class="status-num" style="color:var(--info)">{{ nodes.get('in_progress', 0) or 0 }}</div>
+    <div class="status-lbl">실행 중</div>
+  </div>
+  <div class="status-card">
+    <div class="status-num" style="color:var(--danger)">{{ nodes.get('needs_human', 0) or 0 }}</div>
+    <div class="status-lbl">사람 필요</div>
+  </div>
+  <div class="status-card">
+    <div class="status-num" style="color:var(--warning)">{{ nodes.get('suspended', 0) or 0 }}</div>
+    <div class="status-lbl">일시정지</div>
+  </div>
+</div>
+
+<div class="row-2">
+  <!-- 노드 상태 분포 -->
+  <div class="card">
+    <div class="section-title">노드 상태 분포</div>
+    {% set total = (nodes.get('total', 0) or 1) %}
+    {% for state, color, label in [
+        ('completed',  'var(--st-completed)', '완료'),
+        ('in_progress','var(--st-progress)', '실행중'),
+        ('needs_human','var(--st-failed)', '사람필요'),
+        ('suspended',  'var(--st-awaiting)', '일시정지'),
+        ('failed',     'var(--st-failed)', '실패'),
+        ('blocked',    'var(--st-muted)', '블록됨'),
+        ('awaiting',   'var(--st-ready)', '승인대기'),
+      ] %}
+    {% set cnt = nodes.get(state, 0) or 0 %}
+    <div class="node-bar">
+      <div class="node-bar-label">
+        <span>{{ label }}</span>
+        <span style="color:var(--text-muted)">{{ cnt }}</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:{{ ((cnt / total) * 100)|int }}%;background:{{ color }}"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- 인게이지먼트 + 최근 이벤트 -->
+  <div style="display:flex;flex-direction:column;gap:1rem;">
+    <div class="card">
+      <div class="section-title">인게이지먼트</div>
+      <div style="display:flex;gap:2rem;">
+        <div>
+          <div style="font-size:1.5rem;font-weight:700">{{ engagements.get('total', 0) or 0 }}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted)">전체</div>
+        </div>
+        <div>
+          <div style="font-size:1.5rem;font-weight:700;color:var(--success)">{{ engagements.get('active', 0) or 0 }}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted)">진행 중</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1">
+      <div class="section-title">최근 이벤트 <span id="refresh-time" style="font-weight:400;font-size:0.68rem"></span></div>
+      <div style="max-height:220px;overflow-y:auto">
+        {% if recent_events %}
+          {% for ev in recent_events %}
+          <div class="event-row">
+            <span class="event-type">{{ ev.event_type }}</span>
+            <span class="event-time">{{ ev.recorded_at[:19] if ev.recorded_at else '' }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="color:var(--text-muted);font-size:0.85rem;padding:1rem 0">이벤트 없음</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 헬스체크 -->
+<div class="card" style="margin-top:1rem">
+  <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+    서버 헬스체크
+    <button class="btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;" onclick="runHealthCheck()">새로고침</button>
+  </div>
+  <div id="health-result" style="display:flex;gap:1.5rem;flex-wrap:wrap;padding:0.25rem 0;">
+    <span style="color:var(--text-muted);font-size:0.85rem;">확인 중...</span>
+  </div>
+</div>
+
+<!-- 빠른 링크 -->
+<div class="card" style="margin-top:1rem">
+  <div class="section-title">빠른 이동</div>
+  <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+    <a href="/" class="btn">대시보드</a>
+    <a href="/engagements" class="btn">인게이지먼트 목록</a>
+    <a href="/intake/submissions" class="btn">접수 관리</a>
+    <a href="/docs" class="btn" target="_blank">API 문서</a>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('refresh-time').textContent =
+    '— ' + new Date().toLocaleTimeString('ko-KR');
+
+  async function runHealthCheck() {
+    const el = document.getElementById('health-result');
+    el.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem;">확인 중...</span>';
+    try {
+      const start = Date.now();
+      const resp = await fetch('/health');
+      const ms = Date.now() - start;
+      const data = await resp.json();
+      const statusColor = data.status === 'ok' ? 'var(--success)' : 'var(--danger)';
+      const dbColor = data.db ? 'var(--success)' : 'var(--danger)';
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${statusColor};display:inline-block;"></span>
+          <span style="font-size:0.875rem;font-weight:600;color:${statusColor}">서버 ${data.status === 'ok' ? '정상' : '오류'}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${dbColor};display:inline-block;"></span>
+          <span style="font-size:0.875rem;font-weight:600;color:${dbColor}">DB ${data.db ? '연결됨' : '오류'}</span>
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-muted);">응답: ${ms}ms</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">확인: ${new Date().toLocaleTimeString('ko-KR')}</div>
+      `;
+    } catch(e) {
+      el.innerHTML = `<span style="color:var(--danger);font-size:0.85rem;">연결 실패: ${e.message}</span>`;
+    }
+  }
+  runHealthCheck();
+</script>
+{% endblock %}

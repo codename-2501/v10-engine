@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/core/state_store.py
+# hypothesis_version: 6.141.1
+
+[500, 'COMPLETE', 'FAILED', 'PENDING', 'RESERVED', 'SKIPPED', 'cnt', 'item_key', 'retry_count', 'status']

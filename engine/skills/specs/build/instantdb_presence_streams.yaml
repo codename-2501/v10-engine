@@ -1,0 +1,75 @@
+name: "InstantDB Presence Streams"
+phase: BUILD
+type: code
+model_preference: opus
+backend_requirement: "instantdb"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  InstantDB Presence(누가 지금 여기 있는지) 및 Streams(일회성 이벤트)
+  기능을 활용해 협업/실시간 UX를 구현하세요. 프로젝트 특성상 협업
+  요소가 약하면 최소 스켈레톤 + 활성화 시 확장 가능한 형태로.
+
+  ### Presence / Streams 특성 반영 (MANDATORY)
+  - `db.room(roomType, roomId)` 으로 방 인스턴스 획득
+  - Presence: `useSyncPresence({ name, cursor, color })` — 자동 구독/업데이트
+  - Streams: `room.publishTopic('typing', { userId })`, `room.useTopicEffect`
+  - 데이터는 영속화되지 않음 (DB 저장 없음) — 오직 실시간 브로드캐스트
+  - 기본 TTL 짧음 (세션 종료 시 자동 정리)
+
+  ### 필수 섹션 (순서 준수)
+  1. **사용 시나리오 매핑** — 이 프로젝트에서 Presence/Streams가
+     유용한 화면/기능 식별 (없으면 "현재 미사용, 향후 확장 지점" 명시)
+  2. **Room 정의** — 각 room의 타입(page/chat/document), 참여 조건,
+     데이터 schema
+  3. **Presence 구현** — useSyncPresence 훅 활용, 아바타 리스트 UI,
+     cursor/focus 동기화 예시
+  4. **Streams(Topics) 구현** — typing indicator, reactions,
+     notifications 중 적용 가능한 것 구현
+  5. **확장 훅** — useOnlineUsers, useTypingIndicator, useReactions
+     커스텀 훅으로 추상화
+  6. **성능 및 제한** — 방 당 최대 참여자, 토픽 크기 제한,
+     권한(같은 방 참여자만 메시지 수신)
+
+  ### 품질 기준
+  - 모든 room 참여는 인증된 사용자만
+  - Presence 데이터는 최소 (이름, 색상, 커서 위치) — 개인정보 노출 금지
+  - room ID 는 예측 불가한 값 (추측으로 난입 불가)
+  - Streams 토픽 이름은 상수 관리 (오타 방지)
+  - 미사용 시에도 섹션은 채움 ("이 프로젝트는 해당 기능 비활성화" 명시)
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 6개 필수 섹션 모두 작성 완료 (미사용 시에도 명시)
+  □ Presence 또는 Streams 중 최소 하나 구현 코드 포함
+  □ room 참여 권한 검증 로직 존재
+  □ 커스텀 훅 (useOnlineUsers 등) 최소 1개
+  □ 방 당 참여자/토픽 크기 제한 명시
+
+  <!-- SELF_CHECK: {"sections":6,"active_features":N,"rooms":M,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "사용 시나리오"
+      - "Room 정의"
+      - "Presence"
+      - "Streams"
+      - "확장 훅"
+      - "성능 및 제한"
+    has_code_blocks: true
+    min_chars: 4000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "room 참여가 인증된 사용자로 제한되는지 검증"
+    - "Presence 데이터에 비밀번호/개인정보 등 민감 정보가 포함되지 않는지 검증"
+    - "room ID가 예측 불가한 값(UUID 등)으로 생성되는지 검증"
+    - "Streams 토픽 이름이 상수로 관리되어 오타 버그를 방지하는지 검증"
+    - "이 프로젝트에 해당 기능이 실제로 유용한지 사용 시나리오가 명확히 제시되는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

@@ -1,0 +1,16 @@
+name: "AI 이미지 생성 참조"
+type: reference
+description: |
+  inference.sh CLI 기반 이미지 생성 가이드.
+  산출물 내 다이어그램, 아키텍처 시각화, 목업 이미지 생성 시 참조.
+models:
+  fast_cheap: "FLUX Klein ($0.0001/image)"
+  balanced: "FLUX 1.1 Pro ($0.04/image)"
+  high_quality: "Seedream 4.5 / ImagineArt 1.5 Pro"
+capabilities:
+  - text-to-image
+  - image-to-image
+  - inpainting
+  - upscaling
+  - text rendering on images
+usage: "infsh generate --model <model> --prompt '<description>'"

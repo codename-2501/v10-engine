@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/intake/prd_clarifier.py
+# hypothesis_version: 6.141.1
+
+[2000, "'관리자' 의 유형을 구분하나요?", '(TBD|TODO|미정)', '0', '1', 'V8_PRD_CLARIFY', 'V8_PRD_CLARIFY_DEEP', 'advisory', 'blocking', 'deferred_decision', 'explicit_todo', 'metric_missing', 'priority_conditional', 'priority_undefined', 'quantity_range', 'quantity_vague', 'role_undefined', '관리자(?!.*(유형|권한|역할))', '권한 매트릭스 (역할별 세분화)', '단일 관리자', '선택 구현 (2차)', '슈퍼/일반 2단계', '정확한 수 입력', '제외', '최소~최대 범위', '필수 구현 (1차)']

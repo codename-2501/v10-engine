@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/validators/plugins/id_unique.py
+# hypothesis_version: 6.141.1
+
+['SCR-\\d{3,4}', 'id_unique', 'pattern', 'source_ids', 'validator_config']

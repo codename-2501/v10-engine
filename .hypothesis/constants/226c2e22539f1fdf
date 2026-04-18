@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/validators/plugins/css_class_integrity.py
+# hypothesis_version: 6.141.1
+
+[0.5, '<style', 'class=', 'css_class_integrity', 'max_missing_ratio', 'validator_config']

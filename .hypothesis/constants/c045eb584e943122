@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/executor_cascade.py
+# hypothesis_version: 6.141.1
+
+[300, '+', '+++', '-', '---', 'API', 'COMPLETED', 'DB', 'DESIGN', 'ModelAdapter', 'NodeSnapshot', 'PARTIAL', 'REQ', 'TASK', 'affected', 'affected_sections', 'api', 'api 명세', 'api 설계', 'categories', 'content', 'dag_id', 'db', 'db 설계', 'design', 'design system', 'design token', 'endpoint', 'engagement_id', 'foreign key', 'id', 'name', 'node_type', 'phase', 'reason_excerpt', 'request schema', 'requirement', 'response schema', 'schema definition', 'state', 'task_name', 'triggered_by_qa', 'triggered_by_task', 'type', 'ui 디자인', 'upstream_rework', 'user story', '기능 백로그', '데이터베이스', '디자인', '디자인 시안', '디자인 컴포넌트', '디자인 토큰', '백로그', '스키마', '스타일 가이드', '엔드포인트', '외래키', '요구사항', '유스케이스', '정규화', '테이블 정의']

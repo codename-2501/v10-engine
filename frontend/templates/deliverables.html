@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% block title %}산출물 — {{ engagement.name }} — AX FACTORY{% endblock %}
+{% block page_title %}{{ engagement.name }} — 산출물{% endblock %}
+
+{% block head_extra %}
+<style>
+  .del-header {
+    display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
+    margin-bottom: var(--s6);
+  }
+  .del-header-title { font-size: 22px; font-weight: 800; letter-spacing: -.03em; flex: 1; }
+  .del-header-meta { font-size: 12px; color: var(--text-3); }
+
+  .del-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4);
+    margin-bottom: var(--s7);
+  }
+  .del-stat {
+    background: var(--surface-glass); backdrop-filter: blur(16px);
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: var(--s5); text-align: center;
+  }
+  .del-stat-val {
+    font-size: 2.2rem; font-weight: 800; letter-spacing: -.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .del-stat-lbl { font-size: 12px; font-weight: 550; color: var(--text-3); margin-top: 4px; }
+
+  .proj-section { margin-bottom: var(--s7); }
+  .proj-title {
+    font-size: 16px; font-weight: 700; letter-spacing: -.01em;
+    margin-bottom: var(--s4); padding-bottom: var(--s3);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: var(--s3);
+  }
+  .proj-title-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px;
+    border-radius: 99px; background: var(--accent-dim); color: var(--accent);
+  }
+
+  .phase-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-3);
+    margin: var(--s5) 0 var(--s3);
+    display: flex; align-items: center; gap: var(--s3);
+  }
+  .phase-label::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .art-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--s4);
+  }
+  .art-card {
+    background: var(--surface-glass); backdrop-filter: blur(12px);
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: var(--s5); transition: all .2s ease-out;
+    display: flex; flex-direction: column;
+  }
+  .art-card:hover { border-color: var(--border-h); box-shadow: 0 0 0 3px rgba(255,255,255,.02); }
+  .art-card.completed { border-left: 3px solid var(--ok); }
+  .art-card.in-progress { border-left: 3px solid var(--info); }
+  .art-card.has-artifact { }
+
+  .art-name { font-size: 14px; font-weight: 650; margin-bottom: 6px; line-height: 1.3; }
+  .art-meta { font-size: 11px; color: var(--text-3); margin-bottom: var(--s3); display: flex; gap: var(--s3); flex-wrap: wrap; }
+  .art-meta-tag {
+    padding: 2px 7px; border-radius: 5px; font-weight: 600;
+  }
+  .art-state-completed { background: var(--ok-dim); color: var(--ok); }
+  .art-state-progress  { background: var(--info-dim); color: var(--info); }
+  .art-state-pending   { background: rgba(255,255,255,.05); color: var(--text-3); }
+  .art-state-failed    { background: var(--err-dim); color: var(--err); }
+  .art-type-html { background: var(--accent-dim); color: var(--accent); }
+  .art-type-doc  { background: rgba(255,255,255,.05); color: var(--text-2); }
+
+  .art-actions { margin-top: auto; padding-top: var(--s3); display: flex; gap: var(--s2); flex-wrap: wrap; }
+  .art-btn {
+    font-size: 12px; font-weight: 600; padding: 6px 14px;
+    border-radius: 99px; border: 1px solid var(--border-h);
+    background: rgba(255,255,255,.04); color: var(--text-2);
+    cursor: pointer; text-decoration: none; font-family: inherit;
+    transition: all .15s ease-out;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .art-btn:hover { background: rgba(255,255,255,.08); color: var(--text); border-color: rgba(255,255,255,.2); text-decoration: none; }
+  .art-btn-primary {
+    background: var(--accent); border-color: transparent; color: #000; font-weight: 700;
+  }
+  .art-btn-primary:hover { filter: brightness(1.12); box-shadow: 0 0 0 3px var(--accent-dim); color: #000; }
+
+  .art-version { font-size: 10px; color: var(--text-3); font-weight: 600; }
+
+  .empty-phase {
+    padding: var(--s5); text-align: center; color: var(--text-3); font-size: 13px;
+    border: 1px dashed var(--border); border-radius: var(--r);
+  }
+
+  /* 모달 오버레이 */
+  .preview-overlay {
+    position: fixed; inset: 0; background: var(--overlay);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; backdrop-filter: blur(4px);
+  }
+
+  @media (max-width: 900px) {
+    .del-stats { grid-template-columns: repeat(3, 1fr); }
+    .art-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .del-stats { grid-template-columns: 1fr; }
+    .del-header { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+{% endblock %}
+
+{% block modals %}
+<!-- 수정 요청 모달 -->
+<div id="reviseModal" style="display:none;position:fixed;inset:0;background:var(--overlay);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px);" onclick="if(event.target===this)closeReviseModal()">
+  <div style="background:var(--surface);border:1px solid var(--border-dim);border-radius:var(--r-lg);padding:var(--s6);width:520px;max-width:95vw;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--s5);padding-bottom:var(--s4);border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:15px;font-weight:700;" id="reviseTitle">수정 요청</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px;">AI가 산출물을 수정합니다. 하위 산출물에도 자동 반영됩니다.</div>
+      </div>
+      <button style="background:none;border:none;color:var(--text-3);font-size:20px;cursor:pointer;padding:4px;" onclick="closeReviseModal()">&times;</button>
+    </div>
+    <textarea id="reviseInput" placeholder="예: 결제 방식에 카카오페이를 추가해주세요&#10;예: 회원 등급을 3단계에서 5단계로 변경&#10;예: 관리자 대시보드 화면을 추가해주세요"
+      style="width:100%;min-height:120px;padding:var(--s4);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:14px;font-family:inherit;line-height:1.7;resize:vertical;outline:none;"></textarea>
+    <div style="display:flex;gap:var(--s3);justify-content:flex-end;margin-top:var(--s4);">
+      <button class="btn" onclick="closeReviseModal()">취소</button>
+      <button class="art-btn-primary art-btn" id="reviseSubmitBtn" onclick="submitRevise()" style="font-size:13px;padding:8px 20px;">AI에게 수정 요청</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="del-header reveal">
+  <div>
+    <div class="del-header-title">{{ engagement.name }}</div>
+    <div class="del-header-meta">{{ engagement.client_name or '' }} · 산출물 전체 보기</div>
+  </div>
+  <a href="/engagements/{{ engagement.id }}" class="btn">← 프로젝트 상세</a>
+</div>
+
+<!-- 최종 결과물 프리뷰 -->
+{% if preview_urls %}
+<div class="card reveal" style="margin-bottom:var(--s6);padding:var(--s6);border-left:3px solid var(--accent);">
+  <div style="display:flex;align-items:center;gap:var(--s4);flex-wrap:wrap;margin-bottom:var(--s4);">
+    <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;">최종 결과물</div>
+    <span style="font-size:12px;color:var(--text-3);">빌드된 서비스를 직접 확인하세요</span>
+  </div>
+  <div style="display:flex;gap:var(--s4);flex-wrap:wrap;">
+    {% for pu in preview_urls %}
+    <a href="{{ pu.url }}" target="_blank" class="art-btn-primary art-btn" style="font-size:14px;padding:10px 24px;">
+      {{ pu.label }}
+    </a>
+    {% endfor %}
+    {% if api_docs_url %}
+    <a href="{{ api_docs_url }}" target="_blank" class="art-btn" style="font-size:14px;padding:10px 24px;">
+      API 문서 (Swagger)
+    </a>
+    {% endif %}
+  </div>
+  <div style="margin-top:var(--s4);display:flex;gap:var(--s5);flex-wrap:wrap;font-size:12px;color:var(--text-3);">
+    {% for pu in preview_urls %}
+    <span>{{ pu.label }}: <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;">{{ pu.url }}</code></span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Stats -->
+<div class="del-stats stagger">
+  <div class="del-stat reveal">
+    <div class="del-stat-val" style="color:var(--text)">{{ total_tasks }}</div>
+    <div class="del-stat-lbl">전체 산출물</div>
+  </div>
+  <div class="del-stat reveal">
+    <div class="del-stat-val" style="color:var(--ok)">{{ completed_tasks }}</div>
+    <div class="del-stat-lbl">완료</div>
+  </div>
+  <div class="del-stat reveal">
+    <div class="del-stat-val" style="color:var(--accent)">{{ with_artifact }}</div>
+    <div class="del-stat-lbl">산출물 생성됨</div>
+  </div>
+</div>
+
+<!-- Per-project artifacts -->
+{% for pd in artifacts_data %}
+<div class="proj-section reveal">
+  <div class="proj-title">
+    {{ pd.project_name }}
+    <span class="proj-title-badge">{{ pd.phase_list|length }}개 Phase</span>
+  </div>
+
+  {% for ph in pd.phase_list %}
+  <div class="phase-label">{{ ph.label }} ({{ ph.name }})</div>
+  <div class="art-grid stagger">
+    {% for item in ph.nodes %}
+    <div class="art-card reveal {% if item.state == 'COMPLETED' %}completed{% elif item.state == 'IN_PROGRESS' %}in-progress{% endif %} {% if item.artifact_id %}has-artifact{% endif %}">
+      <div class="art-name">{{ item.name }}</div>
+      <div class="art-meta">
+        {% if item.state == 'COMPLETED' %}
+          <span class="art-meta-tag art-state-completed">완료</span>
+        {% elif item.state == 'IN_PROGRESS' %}
+          <span class="art-meta-tag art-state-progress">진행중</span>
+        {% elif item.state == 'FAILED' %}
+          <span class="art-meta-tag art-state-failed">실패</span>
+        {% else %}
+          <span class="art-meta-tag art-state-pending">{{ item.state }}</span>
+        {% endif %}
+        {% if item.artifact_type == 'html' %}
+          <span class="art-meta-tag art-type-html">HTML</span>
+        {% elif item.artifact_id %}
+          <span class="art-meta-tag art-type-doc">문서</span>
+        {% endif %}
+        {% if item.current_version %}
+          <span class="art-version">v{{ item.current_version }}</span>
+        {% endif %}
+      </div>
+      <div class="art-actions">
+        {% if item.artifact_id and item.state == 'COMPLETED' %}
+          <a class="art-btn-primary art-btn" href="/api/v1/projects/{{ pd.project_id }}/nodes/{{ item.id }}/artifact/view" target="_blank">
+            보기
+          </a>
+          <button class="art-btn" onclick="openReviseModal('{{ pd.project_id }}','{{ item.id }}','{{ item.name }}')">
+            수정
+          </button>
+        {% elif item.state == 'COMPLETED' and not item.artifact_id %}
+          <span style="font-size:11px;color:var(--text-3);">산출물 없음</span>
+        {% elif item.state == 'FAILED' %}
+          <button class="art-btn" style="color:var(--err);border-color:var(--err);" onclick="retryNode('{{ pd.project_id }}','{{ item.id }}','{{ item.name }}')">재시도</button>
+        {% else %}
+          <span style="font-size:11px;color:var(--text-3);">미완료</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div style="text-align:center;padding:var(--s8);color:var(--text-3);">
+  <div style="font-size:24px;opacity:.2;margin-bottom:var(--s3);">📦</div>
+  프로젝트가 없습니다.
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+var _reviseProjectId = null, _reviseNodeId = null;
+
+function openReviseModal(projectId, nodeId, name) {
+  _reviseProjectId = projectId;
+  _reviseNodeId = nodeId;
+  document.getElementById('reviseTitle').textContent = name + ' — 수정 요청';
+  document.getElementById('reviseInput').value = '';
+  document.getElementById('reviseSubmitBtn').disabled = false;
+  document.getElementById('reviseSubmitBtn').textContent = 'AI에게 수정 요청';
+  document.getElementById('reviseModal').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('reviseInput').focus(); }, 100);
+}
+
+function closeReviseModal() {
+  document.getElementById('reviseModal').style.display = 'none';
+  _reviseProjectId = null; _reviseNodeId = null;
+}
+
+async function submitRevise() {
+  var request = document.getElementById('reviseInput').value.trim();
+  if (!request) { alert('수정 요청 내용을 입력하세요.'); return; }
+  var btn = document.getElementById('reviseSubmitBtn');
+  btn.disabled = true; btn.textContent = '전송 중...';
+
+  try {
+    var token = localStorage.getItem('ai_si_token') || '';
+    var r = await fetch('/api/v1/projects/' + _reviseProjectId + '/nodes/' + _reviseNodeId + '/revise', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request: request })
+    });
+    if (!r.ok) {
+      var d = await r.json().catch(function(){ return {}; });
+      throw new Error(d.detail || '오류 ' + r.status);
+    }
+    closeReviseModal();
+    showToast('수정 요청이 전송되었습니다. AI가 백그라운드에서 수정 중입니다.', 'success');
+  } catch(e) {
+    alert('수정 요청 실패: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'AI에게 수정 요청';
+  }
+}
+
+async function retryNode(projectId, nodeId, name) {
+  var token = localStorage.getItem('ai_si_token') || '';
+  try {
+    var r = await fetch('/api/v1/projects/' + projectId + '/nodes/' + nodeId + '/retry', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (r.ok) {
+      showToast(name + ' 재시도가 시작되었습니다.', 'success');
+      setTimeout(function(){ location.reload(); }, 1500);
+    } else {
+      var d = await r.json().catch(function(){ return {}; });
+      alert('재시도 실패: ' + (d.detail || r.status));
+    }
+  } catch(e) { alert('오류: ' + e.message); }
+}
+
+function showToast(msg, type) {
+  var t = document.createElement('div');
+  t.className = 'toast ' + (type || 'success');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; t.style.transition='all .3s'; setTimeout(function(){t.remove();},300); }, 3500);
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeReviseModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,107 @@
+name: "UI 디자인 시안 — BO"
+phase: DESIGN
+type: html
+model_preference: opus
+
+# Stage 1: BO(관리자) 화면마다 1 chunk
+chunk_items_source:
+  from_spec: "화면 목록 정의서"
+  extract_patterns:
+    - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
+    - "([A-Z]{2,5}-[A-Z]{2,4}-\\d{3,4})"
+  filter_regex: "(SC-AD-|SC-MGR-|SCR-BO-)"
+
+# Stage 9: Dynamic Layer Selection
+context_layers:
+  - prd
+  - design_system
+  - current_task
+  - sibling_artifacts
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙: <!DOCTYPE html>부터 </html>까지 완전한 HTML만 출력하세요.
+  도구 호출(function_calls, invoke, Write, Bash 등)을 절대 하지 마세요.
+  마크다운 코드 블록(```)으로 감싸지 마세요. HTML 텍스트를 직접 출력하세요.
+
+  화면 설계서(와이어프레임)와 컴포넌트 정의서(디자인 시스템)를 기반으로
+  **BO(Back Office — 관리자) UI 디자인 시안**을 완전한 HTML+CSS로 구현하세요.
+
+  ### 대상 화면 — BO만
+  화면 설계서에서 **관리자 백오피스 화면**만 구현합니다:
+  - 관리자 대시보드 (통계 카드, 차트, 최근 활동)
+  - 상담 관리 (테이블, 필터, 상세보기, 상태 변경)
+  - 컨설팅 관리 (요청 목록, 상태 관리)
+  - 이용자 관리 (회원 목록, 검색, 상세)
+  - 공지사항 관리 (CRUD, 에디터)
+  - 통계/리포트 (차트, 기간 필터, 다운로드)
+  - FO(고객) 화면은 이 산출물에 포함하지 마세요 — 별도 산출물입니다.
+  - 화면설계서에 정의된 BO 화면을 빠짐없이 전부 구현하세요.
+
+  ### 관리자 레이아웃
+  - 좌측 사이드바 네비게이션 (메뉴: 대시보드, 상담, 컨설팅, 이용자, 공지, 통계)
+  - 상단 헤더 (관리자명, 알림, 로그아웃)
+  - 메인 콘텐츠 영역
+  - FO 시안과 동일한 CSS 변수/디자인 토큰을 공유하되 관리자용 레이아웃 적용
+
+  ### 핵심 — 이것은 와이어프레임이 아닌 "완성된 디자인 시안"
+  이 산출물은 고객이 보고 디자인 승인 여부를 판단하는 **최종 시안**입니다.
+  텍스트+인풋만 나열한 와이어프레임은 절대 불가합니다.
+  코드 블록(마크다운 코드)으로 출력하면 안 됩니다. 렌더링되는 HTML로 출력하세요.
+  실제 서비스와 구분할 수 없는 수준의 시각적 완성도가 필요합니다.
+
+  각 화면에 반드시 포함할 것:
+  - 좌측 사이드바 네비게이션 (로고, 메뉴 아이템, 활성 상태)
+  - 상단 헤더 (관리자명, 알림 아이콘, 로그아웃)
+  - 스타일링된 카드, 버튼, 테이블, 폼 (border-radius, shadow, 색상, 간격 모두 적용)
+  - 테이블은 실제 더미 데이터 5행 이상, 필터/검색 UI 포함
+  - 대시보드는 통계 카드(숫자+라벨+아이콘) + 차트 영역(placeholder) + 최근 활동 리스트
+  - 호버/포커스/활성 상태 CSS
+
+  ### HTML 구현 규칙
+  - 완전한 standalone HTML 문서 (Pretendard 폰트 CDN만 허용)
+  - CSS는 <style> 태그 안에 전부 포함, 코드 블록으로 감싸지 말 것
+  - 반응형 (모바일 375px ~ 데스크탑 1280px)
+  - 각 화면은 <section> 태그로 구분, 화면 ID(SCR-XXX)와 이름을 표기
+  - 실제 프로젝트 맥락에 맞는 더미 데이터 사용 (Lorem ipsum 금지)
+  - 모든 인풋/버튼/테이블은 CSS로 완전히 스타일링 (브라우저 기본 스타일 금지)
+
+  ### 디자인 퀄리티 규칙
+  - 반드시 다크 테마: 배경 #111318, 카드 #1a1d24, 텍스트 #eaedf2. 라이트 테마(흰 배경) 절대 금지
+  - body { background: #111318 } 필수
+  - Pretendard Variable 웹폰트 사용
+  - accent 색상: FO 시안과 동일 (실버케어→따뜻한 앰버 #e8a838 계열)
+  - 보라색 그라디언트, 시스템 폰트, AI스러운 정형화 레이아웃 금지
+  - 넉넉한 여백: 섹션 간 48px 이상, 카드 padding 24px 이상
+  - 카드: backdrop-filter blur, border rgba(255,255,255,.06), border-radius 14px
+  - 버튼: border-radius 99px (pill), hover 시 ring 피드백
+  - 테이블 th: uppercase 11px, letter-spacing .05em, 행 hover 배경 변화
+
+  ### 절대 금지 — 디자인 시스템 콘텐츠 혼입
+  - CSS 변수 팔레트 표, 타이포 스케일 표, 컴포넌트 쇼케이스 섹션 금지
+  - 페이지 단위 시안만 포함
+
+  ### 출력 전 자가검증
+  □ BO 전체 화면이 빠짐없이 포함되었는가
+  □ FO(고객) 화면이 포함되지 않았는가
+  □ 사이드바 네비게이션 레이아웃이 적용되었는가
+  □ 다크 테마 적용 확인
+  □ 각 화면에 SCR-XXX ID가 있는가
+  □ TODO/TBD/미정 없는가
+
+validation:
+  structural:
+    min_chars: 8000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "Lorem ipsum", "Segoe UI", "background: #f", "background:#f"]
+  semantic:
+    - "BO(관리자) 화면이 빠짐없이 구현되었는지 검증"
+    - "FO(고객) 화면이 혼입되지 않았는지 검증"
+    - "사이드바 네비게이션 레이아웃이 적용되었는지 검증"
+    - "다크 테마가 적용되었는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준: {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

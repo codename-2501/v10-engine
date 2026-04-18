@@ -1,0 +1,64 @@
+name: "백엔드 API 구현"
+phase: DEVELOPMENT
+type: code
+model_preference: opus
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  API 설계서와 데이터 모델 설계서를 기반으로 백엔드 API를 구현하세요.
+
+  ### 필수 섹션 (순서 준수)
+  1. **프로젝트 구조** — 디렉토리 구조, 레이어 아키텍처 (Controller/Service/Repository)
+  2. **데이터 모델** — ORM 모델/엔티티 정의, 관계 매핑, 인덱스 (전체 코드)
+  3. **API 엔드포인트** — RESTful API 구현, 라우터, 미들웨어 (전체 코드)
+  4. **비즈니스 로직** — 서비스 레이어, 트랜잭션 처리, 검증 로직 (전체 코드)
+  5. **인증/인가** — JWT/세션 인증, RBAC 권한 제어, 미들웨어
+  6. **에러 핸들링** — 글로벌 에러 핸들러, 커스텀 예외, 에러 코드 체계
+
+  ### 품질 기준
+  - SOLID 원칙 준수
+  - 입력 검증 필수 (SQL Injection, XSS 방지)
+  - 비밀번호 해싱 (bcrypt/argon2)
+  - Rate Limiting 구현
+  - 요청/응답 로깅
+  - Swagger/OpenAPI 문서 자동 생성
+  - 환경변수 기반 설정 (.env)
+  - 에러 응답 일관된 포맷
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 6개 필수 섹션 모두 작성 완료
+  □ 코드 블록 10개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ SQL Injection 방지 확인 (파라미터 바인딩)
+  □ 인증/인가 로직 완전 구현
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":6,"code_blocks":10,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "프로젝트 구조"
+      - "데이터 모델"
+      - "API 엔드포인트"
+      - "비즈니스 로직"
+      - "인증/인가"
+      - "에러 핸들링"
+    has_code_blocks: true
+    min_chars: 8000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "SQL Injection 방지를 위한 파라미터 바인딩이 모든 쿼리에 적용되는지 검증"
+    - "인증/인가 미들웨어가 보호 대상 엔드포인트에 적용되는지 검증"
+    - "에러 응답 포맷이 일관되는지 검증"
+    - "비밀번호가 평문 저장되지 않는지 검증"
+    - "코드 리뷰 관점: Critical(즉시 수정) / Important(진행 전 수정) / Minor(기록) 기준으로 이슈 분류"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

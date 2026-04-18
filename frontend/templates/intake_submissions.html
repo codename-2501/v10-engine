@@ -1,0 +1,679 @@
+{% extends "base.html" %}
+{% block title %}접수 관리 — AX FACTORY{% endblock %}
+{% block page_title %}인테이크 접수 관리{% endblock %}
+
+{% block head_extra %}
+<style>
+  .stats-row { display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+  .stat-card {
+    flex:1; min-width:120px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:1rem 1.25rem;
+  }
+  .stat-card .stat-value { font-size:1.75rem; font-weight:700; line-height:1; }
+  .stat-card .stat-label { font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem; }
+
+  .table-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .table-toolbar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0.85rem 1.25rem;
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap; gap:.5rem;
+  }
+  .table-toolbar h3 { font-size:0.875rem; font-weight:600; }
+  .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .table-scroll .table { min-width:800px; }
+  .table-scroll .table td { white-space:normal; word-break:break-word; }
+  .table-scroll .table td:last-child { white-space:nowrap; }
+
+  .action-btn {
+    padding:0.25rem 0.6rem;
+    border-radius:4px;
+    border:1px solid var(--border);
+    background:var(--surface);
+    color:var(--text);
+    cursor:pointer;
+    font-size:0.75rem;
+    transition:all 0.15s;
+  }
+  .action-btn:hover { background:rgba(255,255,255,0.05); }
+  .action-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .action-btn.primary:hover { opacity:0.9; }
+  .action-btn:disabled { opacity:0.45; cursor:not-allowed; }
+
+  /* Modal — 별도 처리 없음, HTML inline style로 제어 */
+  .modal-close:hover { color:var(--text); }
+
+  .detail-section { margin-bottom:1.25rem; }
+  .detail-section h4 {
+    font-size:0.7rem; text-transform:uppercase;
+    letter-spacing:0.05em; color:var(--text-muted);
+    margin-bottom:0.5rem; padding-bottom:0.25rem;
+    border-bottom:1px solid var(--border);
+  }
+  .detail-row {
+    display:flex; padding:0.3rem 0;
+    font-size:0.825rem; gap:1rem;
+  }
+  .detail-key { color:var(--text-muted); min-width:130px; flex-shrink:0; }
+  .detail-val { color:var(--text); word-break:break-word; }
+
+  .empty-state {
+    text-align:center; padding:3rem 1rem;
+    color:var(--text-muted); font-size:0.875rem;
+  }
+
+  /* Token modal */
+  .token-modal-overlay {
+    position:fixed; inset:0;
+    background:var(--overlay);
+    display:flex; align-items:center; justify-content:center;
+    z-index:2000;
+  }
+  .token-modal-box {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:1.75rem;
+    width:400px; max-width:90vw;
+  }
+  .form-input-sm {
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    color:var(--text);
+    padding:0.45rem 0.7rem;
+    font-size:0.875rem;
+    outline:none;
+    margin:0.5rem 0 1rem;
+  }
+  .form-input-sm:focus { border-color:var(--accent); }
+
+  .refresh-info { font-size:0.7rem; color:var(--text-muted); }
+  #loadingSpinner { color:var(--text-muted); font-size:0.8rem; }
+
+  @media (max-width: 900px) {
+    .stats-row .stat-card { min-width: 100px; }
+    .table-toolbar { flex-wrap: wrap; gap: .5rem; }
+  }
+  @media (max-width: 640px) {
+    .stats-row { gap: .5rem; }
+    .stats-row .stat-card { min-width: 80px; padding: .75rem; }
+    .stat-card .stat-value { font-size: 1.4rem; }
+    .action-btn { font-size: 11px; padding: 3px 6px; }
+  }
+</style>
+{% endblock %}
+
+{% block modals %}
+<!-- Detail modal — body 바깥, stacking context 독립 -->
+<div id="detailModal" onclick="closeDetailOnOverlay(event)"
+  style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--overlay-heavy);z-index:var(--z-modal);overflow:hidden;">
+  <div id="detailBox"
+    style="position:absolute;top:56px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-dim);border-radius:14px;width:720px;max-width:calc(100% - 32px);bottom:16px;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <h3 id="detailTitle" style="font-size:1rem;font-weight:600;margin:0;">상세 정보</h3>
+      <button onclick="closeDetail()" style="background:none;border:none;color:var(--text-3);font-size:1.25rem;cursor:pointer;padding:4px;">&times;</button>
+    </div>
+    <div id="detailContent" style="overflow-y:auto;padding:1.5rem;flex:1;"></div>
+  </div>
+</div>
+
+<!-- Convert/착수 modal -->
+<div id="convertModal" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--overlay);align-items:center;justify-content:center;" onclick="if(event.target===this)closeConvertModal()">
+  <div class="modal-box" style="max-width:480px;max-height:85vh;">
+    <div class="modal-header">
+      <h3>🚀 프로젝트 착수</h3>
+      <button class="modal-close" onclick="closeConvertModal()">&times;</button>
+    </div>
+    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1.25rem;">
+      인테이크 접수를 인게이지먼트로 전환하고 프로젝트를 시작합니다.
+    </p>
+    <div style="margin-bottom:0.9rem;">
+      <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.35rem;">프로젝트명 *</label>
+      <input id="cv-name" class="form-input-sm" placeholder="프로젝트명">
+    </div>
+    <div style="margin-bottom:0.9rem;">
+      <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.35rem;">클라이언트명</label>
+      <input id="cv-client" class="form-input-sm" placeholder="고객사명">
+    </div>
+    <div style="margin-bottom:1.25rem;">
+      <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.35rem;">우선순위</label>
+      <select id="cv-priority" class="form-input-sm">
+        <option value="LOW">낮음</option>
+        <option value="MEDIUM" selected>보통</option>
+        <option value="HIGH">높음</option>
+        <option value="CRITICAL">긴급</option>
+      </select>
+    </div>
+    <p id="cv-error" style="color:var(--danger);font-size:0.8rem;margin-bottom:0.75rem;min-height:1em;"></p>
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+      <button class="btn" onclick="closeConvertModal()">취소</button>
+      <button id="cv-submit" class="btn btn-primary" onclick="doConvert()">착수하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div id="deleteModal" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--overlay);align-items:center;justify-content:center;" onclick="if(event.target===this)closeDeleteModal()">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <h3>접수 삭제</h3>
+      <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+    </div>
+    <p style="font-size:0.875rem;margin-bottom:1.5rem;">
+      <strong id="del-name"></strong> 접수를 삭제합니다.<br>
+      <span style="color:var(--text-muted);font-size:0.8rem;">이 작업은 되돌릴 수 없습니다.</span>
+    </p>
+    <p id="del-error" style="color:var(--danger);font-size:0.8rem;margin-bottom:0.75rem;min-height:1em;"></p>
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+      <button class="btn" onclick="closeDeleteModal()">취소</button>
+      <button id="del-submit" class="action-btn" style="background:var(--danger);border-color:var(--danger);color:#fff;" onclick="doDelete()">삭제</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats row -->
+<div class="stats-row" id="statsRow">
+  <div class="stat-card">
+    <div class="stat-value" id="stat-total" style="color:var(--text)">—</div>
+    <div class="stat-label">전체</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-received" style="color:var(--info)">—</div>
+    <div class="stat-label">신규 (RECEIVED)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-valid" style="color:var(--accent)">—</div>
+    <div class="stat-label">검토중 (VALID)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-converted" style="color:var(--success)">—</div>
+    <div class="stat-label">전환완료 (CONVERTED)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-failed" style="color:var(--danger)">—</div>
+    <div class="stat-label">실패 (FAILED)</div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="table-card">
+  <div class="table-toolbar">
+    <h3>접수 목록</h3>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <span class="refresh-info" id="lastRefresh"></span>
+      <span id="loadingSpinner" style="display:none;">로딩 중...</span>
+      <button class="btn" onclick="loadSubmissions()">새로고침</button>
+      <a href="/intake" class="btn btn-primary">+ 새 접수</a>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table class="table" id="submissionsTable">
+      <thead>
+        <tr>
+          <th>제출일시</th>
+          <th>프로젝트명</th>
+          <th>범위</th>
+          <th>예산</th>
+          <th>담당자</th>
+          <th>상태</th>
+          <th>액션</th>
+        </tr>
+      </thead>
+      <tbody id="submissionsBody">
+        <tr><td colspan="7" class="empty-state">데이터를 불러오는 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allSubmissions = [];
+
+// ── Token helpers ──────────────────────────────────────────────────────────
+function getToken() { return localStorage.getItem('ai_si_token'); }
+
+// ── Status badge ───────────────────────────────────────────────────────────
+function statusBadge(status) {
+  const map = {
+    'RECEIVED':   ['badge-info',    '신규'],
+    'VALIDATING': ['badge-warning', '검증중'],
+    'VALID':      ['badge-accent',  '유효'],
+    'INVALID':    ['badge-danger',  '무효'],
+    'CONVERTING': ['badge-warning', '전환중'],
+    'CONVERTED':  ['badge-success', '전환완료'],
+    'FAILED':     ['badge-danger',  '실패'],
+  };
+  const [cls, label] = map[status] || ['badge-muted', status];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+// ── Format date ────────────────────────────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso.replace(' ', 'T') + (iso.includes('T') ? '' : 'Z'));
+    return d.toLocaleString('ko-KR', {
+      year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit'
+    });
+  } catch { return iso; }
+}
+
+// ── Load submissions ───────────────────────────────────────────────────────
+async function loadSubmissions() {
+  document.getElementById('loadingSpinner').style.display = 'inline';
+
+  try {
+    const resp = await authFetch('/api/v1/intake/submissions');
+    if (!resp) return; // authFetch redirected to /login
+    if (!resp.ok) throw new Error(`서버 오류 ${resp.status}`);
+    allSubmissions = await resp.json();
+    renderTable(allSubmissions);
+    renderStats(allSubmissions);
+    document.getElementById('lastRefresh').textContent =
+      '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+  } catch(e) {
+    document.getElementById('submissionsBody').innerHTML =
+      `<tr><td colspan="7" class="empty-state" style="color:var(--danger)">오류: ${e.message}</td></tr>`;
+  } finally {
+    document.getElementById('loadingSpinner').style.display = 'none';
+  }
+}
+
+// ── Render stats ───────────────────────────────────────────────────────────
+function renderStats(rows) {
+  const counts = { total: rows.length, RECEIVED:0, VALID:0, CONVERTED:0, FAILED:0 };
+  rows.forEach(r => {
+    if (r.status in counts) counts[r.status]++;
+  });
+  document.getElementById('stat-total').textContent     = counts.total;
+  document.getElementById('stat-received').textContent  = counts.RECEIVED;
+  document.getElementById('stat-valid').textContent     = counts.VALID;
+  document.getElementById('stat-converted').textContent = counts.CONVERTED;
+  document.getElementById('stat-failed').textContent    = counts.FAILED;
+}
+
+// ── Field helpers (handles both public & internal form schemas) ─────────────
+function pf(p) {
+  // Normalize parsed data — returns helper functions scoped to this submission
+  const norm = (v) => Array.isArray(v) ? (v.length ? v.join(', ') : '—') : (v || '—');
+  const s    = (v) => v || '—';
+  return {
+    projectName:     p.project_name   || p.project_title || p.projectName || '(미입력)',
+    projectSummary:  p.project_summary|| p.projectSummary || '',
+    projectDesc:     p.project_desc   || p.problem_desc  || p.description || p.projectDesc || '',
+    scope:           norm(p.scope),
+    projectTypes:    norm(p.project_types),
+    projectSubtypes: p.project_subtypes || '',
+    useCases:        norm(p.use_cases)  || s(p.useCases),
+    expectedKpi:     s(p.expected_kpi  || p.expectedKpi),
+    targetUsers:     norm(p.target_users|| p.targetUsers),
+    deployType:      norm(p.deploy_type || p.deployType),
+    dataReadiness:   s(p.data_readiness),
+    dataVolume:      s(p.data_volume),
+    dataTypes:       norm(p.data_types),
+    securityReqs:    norm(p.security_reqs),
+    mlFrameworks:    norm(p.ml_frameworks),
+    mlopsTools:      norm(p.mlops_tools),
+    dataTools:       norm(p.data_tools),
+    infraEnv:        norm(p.infra_env),
+    integrations:    norm(p.integrations),
+    techNotes:       s(p.tech_notes || p.tech_preferences),
+    budget:          s(p.budget        || p.budget_range),
+    maintenanceBudget: s(p.maintenance_budget),
+    startDate: (p.start_date) || [p.start_year, p.start_month ? p.start_month+'월' : '', p.start_period].filter(Boolean).join(' ') || '',
+    endDate:   (p.end_date)   || [p.end_year,   p.end_month   ? p.end_month  +'월' : ''].filter(Boolean).join(' ')   || '',
+    flexSchedule:    s(p.flex_schedule || p.flexSchedule || p.timeline),
+    priority:        s(p.priority),
+    contactName:     s(p.contact_name    || p.contactName),
+    contactTitle:    s(p.contact_title   || p.contact_role   || p.contactTitle),
+    contactCompany:  s(p.contact_company || p.company_name   || p.contactCompany),
+    contactIndustry: s(p.contact_industry|| p.industry),
+    contactEmail:    s(p.contact_email   || p.contactEmail),
+    contactPhone:    s(p.contact_phone   || p.contactPhone),
+    contactDept:     s(p.contact_dept),
+    additionalDesc:  s(p.additional_desc || p.additional_notes|| p.additionalDesc),
+    needRealtime:    p.need_realtime,
+    needCustomModel: p.need_custom_model,
+    needExplainability: p.need_explainability,
+    needOnprem:      p.need_onprem,
+    needAi:          p.need_ai,
+    needPrediction:  p.need_prediction,
+    needIntegration: p.need_integration,
+    aiExperience:    s(p.ai_experience),
+    hasExistingDocs: s(p.has_existing_docs),
+    serviceType:     norm(p.service_type || p.service_types),
+    projectPurpose:  s(p.project_purpose),
+    designTone:      norm(p.design_tone),
+    colorPreference: s(p.color_preference),
+    references:      s(p.references),
+    keyScreens:      s(p.key_screens),
+    features:        s(p.features),
+    coreFeatures:    s(p.core_features),
+    currentProcess:  s(p.current_process),
+    competitors:     s(p.competitors),
+    userScenarios:   s(p.user_scenarios),
+    mode:            p.mode || '',
+    source:          p.source || 'public',
+  };
+}
+
+// ── Render table ───────────────────────────────────────────────────────────
+function renderTable(rows) {
+  const tbody = document.getElementById('submissionsBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">접수된 항목이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const p = pf(r.parsed || {});
+    const scopeShort = p.scope.length > 30 ? p.scope.slice(0,30)+'…' : p.scope;
+
+    const id = r.id;
+    const detailBtn = `<button class="action-btn" onclick="showDetail('${id}')">상세보기</button>`;
+    let extra = '';
+    if (r.status === 'RECEIVED') {
+      extra = `<button class="action-btn" onclick="setStatus('${id}','VALID')"  title="검토중으로 변경">검토중▸</button>`
+            + `<button class="action-btn primary" onclick="openConvertModal('${id}')" >🚀 착수</button>`
+            + `<button class="action-btn" onclick="openDeleteModal('${id}','${esc(p.projectName)}')" style="color:var(--danger);">삭제</button>`;
+    } else if (r.status === 'VALID') {
+      extra = `<button class="action-btn" onclick="setStatus('${id}','RECEIVED')"  title="신규로 되돌리기">◂신규</button>`
+            + `<button class="action-btn primary" onclick="openConvertModal('${id}')" >🚀 착수</button>`
+            + `<button class="action-btn" onclick="openDeleteModal('${id}','${esc(p.projectName)}')" style="color:var(--danger);">삭제</button>`;
+    } else if (r.status === 'CONVERTING') {
+      extra = `<button class="action-btn" onclick="setStatus('${id}','RECEIVED')"  title="전환중 stuck 강제 해제">초기화</button>`;
+    } else if (r.status === 'CONVERTED' && r.engagement_id) {
+      extra = `<a class="action-btn" href="/engagements/${r.engagement_id}" style="text-decoration:none;">인게이지먼트 →</a>`
+            + `<button class="action-btn" onclick="openDeleteModal('${id}','${esc(p.projectName)}')" style="color:var(--danger);">삭제</button>`;
+    } else if (r.status === 'FAILED') {
+      extra = `<button class="action-btn" onclick="setStatus('${id}','RECEIVED')"  title="신규로 초기화 후 재시도">재시도</button>`
+            + `<button class="action-btn" onclick="openDeleteModal('${id}','${esc(p.projectName)}')" style="color:var(--danger);">삭제</button>`;
+    } else if (r.status === 'INVALID') {
+      extra = `<button class="action-btn" onclick="openDeleteModal('${id}','${esc(p.projectName)}')" style="color:var(--danger);">삭제</button>`;
+    }
+
+    return `<tr>
+      <td style="white-space:nowrap;font-size:0.775rem;">${fmtDate(r.created_at)}</td>
+      <td style="font-weight:500;">${esc(p.projectName)}</td>
+      <td style="font-size:0.775rem;color:var(--text-muted);">${esc(scopeShort)}</td>
+      <td style="font-size:0.775rem;">${esc(p.budget)}</td>
+      <td style="font-size:0.775rem;">${esc(p.contactName + (p.contactCompany !== '—' ? ' / '+p.contactCompany : ''))}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:4px;">${detailBtn}${extra}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Escape HTML ────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Detail modal ───────────────────────────────────────────────────────────
+function showDetail(id) {
+  const row = allSubmissions.find(r => r.id === id);
+  if (!row) return;
+  const p = pf(row.parsed || {});
+
+  document.getElementById('detailTitle').textContent =
+    p.projectName + ' — ' + statusBadge(row.status).replace(/<[^>]+>/g,'');
+
+  function row2(key, val) {
+    return `<div class="detail-row"><span class="detail-key">${key}</span><span class="detail-val">${esc(val)}</span></div>`;
+  }
+  function yn(v) { return v === true ? '예' : v === false ? '아니오' : '—'; }
+
+  document.getElementById('detailContent').innerHTML = `
+    <div style="margin-bottom:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+      ${statusBadge(row.status)}
+      <span style="font-size:0.75rem;color:var(--text-muted);">ID: <code style="font-family:monospace;">${row.id}</code></span>
+      <span style="font-size:0.75rem;color:var(--text-muted);">제출: ${fmtDate(row.created_at)}</span>
+      ${p.source ? `<span style="font-size:0.72rem;color:var(--text-muted);">[${p.source === 'internal' ? '내부' : '외부'}]</span>` : ''}
+      ${row.engagement_id ? `<a href="/engagements/${row.engagement_id}" style="font-size:0.75rem;color:var(--success);">인게이지먼트 →</a>` : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>프로젝트 개요</h4>
+      ${row2('프로젝트명', p.projectName)}
+      ${row2('한 줄 요약', p.projectSummary)}
+      ${row2('목적', p.projectPurpose)}
+      ${row2('배경·목적', p.projectDesc)}
+      ${row2('서비스 유형', p.serviceType)}
+      ${row2('서비스 범위', p.scope)}
+      ${row2('프로젝트 유형', p.projectTypes)}
+      ${p.projectSubtypes ? row2('세부 유형', p.projectSubtypes) : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>핵심 기능 &amp; 현행 프로세스</h4>
+      ${p.coreFeatures !== '—' ? row2('핵심 기능 목록', p.coreFeatures) : ''}
+      ${p.currentProcess !== '—' ? row2('현행 업무 프로세스 (AS-IS)', p.currentProcess) : ''}
+      ${p.competitors !== '—' ? row2('경쟁사 / 벤치마크', p.competitors) : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>활용 사례 &amp; 목표</h4>
+      ${row2('주요 기능', p.features)}
+      ${row2('사용자 시나리오', p.userScenarios)}
+      ${row2('활용 사례', p.useCases)}
+      ${row2('기대 KPI', p.expectedKpi)}
+    </div>
+
+    <div class="detail-section">
+      <h4>대상 &amp; 데이터</h4>
+      ${row2('서비스 대상', p.targetUsers)}
+      ${row2('배포 환경', p.deployType)}
+      ${row2('데이터 보유', p.dataReadiness)}
+      ${row2('데이터 규모', p.dataVolume)}
+      ${row2('데이터 유형', p.dataTypes)}
+      ${row2('보안 요건', p.securityReqs)}
+      ${row2('AI 도입', p.needAi)}
+      ${row2('AI 경험', p.aiExperience)}
+      ${row2('기존 문서', p.hasExistingDocs)}
+      ${p.needRealtime !== undefined ? row2('실시간 처리', yn(p.needRealtime)) : ''}
+      ${p.needCustomModel !== undefined ? row2('커스텀 모델', yn(p.needCustomModel)) : ''}
+      ${p.needPrediction !== undefined ? row2('예측/분석', yn(p.needPrediction)) : ''}
+      ${p.needIntegration !== undefined ? row2('시스템 연동', yn(p.needIntegration)) : ''}
+      ${p.needExplainability !== undefined ? row2('설명 가능성', yn(p.needExplainability)) : ''}
+      ${p.needOnprem !== undefined ? row2('온프레미스', yn(p.needOnprem)) : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>기술 스택</h4>
+      ${row2('ML 프레임워크', p.mlFrameworks)}
+      ${row2('MLOps 도구', p.mlopsTools)}
+      ${row2('데이터 도구', p.dataTools)}
+      ${row2('인프라 환경', p.infraEnv)}
+      ${row2('연동 시스템', p.integrations)}
+      ${p.techNotes !== '—' ? row2('기술 특이사항', p.techNotes) : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>디자인</h4>
+      ${row2('디자인 톤', p.designTone)}
+      ${row2('컬러 선호', p.colorPreference)}
+      ${row2('핵심 화면', p.keyScreens)}
+      ${row2('레퍼런스', p.references)}
+    </div>
+
+    ${(row.parsed._reference_analysis && row.parsed._reference_analysis.length) ? `
+    <div class="detail-section">
+      <h4>레퍼런스 분석 결과</h4>
+      ${row.parsed._reference_analysis.map(r => `
+        <div style="margin-bottom:.75rem;padding:.6rem .8rem;background:var(--surface-dim);border-radius:6px;border:1px solid var(--border);">
+          <div style="font-weight:600;font-size:.82rem;margin-bottom:.3rem;">
+            <a href="${esc(r.url)}" target="_blank" style="color:var(--accent);">${esc(r.title || r.url)}</a>
+            ${r.fetch_error ? '<span style="color:var(--danger);font-size:.7rem;"> (접속 실패)</span>' : ''}
+          </div>
+          ${r.content_summary ? '<div style="font-size:.78rem;color:var(--text-2);margin-bottom:.3rem;">' + esc(r.content_summary) + '</div>' : ''}
+          ${r.features && r.features.length ? '<div style="font-size:.72rem;color:var(--text-muted);">기능: ' + r.features.slice(0,5).map(f => esc(f)).join(', ') + '</div>' : ''}
+          ${r.strengths && r.strengths.length ? '<div style="font-size:.72rem;color:var(--st-completed);margin-top:.2rem;">강점: ' + r.strengths.map(s => esc(s)).join(' / ') + '</div>' : ''}
+          ${r.weaknesses && r.weaknesses.length ? '<div style="font-size:.72rem;color:var(--st-awaiting);margin-top:.2rem;">약점: ' + r.weaknesses.map(w => esc(w)).join(' / ') + '</div>' : ''}
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
+
+    <div class="detail-section">
+      <h4>예산 &amp; 일정</h4>
+      ${row2('개발 예산', p.budget)}
+      ${row2('유지보수 예산', p.maintenanceBudget)}
+      ${row2('시작일', p.startDate || '—')}
+      ${row2('완료 목표', p.endDate || '—')}
+      ${row2('일정 유연성', p.flexSchedule)}
+      ${row2('우선순위', p.priority)}
+    </div>
+
+    <div class="detail-section">
+      <h4>담당자 정보</h4>
+      ${row2('담당자', p.contactName + (p.contactTitle !== '—' ? ' / ' + p.contactTitle : ''))}
+      ${row2('부서', p.contactDept)}
+      ${row2('회사 / 산업', p.contactCompany + (p.contactIndustry !== '—' ? ' / ' + p.contactIndustry : ''))}
+      ${row2('이메일', p.contactEmail)}
+      ${row2('연락처', p.contactPhone)}
+      ${p.additionalDesc !== '—' ? row2('추가 전달사항', p.additionalDesc) : ''}
+    </div>
+  `;
+  document.getElementById('detailModal').style.display = 'flex';
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').style.display = 'none';
+}
+
+function closeDetailOnOverlay(event) {
+  if (event.target === document.getElementById('detailModal')) closeDetail();
+}
+
+// ── Convert modal ──────────────────────────────────────────────────────────
+let _convertId = null;
+
+function openConvertModal(id) {
+  const row = allSubmissions.find(r => r.id === id);
+  if (!row) return;
+  const p = row.parsed || {};
+  _convertId = id;
+
+  const pn = pf(row.parsed || {});
+  document.getElementById('cv-name').value = pn.projectName !== '(미입력)' ? pn.projectName : '';
+  document.getElementById('cv-client').value = pn.contactCompany !== '—' ? pn.contactCompany : '';
+  document.getElementById('cv-priority').value = 'MEDIUM';
+  document.getElementById('cv-error').textContent = '';
+  document.getElementById('cv-submit').disabled = false;
+  document.getElementById('cv-submit').textContent = '착수하기';
+  document.getElementById('convertModal').style.display = 'flex';
+}
+
+function closeConvertModal() {
+  document.getElementById('convertModal').style.display = 'none';
+  _convertId = null;
+}
+
+async function doConvert() {
+  if (!_convertId) return;
+  const name = document.getElementById('cv-name').value.trim();
+  const client = document.getElementById('cv-client').value.trim();
+  if (!name) { document.getElementById('cv-error').textContent = '프로젝트명을 입력해주세요.'; return; }
+
+  const btn = document.getElementById('cv-submit');
+  btn.disabled = true;
+  btn.textContent = '처리 중...';
+  document.getElementById('cv-error').textContent = '';
+
+  try {
+    const resp = await authFetch(`/api/v1/intake/submissions/${_convertId}/convert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, client_name: client }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `오류 ${resp.status}`);
+    }
+    const data = await resp.json();
+    closeConvertModal();
+    // 인게이지먼트 페이지로 바로 이동
+    location.href = `/engagements/${data.engagement_id}`;
+  } catch(e) {
+    document.getElementById('cv-error').textContent = `오류: ${e.message}`;
+    btn.disabled = false;
+    btn.textContent = '착수하기';
+  }
+}
+
+// ── Status change ──────────────────────────────────────────────────────────
+async function setStatus(id, newStatus) {
+  const labelMap = { VALID:'검토중', RECEIVED:'신규' };
+  const label = labelMap[newStatus] || newStatus;
+  if (!confirm(`상태를 "${label}"(으)로 변경하시겠습니까?`)) return;
+
+  try {
+    const resp = await authFetch(`/api/v1/intake/submissions/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (!resp) return;
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `오류 ${resp.status}`);
+    }
+    await loadSubmissions();
+  } catch(e) {
+    alert(`상태 변경 실패: ${e.message}`);
+  }
+}
+
+// ── Delete modal ───────────────────────────────────────────────────────────
+let _deleteId = null;
+
+function openDeleteModal(id, name) {
+  _deleteId = id;
+  document.getElementById('del-name').textContent = name;
+  document.getElementById('del-error').textContent = '';
+  document.getElementById('del-submit').disabled = false;
+  document.getElementById('deleteModal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteModal').style.display = 'none';
+  _deleteId = null;
+}
+
+async function doDelete() {
+  if (!_deleteId) return;
+  const btn = document.getElementById('del-submit');
+  btn.disabled = true;
+  try {
+    const resp = await authFetch(`/api/v1/intake/submissions/${_deleteId}`, { method: 'DELETE' });
+    if (!resp) return;
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `오류 ${resp.status}`);
+    }
+    closeDeleteModal();
+    await loadSubmissions();
+  } catch(e) {
+    document.getElementById('del-error').textContent = `삭제 실패: ${e.message}`;
+    btn.disabled = false;
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadSubmissions();
+
+// Auto-refresh every 30s
+setInterval(loadSubmissions, 30000);
+</script>
+{% endblock %}

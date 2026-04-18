@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}디자인 프리뷰 — {{ engagement.name }}{% endblock %}
+{% block page_title %}디자인 프리뷰{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* 풀스크린 — page 스크롤 제거, flex column */
+  .page { padding: 0 !important; overflow: hidden !important; }
+  .page-inner { max-width: none !important; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* 탭 바 — 상단 고정 (flex shrink 0) */
+  .dp-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    flex-shrink: 0; background: var(--bg);
+  }
+  .dp-tab {
+    padding: 12px 24px; font-size: 13px; font-weight: 650;
+    color: var(--text-3); cursor: pointer; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all .15s ease-out;
+    background: none; border-top: none; border-left: none; border-right: none;
+    font-family: inherit;
+  }
+  .dp-tab:hover { color: var(--text-2); }
+  .dp-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .dp-tab .dp-tab-ver {
+    font-size: 9px; padding: 1px 6px; border-radius: 99px;
+    margin-left: 6px; background: var(--surface-dim); color: var(--text-3);
+    font-weight: 700; vertical-align: middle;
+  }
+
+  /* 뷰포트 토글 — 탭 바 우측 */
+  .dp-vp-group {
+    display: flex; align-items: center; gap: 4px;
+    margin-left: auto; padding: 0 16px; flex-shrink: 0;
+  }
+  .dp-vp-btn {
+    padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: 650;
+    font-family: inherit; cursor: pointer; transition: all .15s ease-out;
+    border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--text-3);
+  }
+  .dp-vp-btn:hover { color: var(--text); border-color: rgba(255,255,255,.15); }
+  .dp-vp-btn.active { background: var(--accent); color: #000; border-color: transparent; font-weight: 700; }
+
+  /* 시안 영역 — 나머지 공간 전부 채움 */
+  .dp-frame-area {
+    flex: 1; position: relative; overflow: hidden;
+  }
+  .dp-frame-wrap {
+    display: none; position: absolute; inset: 0;
+  }
+  .dp-frame-wrap.active { display: block; }
+  .dp-frame {
+    width: 100%; height: 100%; border: none;
+  }
+
+  /* 승인 바 — 하단 고정 */
+  .dp-approve-bar {
+    flex-shrink: 0;
+    background: rgba(22,25,31,.95); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+  }
+  .dp-approve-text {
+    font-size: 13px; font-weight: 650; color: var(--text-2); flex: 1; text-align: center;
+  }
+  .dp-approve-btn {
+    padding: 8px 24px; border-radius: 99px; font-size: 13px; font-weight: 700;
+    font-family: inherit; cursor: pointer; transition: all .15s ease-out; border: none;
+  }
+  .dp-approve-yes {
+    background: var(--accent); color: #000;
+  }
+  .dp-approve-yes:hover { filter: brightness(1.12); box-shadow: 0 0 0 4px var(--accent-dim); }
+  .dp-approve-revise {
+    background: var(--surface-dim); color: var(--text-2); border: 1px solid var(--border);
+  }
+  .dp-approve-revise:hover { background: var(--border-dim); color: var(--text); }
+
+  .dp-empty {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: var(--text-3);
+  }
+
+  /* 수정 요청 모달 */
+  .dp-modal-overlay {
+    position: fixed; inset: 0; background: var(--overlay);
+    display: none; align-items: flex-start; justify-content: center;
+    z-index: 100; padding: 80px 16px 24px; overflow-y: auto;
+    backdrop-filter: blur(4px);
+  }
+  .dp-modal-overlay.show { display: flex; }
+
+  @media (max-width: 768px) {
+    .dp-tab { padding: 10px 14px; font-size: 11px; }
+    .dp-vp-group { display: none; }
+    .dp-approve-bar { padding: 10px 12px; flex-wrap: wrap; gap: 8px; }
+    .dp-approve-btn { font-size: 12px; padding: 7px 18px; }
+  }
+  @media print {
+    .dp-tabs, .dp-approve-bar { display: none !important; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 수정 요청 모달 -->
+<div class="dp-modal-overlay" id="dpReviseModal" onclick="if(event.target===this)closeDpRevise()">
+  <div style="background:var(--surface);border:1px solid var(--border-dim);border-radius:var(--r-lg);padding:var(--s6);width:520px;max-width:100%;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--s5);padding-bottom:var(--s4);border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:15px;font-weight:700;" id="dpReviseTitle">디자인 수정 요청</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px;">AI가 디자인을 수정합니다.</div>
+      </div>
+      <button style="background:none;border:none;color:var(--text-3);font-size:20px;cursor:pointer;" onclick="closeDpRevise()">&times;</button>
+    </div>
+    <textarea id="dpReviseInput" placeholder="예: 메인 컬러를 더 따뜻한 톤으로 바꿔주세요&#10;예: 네비게이션 구조를 탭 방식으로 변경해주세요&#10;예: 카드 레이아웃을 2열에서 3열로 변경"
+      style="width:100%;min-height:120px;padding:var(--s4);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:14px;font-family:inherit;line-height:1.7;resize:vertical;outline:none;"></textarea>
+    <div style="display:flex;gap:var(--s3);justify-content:flex-end;margin-top:var(--s4);">
+      <button class="btn" onclick="closeDpRevise()">취소</button>
+      <button class="dp-approve-yes" style="font-size:13px;padding:8px 20px;border-radius:99px;font-family:inherit;cursor:pointer;border:none;" id="dpReviseSubmit" onclick="submitDpRevise()">수정 요청</button>
+    </div>
+  </div>
+</div>
+
+{% if design_artifacts %}
+<!-- 탭 + 뷰포트 -->
+<div class="dp-tabs">
+  {% for art in design_artifacts %}
+  <button class="dp-tab {% if loop.first %}active{% endif %}" onclick="showTab({{ loop.index0 }})" data-idx="{{ loop.index0 }}">
+    {{ art.name }}
+    <span class="dp-tab-ver">v{{ art.current_version }}</span>
+  </button>
+  {% endfor %}
+  <div class="dp-vp-group">
+    <button class="dp-vp-btn active" onclick="setViewport(this,'100%')">데스크탑</button>
+    <button class="dp-vp-btn" onclick="setViewport(this,'768px')">태블릿</button>
+    <button class="dp-vp-btn" onclick="setViewport(this,'375px')">모바일</button>
+  </div>
+</div>
+
+<!-- 시안 프레임 -->
+<div class="dp-frame-area">
+  {% for art in design_artifacts %}
+  <div class="dp-frame-wrap {% if loop.first %}active{% endif %}" data-idx="{{ loop.index0 }}" data-project="{{ art.project_id }}" data-node="{{ art.id }}">
+    <iframe class="dp-frame" src="/api/v1/projects/{{ art.project_id }}/nodes/{{ art.id }}/artifact/view"></iframe>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- 하단 승인 바 -->
+<div class="dp-approve-bar">
+  <div class="dp-approve-text">이 디자인으로 진행하시겠습니까?</div>
+  <button class="dp-approve-btn dp-approve-revise" onclick="openDpRevise()">수정 요청</button>
+  <button class="dp-approve-btn dp-approve-yes" onclick="approveDesign()">디자인 승인</button>
+</div>
+
+{% else %}
+<div class="dp-empty">
+  <div style="font-size:32px;opacity:.15;margin-bottom:var(--s4);">🎨</div>
+  <div style="font-size:15px;font-weight:600;margin-bottom:8px;">아직 완료된 디자인 시안이 없습니다</div>
+  <div style="font-size:13px;">DESIGN 단계가 완료되면 시안이 여기에 표시됩니다.</div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showTab(idx) {
+  document.querySelectorAll('.dp-tab').forEach(function(t,i){ t.classList.toggle('active', i===idx); });
+  document.querySelectorAll('.dp-frame-wrap').forEach(function(f,i){ f.classList.toggle('active', i===idx); });
+}
+
+function setViewport(btn, width) {
+  document.querySelectorAll('.dp-vp-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.dp-frame').forEach(function(f){
+    f.style.maxWidth = width;
+    f.style.margin = width === '100%' ? '0' : '0 auto';
+    f.style.display = 'block';
+  });
+}
+
+function openDpRevise() {
+  var name = document.querySelector('.dp-tab.active').textContent.trim();
+  document.getElementById('dpReviseTitle').textContent = name + ' — 수정 요청';
+  document.getElementById('dpReviseInput').value = '';
+  document.getElementById('dpReviseSubmit').disabled = false;
+  document.getElementById('dpReviseSubmit').textContent = '수정 요청';
+  document.getElementById('dpReviseModal').classList.add('show');
+  setTimeout(function(){ document.getElementById('dpReviseInput').focus(); }, 100);
+}
+
+function closeDpRevise() {
+  document.getElementById('dpReviseModal').classList.remove('show');
+}
+
+async function submitDpRevise() {
+  var req = document.getElementById('dpReviseInput').value.trim();
+  if (!req) { alert('수정 내용을 입력하세요.'); return; }
+  var btn = document.getElementById('dpReviseSubmit');
+  btn.disabled = true; btn.textContent = '전송 중...';
+
+  var wrap = document.querySelector('.dp-frame-wrap.active');
+  var projectId = wrap.dataset.project;
+  var nodeId = wrap.dataset.node;
+  var token = localStorage.getItem('ai_si_token') || '';
+
+  try {
+    var r = await fetch('/api/v1/projects/' + projectId + '/nodes/' + nodeId + '/revise', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request: req })
+    });
+    if (!r.ok) {
+      var d = await r.json().catch(function(){ return {}; });
+      throw new Error(d.detail || '오류 ' + r.status);
+    }
+    closeDpRevise();
+    alert('수정 요청이 전송되었습니다.\nAI가 백그라운드에서 수정 중입니다.\n완료 후 새로고침하면 반영됩니다.');
+  } catch(e) {
+    alert('수정 요청 실패: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '수정 요청';
+  }
+}
+
+function approveDesign() {
+  alert('디자인이 승인되었습니다.\nBUILD 단계로 진행합니다.');
+  location.href = '/engagements/' + '{{ engagement.id }}';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeDpRevise();
+});
+</script>
+{% endblock %}

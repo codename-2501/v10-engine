@@ -1,0 +1,173 @@
+name: "UI 디자인 시안"
+phase: DESIGN
+type: html
+model_preference: opus
+
+# S11: 100% 화면 커버리지 보장 — 화면 목록 정의서에서 SC-XX-NNN 자동 추출 후
+# 화면당 1회 LLM 호출로 <section> 생성 → 병합. 수십 화면도 완전 구현 보장.
+chunk_items_source:
+  from_spec: "화면 목록 정의서"
+  extract_patterns:
+    - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
+    - "([A-Z]{2,5}-[A-Z]{2,4}-\\d{3,4})"
+
+# Stage 9: Dynamic Layer Selection
+context_layers:
+  - prd
+  - design_system
+  - current_task
+  - sibling_artifacts
+
+# Stage 12: Prompt·Output 토큰 상한 선언 (spec 단위, 기존 8000 하드코딩 이동)
+max_output_tokens: 8000
+
+# Stage 10: Formal Schema Validation
+output_schema:
+  type: html
+  schema_ref: schemas/chunked_html_section.json
+  strict: false          # HTML 은 structural 만 참조
+  on_fail: warn          # warn: 로그만, 본 산출물은 유지
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙: <!DOCTYPE html>부터 </html>까지 완전한 HTML만 출력하세요.
+  도구 호출(function_calls, invoke, Write, Bash 등)을 절대 하지 마세요.
+  마크다운 코드 블록(```)으로 감싸지 마세요. HTML 텍스트를 직접 출력하세요.
+
+  화면 설계서(와이어프레임)와 컴포넌트 정의서(디자인 시스템)를 기반으로
+  **실제 UI 디자인 시안**을 완전한 HTML+CSS로 구현하세요.
+
+  고객이 이 산출물을 보고 "이 디자인으로 갈지, 수정할지" 판단합니다.
+  따라서 텍스트 설명이 아닌 **실제 렌더링되는 화면**이어야 합니다.
+
+  ### 필수 화면 — FO + BO 전체 화면을 빠짐없이 구현
+  화면 설계서(와이어프레임)에 정의된 **모든 화면**을 실제 HTML+CSS로 구현하세요.
+  화면설계서의 SCR-001부터 마지막 번호까지 전부 포함해야 합니다.
+  5개만 만들면 실패입니다. 화면설계서에 정의된 화면 수만큼 전부 시안으로 구현하세요.
+
+  ### 각 화면 section 명명 규약 (MANDATORY)
+  모든 `<section>` 태그는 id 속성에 `SCR-XXX` 태그를 포함해야 하며, 그 주변에 텍스트로
+  `SCR-XXX | 화면 이름` 형식을 명시해야 합니다. 이 태그로 하위 도구(preview HTML 분리기,
+  QA 커버리지 검증기)가 1:1 매칭을 수행합니다.
+
+  올바른 예:
+  ```html
+  <section id="SCR-001" class="screen">
+    <header class="screen-label">SCR-001 | 메인 랜딩</header>
+    <!-- ... -->
+  </section>
+  ```
+  SCR 태그가 누락되면 QA 커버리지 검증에서 매칭이 실패하고 FAIL 판정을 받습니다.
+
+  **FO (Front Office — 고객/이용자 화면):**
+  - 공개 페이지 (홈, 서비스 안내, 상담 신청 등)
+  - 이용자 전용 페이지 (마이페이지, 상담 내역, 알림 등)
+  - 각 화면의 네비게이션, 콘텐츠 영역, 폼, 상호작용 요소를 실제 서비스처럼 구현
+
+  **BO (Back Office — 관리자 화면):**
+  - 관리자 대시보드, 데이터 관리, 사용자 관리, 통계/리포트 등
+  - 테이블, 필터, 검색, CRUD 기능이 보이는 실제 관리 화면
+  - FO와 동일한 디자인 시스템(CSS 변수, 컴포넌트)을 공유하되 관리자용 레이아웃 적용
+
+  FO만 있고 BO가 없으면 실패입니다. 반드시 양쪽 모두 구현하세요.
+
+  ### 절대 금지 — 디자인 시스템 콘텐츠 혼입 금지
+  아래 내용은 "컴포넌트 정의서 (디자인 시스템)"의 영역이므로 이 산출물에 포함하지 마세요:
+  - CSS 변수 정의 표/팔레트 표 (CSS 변수는 코드에 사용하되 별도 섹션으로 나열 금지)
+  - 타이포그래피 스케일 표
+  - 컴포넌트 쇼케이스 (버튼/인풋/카드 등을 독립적으로 나열하는 섹션)
+  - 모달, 토스트, 푸터 등 개별 컴포넌트만 보여주는 섹션
+  이 산출물은 **페이지 단위 시안만** 포함합니다. 컴포넌트는 페이지 안에서 사용되는 형태로만 보여주세요.
+
+  ### HTML 구현 규칙
+  - 완전한 standalone HTML 문서 (외부 CDN/파일 참조 금지, 단 Pretendard 폰트 CDN은 허용)
+  - CSS는 `<style>` 태그 안에 전부 포함
+  - 반응형 (모바일 375px ~ 데스크탑 1280px)
+  - 각 화면은 `<section>` 태그로 구분, 화면 이름을 `<h2>`로 표기
+  - 실제 프로젝트 맥락에 맞는 더미 데이터 사용 (Lorem ipsum 금지)
+  - 호버/포커스 상태 스타일 포함
+  - 컴포넌트 정의서의 컬러/타이포/간격 토큰 적용
+
+  ### ★ 디자인 퀄리티 규칙 (엄격히 준수)
+
+  **금지 사항:**
+  - 보라색 그라디언트, 기본 시스템 폰트 금지
+  - AI가 만든 것 같은 정형화된 레이아웃 금지 (히어로+3카드+CTA 반복 패턴)
+  - 쿠키커터 다크 대시보드 템플릿 느낌 금지
+  - 무의미한 장식 요소 (떠다니는 도형, 그라디언트 블롭 등) 금지
+
+  **필수 사항:**
+  - 프로젝트 맥락에 맞는 독창적 디자인 (실버케어→따뜻한 톤, SaaS→모던 미니멀, 제조→견고한 느낌 등)
+  - Pretendard Variable 웹폰트 사용: `@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');`
+  - 실제 서비스 수준의 시각적 완성도 — awwwards nominee 수준 목표
+
+  **타이포그래피:**
+  - font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif
+  - 대담한 사이즈 계층: 히어로 32~48px (weight 800), 본문 15~16px, 보조 12~13px
+  - letter-spacing: 제목 -.03em, 본문 0, 캡션 .04em
+  - font-weight 변화로 시각 계층 표현 (400/550/650/700/800)
+
+  **색상 전략:**
+  - 흑백 베이스 + 강렬한 accent 1색 (프로젝트 성격에 맞게 선택)
+  - 반드시 다크 테마: 배경 #111318, 카드 #1a1d24, 텍스트 #eaedf2. 라이트 테마(흰 배경) 절대 금지
+  - pure black(#000) 금지 — dark grey 사용 (#111318 ~ #1c1f27 범위)
+  - accent 색상은 프로젝트 맥락에 맞게 1색 선택 (다크 배경 위에서 잘 보이는 밝은 톤)
+  - CSS 변수로 정의: --bg, --surface, --border, --text, --text-2, --text-3, --accent
+
+  **공간 (Spacing):**
+  - 넉넉한 여백 — 섹션 간 48~64px, 카드 내부 패딩 24~32px
+  - 8px 기반 스케일 (8, 16, 24, 32, 48, 64)
+  - 콘텐츠가 숨 쉴 수 있는 호흡감 필수
+
+  **컴포넌트:**
+  - 버튼: border-radius 99px (pill 스타일), hover 시 ring 피드백 (box-shadow: 0 0 0 3px accent-dim)
+  - 카드: backdrop-filter: blur(16px), border rgba(255,255,255,.06), radius 14~16px
+  - border는 거의 안 보이는 수준 (rgba 0.06~0.08)
+  - 테이블 th: uppercase 11px, letter-spacing .05em
+
+  **모션 (절제):**
+  - transition: .15s ~ .25s ease-out (모든 인터랙션)
+  - hover 시 미세한 transform: translateY(-2px) + shadow 증가
+  - focus-visible: outline 2px solid accent, offset 2px
+  - 장식적 애니메이션 금지 — 기능적 피드백만
+
+  **접근성:**
+  - WCAG 2.1 AA 대비(4.5:1) 준수
+  - :focus-visible 포커스 링
+  - 아이콘은 유니코드 이모지 또는 인라인 SVG
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 화면설계서에 정의된 모든 화면이 시안으로 포함되었는가 (5개만이면 실패)
+  □ 디자인 시스템 콘텐츠(컬러 팔레트 표, 타이포 스케일 표, 컴포넌트 쇼케이스)가 별도 섹션으로 존재하지 않는가
+  □ 각 화면이 <section> 태그로 구분되고 화면 ID(SCR-XXX)와 이름이 표기되어 있는가
+  □ Pretendard 폰트 적용 확인
+  □ CSS 변수 기반 컬러 시스템 적용 (코드에만 사용, 별도 나열 섹션 없음)
+  □ 반응형 미디어쿼리 포함 (375px ~ 1280px)
+  □ 호버/포커스 인터랙션 스타일 포함
+  □ 프로젝트 맥락에 맞는 실제 데이터 사용
+  □ 보라색 그라디언트/시스템 폰트 미사용 확인
+
+validation:
+  structural:
+    min_chars: 20000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성", "Lorem ipsum", "Segoe UI"]
+  semantic:
+    - "화면설계서에 정의된 모든 화면(SCR-XXX)이 빠짐없이 시안으로 구현되었는지 검증 — 5개만 있으면 FAIL"
+    - "디자인 시스템 콘텐츠(컬러 팔레트 표, 타이포그래피 스케일 표, 컴포넌트 쇼케이스)가 별도 섹션으로 혼입되지 않았는지 검증 — 혼입 시 FAIL"
+    - "각 화면이 section 태그로 구분되고 화면 ID와 이름이 명시되어 있는지 검증"
+    - "프로젝트 맥락에 맞는 실제 데이터가 사용되는지 검증 (Lorem ipsum 금지)"
+    - "Pretendard 폰트가 적용되었는지 검증"
+    - "AI스러운 정형화된 레이아웃이 아닌 프로젝트 맥락에 맞는 독창적 디자인인지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  추가 검증:
+  - 고객이 이 화면을 보고 디자인 승인 결정을 내릴 수 있는 수준인가?
+  - AI가 만든 것 같은 정형화된 느낌이 아닌, 실제 서비스 수준의 완성도를 갖추었는가?
+  - 보라색 그라디언트, 시스템 폰트, 쿠키커터 레이아웃이 사용되지 않았는가?
+  - 타이포, 간격, 색상이 프로젝트 맥락에 맞게 독창적으로 설계되었는가?
+  판정: PASS 또는 FAIL + 구체적 사유

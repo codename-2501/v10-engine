@@ -1,0 +1,76 @@
+name: "프론트엔드 컴포넌트 구현"
+phase: BUILD
+type: code
+model_preference: sonnet
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  **페이지 조립 HTML을 React/Next.js 페이지 컴포넌트로 1:1 변환**하세요.
+
+  이전 단계(프론트엔드 공통 인프라)에서 globals.css, 공통 컴포넌트, 레이아웃, API 클라이언트가 이미 구축되었습니다.
+  이 산출물에서는 **조립된 HTML 페이지를 React 페이지 컴포넌트로 변환**하는 것만 집중합니다.
+
+  ### 1:1 변환 규칙 (MANDATORY — 최우선)
+  - 조립 HTML의 색상, 간격, 폰트, 레이아웃, 그림자, 모서리를 **정확히 그대로** 구현
+  - HTML의 인라인 CSS → Tailwind 클래스 또는 CSS Module로 변환하되 시각적 결과 동일
+  - CSS 변수(var(--xxx))는 globals.css에서 가져옴 (공통 인프라에서 이미 정의)
+  - 각 조립 HTML 페이지 = 1개 Next.js 페이지 (app/ 라우트)
+  - 공통 인프라의 컴포넌트를 최대한 활용 (Button, Modal, DataTable, Card 등)
+  - **디자인을 임의로 변경/개선 금지 — HTML 그대로 변환**
+
+  ### 부가 UI (자유 추가)
+  조립 HTML에 없지만 실제 서비스에 필요한 것들은 디자인 톤을 맞춰서 추가:
+  - 모달 (생성/수정/삭제 확인)
+  - 폼 유효성 검증 UI
+  - 로딩/에러/빈 상태
+  - 404 / 접근 거부 페이지
+  - 기타 프로젝트 맥락상 필요한 화면
+
+  ### 필수 섹션
+
+  1. **페이지 라우트 목록** — 조립 HTML에서 추출한 전체 페이지 → Next.js 라우트 매핑 테이블
+  2. **페이지 컴포넌트** — 각 페이지별 전체 React 코드
+     - 공통 인프라 컴포넌트를 import
+     - 정적 데이터는 조립 HTML에서 그대로 가져옴
+     - API 연동 포인트는 주석으로 표시 (// API: GET /api/v1/xxx)
+  3. **페이지 전용 컴포넌트** — 특정 페이지에서만 사용되는 컴포넌트
+  4. **타입 정의** — 페이지별 데이터 타입, API 응답 타입
+
+  ### 코드 품질 기준
+  - TypeScript strict mode
+  - 모든 컴포넌트에 Props 타입
+  - 접근성(a11y) — aria, keyboard navigation
+  - 반응형 — 모바일/태블릿/데스크톱
+  - 에러 처리 — try/catch + ErrorBoundary
+
+  ### 출력 전 자가검증
+  □ 조립 HTML의 모든 페이지가 React 컴포넌트로 변환됨
+  □ 코드 블록 10개 이상
+  □ TODO/TBD/미정 키워드 없음
+  □ 공통 인프라 컴포넌트를 import해서 사용
+  □ 디자인이 조립 HTML과 시각적으로 동일
+
+  <!-- SELF_CHECK: {"pages_converted":true,"code_blocks":10,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "페이지 라우트 목록"
+      - "페이지 컴포넌트"
+    has_code_blocks: true
+    min_chars: 5000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "조립 HTML의 모든 페이지가 React 컴포넌트로 변환되었는지 검증"
+    - "공통 인프라 컴포넌트를 import해서 사용하는지 검증"
+    - "TypeScript Props 타입이 모든 컴포넌트에 정의되었는지 검증"
+    - "디자인이 조립 HTML과 동일한지 검증 (색상, 간격, 레이아웃)"
+
+qa_prompt: |
+  위 페이지 컴포넌트를 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  추가: 조립 HTML과 시각적으로 동일한 React 코드인지 확인.
+  판정: PASS 또는 FAIL + 구체적 사유

@@ -1,0 +1,96 @@
+name: 금융 / 핀테크
+keywords:
+  - 금융
+  - 은행
+  - 증권
+  - 송금
+  - 핀테크
+  - fintech
+  - banking
+  - 투자
+  - 보험
+  - 대출
+  - 카드
+
+terminology:
+  - KYC: 본인 확인 (Know Your Customer)
+  - AML: 자금세탁방지
+  - 가상계좌: 거래용 임시 계좌
+  - 시세: 실시간 가격 데이터
+  - 호가: 매수/매도 주문 가격
+
+regulations:
+  - 전자금융거래법
+  - 신용정보법
+  - 자본시장법
+  - 외국환거래법
+  - 금융보안원 가이드라인
+  - PCI-DSS
+
+screen_estimate:
+  small: 40
+  medium: 70
+  large: 120
+
+spec_overrides:
+  보안_설계서:
+    strict: true
+    extra_required:
+      - 전자금융거래법 준수
+      - 2FA / 공인인증서 / 간편인증
+      - 거래 로그 5년 보존
+      - 이상 거래 감지(FDS)
+      - 망분리 기준
+      - 침입 차단 정책
+  api_설계서:
+    extra_required:
+      - 거래 idempotency
+      - 시그니처 검증
+      - 시세 latency 명시
+  화면_목록_정의서:
+    group_prefix_examples:
+      - "SC-AU: 인증(공인/간편)"
+      - "SC-AC: 계좌/잔액"
+      - "SC-TR: 송금/이체"
+      - "SC-IV: 투자/주문"
+      - "SC-CS: 고객센터"
+
+design_tone:
+  palette: "신뢰감 있는 네이비/딥블루 + 흰색"
+  numbers: "소수점·통화 단위 명확히"
+  forbidden:
+    - "장난스러운 일러스트"
+    - "모호한 거래 표현"
+
+# S13
+component_categories:
+  - name: "layout"
+    chunk_items:
+      - secure_header
+      - auth_shield_banner
+      - side_nav
+  - name: "trading"  # 금융·거래 전용
+    chunk_items:
+      - price_ticker
+      - orderbook
+      - chart_candle
+      - trade_form
+      - position_card
+  - name: "content"
+    chunk_items:
+      - balance_card
+      - transaction_item
+      - account_summary
+      - statement_table
+  - name: "form"
+    chunk_items:
+      - auth_step
+      - pin_input
+      - amount_input
+      - otp_input
+  - name: "feedback"
+    chunk_items:
+      - confirm_dialog
+      - risk_warning_modal
+      - toast
+      - empty_state

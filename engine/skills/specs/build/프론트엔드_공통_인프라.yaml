@@ -1,0 +1,123 @@
+name: "프론트엔드 공통 인프라"
+phase: BUILD
+type: code
+model_preference: sonnet
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  프론트엔드 프로젝트의 **공통 인프라**를 구축하세요.
+  이 산출물은 Next.js App Router 프로젝트의 뼈대입니다.
+  다음 단계(페이지 구현)에서 이 인프라 위에 페이지를 쌓습니다.
+
+  ### 필수 섹션 (순서 준수)
+
+  1. **프로젝트 구조** — Next.js App Router 디렉토리 구조, 파일 네이밍 규칙
+     ```
+     src/
+       app/              # App Router
+         layout.tsx       # 루트 레이아웃
+         globals.css      # 디자인 토큰 CSS 변수
+         (auth)/          # 인증 그룹
+         (main)/          # 메인 레이아웃 그룹
+       components/
+         ui/              # 공통 UI 컴포넌트
+         layout/          # Header, Sidebar, Footer
+       hooks/             # 커스텀 훅
+       lib/               # API 클라이언트, 유틸리티
+       stores/            # 상태 관리
+       types/             # 타입 정의
+     ```
+
+  2. **globals.css** — 디자인 토큰 CSS 변수를 :root에 그대로 복사.
+     아래에 주입되는 디자인 토큰 JSON의 모든 값을 CSS 변수로 변환.
+     다크 테마 기본. 폰트 import 포함.
+
+  3. **공통 컴포넌트** — 전체 코드 포함 (스텁 금지)
+     - Button (primary/secondary/ghost/danger, size sm/md/lg)
+     - Input / Textarea / Select (label + error state)
+     - Modal (confirm/form/alert 변형)
+     - Toast / Notification (success/error/warning/info)
+     - DataTable (정렬, 페이지네이션, 빈 상태)
+     - Card / StatCard
+     - Badge / Tag
+     - Loading (spinner + skeleton)
+     - EmptyState
+     - ErrorBoundary
+     - Breadcrumb
+     - SearchBar
+     - Pagination
+
+  4. **레이아웃 컴포넌트**
+     - Header (로고, 네비게이션, 사용자 메뉴)
+     - Sidebar (접을 수 있는 네비게이션, 활성 상태)
+     - Footer
+     - MobileBottomNav (모바일용 바텀 탭)
+     - PageWrapper (공통 페이지 래퍼)
+
+  5. **상태 관리** — Zustand 스토어
+     - authStore (로그인, 토큰, 사용자 정보)
+     - uiStore (사이드바 상태, 모달, 토스트 큐)
+     - 커스텀 훅 (useAuth, useToast, useModal)
+
+  6. **API 연동 레이어**
+     - API 클라이언트 (fetch wrapper, 토큰 자동 주입, 에러 핸들링)
+     - 요청/응답 타입 정의
+     - API 경로 상수
+     - React Query 또는 SWR 설정
+
+  7. **라우팅 설정**
+     - App Router 라우트 그룹 설정
+     - 인증 가드 (middleware.ts)
+     - 역할별 접근 제어 (RBAC)
+     - 레이아웃 중첩 구조
+
+  ### 코드 품질 기준
+  - TypeScript strict mode 필수
+  - 모든 컴포넌트에 Props 타입 정의
+  - 접근성(a11y) — aria 속성, 키보드 네비게이션, focus-visible
+  - 반응형 — 모바일(480px)/태블릿(768px)/데스크톱(1024px)
+  - prefers-reduced-motion 대응
+  - CSS 변수 기반 — 하드코딩 색상 금지
+
+  ### Vercel React Best Practices
+  - barrel file 금지 — 직접 import
+  - React.memo로 리렌더 방지
+  - dynamic import로 코드 스플리팅
+  - named export만 사용
+
+  ### 출력 전 자가검증
+  □ 7개 섹션 전부 작성
+  □ 코드 블록 15개 이상
+  □ TODO/TBD/미정 키워드 없음
+  □ 모든 컴포넌트에 Props 타입
+  □ globals.css에 디자인 토큰 변수 전부 포함
+
+  <!-- SELF_CHECK: {"sections":7,"code_blocks":15,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "프로젝트 구조"
+      - "globals.css"
+      - "공통 컴포넌트"
+      - "레이아웃 컴포넌트"
+      - "상태 관리"
+      - "API 연동 레이어"
+      - "라우팅 설정"
+    has_code_blocks: true
+    min_chars: 8000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "globals.css에 디자인 토큰 CSS 변수가 모두 포함되어 있는지 검증"
+    - "모든 공통 컴포넌트가 완전한 코드로 작성되었는지 검증 (스텁/placeholder 금지)"
+    - "TypeScript strict mode와 Props 타입이 적용되었는지 검증"
+    - "접근성(aria, keyboard, focus-visible)이 적용되었는지 검증"
+
+qa_prompt: |
+  위 프론트엔드 공통 인프라를 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  추가: 모든 컴포넌트가 즉시 import 가능한 완성 코드인지 확인.
+  판정: PASS 또는 FAIL + 구체적 사유

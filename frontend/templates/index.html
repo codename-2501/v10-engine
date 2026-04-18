@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+{% block title %}대시보드 — AX FACTORY{% endblock %}
+{% block page_title %}대시보드{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ── Hero stats ── */
+  .hero-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s4);
+    margin-bottom: var(--s7);
+  }
+  .hero-stat {
+    background: var(--surface-glass);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: var(--s6);
+    position: relative; overflow: hidden;
+    transition: border-color .2s ease-out, box-shadow .2s ease-out;
+  }
+  .hero-stat:hover { border-color: var(--border-active); box-shadow: 0 0 0 3px rgba(255,255,255,.02); }
+  .hero-stat-accent {
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .hero-stat .stat-val {
+    font-size: 2.8rem; font-weight: 800; line-height: 1;
+    letter-spacing: -.05em; font-variant-numeric: tabular-nums;
+  }
+  .hero-stat .stat-lbl {
+    font-size: 13px; font-weight: 550; color: var(--text-2);
+    margin-top: var(--s2);
+  }
+  .hero-stat .stat-tag {
+    display: inline-block; margin-top: var(--s2);
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3);
+    padding: 2px 6px; border-radius: 4px;
+    background: rgba(255,255,255,.04);
+  }
+
+  /* ── Section header ── */
+  .sec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: var(--s4);
+  }
+  .sec-title {
+    font-size: 18px; font-weight: 700; letter-spacing: -.02em;
+  }
+  .sec-link {
+    font-size: 12px; font-weight: 600; color: var(--text-3);
+    text-decoration: none; transition: color var(--dur);
+  }
+  .sec-link:hover { color: var(--accent); text-decoration: none; }
+
+  /* ── Two-column ── */
+  .dash-cols {
+    display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--s5);
+    margin-bottom: var(--s7);
+  }
+
+  /* ── Engagement rows ── */
+  .eng-list { display: flex; flex-direction: column; }
+  .eng-row {
+    display: flex; align-items: center; gap: var(--s4);
+    padding: var(--s3) var(--s4);
+    border-bottom: 1px solid var(--border);
+    transition: background var(--dur);
+    font-size: 13px;
+  }
+  .eng-row:last-child { border-bottom: none; }
+  .eng-row:hover { background: rgba(255,255,255,.02); }
+  .eng-name {
+    flex: 1; font-weight: 600; color: var(--text);
+    text-decoration: none; position: relative;
+    transition: color .15s ease-out;
+  }
+  .eng-name::after {
+    content: ''; position: absolute; bottom: -1px; left: 0;
+    width: 0; height: 1px; background: var(--accent);
+    transition: width .25s var(--ease);
+  }
+  .eng-name:hover { color: var(--accent); text-decoration: none; }
+  .eng-name:hover::after { width: 100%; }
+  .eng-client { color: var(--text-3); font-size: 12px; min-width: 80px; }
+  .eng-pri { font-size: 11px; font-weight: 700; min-width: 50px; }
+  .eng-act {
+    font-size: 11px; padding: 4px 10px; border-radius: 99px;
+    border: 1px solid var(--border); color: var(--text-3);
+    text-decoration: none; transition: all .15s ease-out;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .eng-act:hover {
+    border-color: var(--accent); color: var(--accent);
+    background: var(--accent-dim);
+    box-shadow: 0 0 0 2px var(--accent-dim);
+    text-decoration: none;
+  }
+  .eng-empty {
+    padding: var(--s7) var(--s4); text-align: center; color: var(--text-3);
+  }
+  .eng-empty a { font-size: 13px; }
+
+  /* ── Feed ── */
+  .feed { max-height: 420px; overflow-y: auto; }
+  .feed-item {
+    padding: var(--s3) var(--s4);
+    border-bottom: 1px solid var(--border);
+    transition: background var(--dur);
+  }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-item:hover { background: rgba(255,255,255,.015); }
+  .feed-head {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .feed-type {
+    font-size: 12px; font-weight: 700; color: var(--accent);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    letter-spacing: -.01em;
+  }
+  .feed-time { font-size: 10px; color: var(--text-3); }
+  .feed-body { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .feed-empty {
+    padding: var(--s8) var(--s4); text-align: center; color: var(--text-3);
+    font-size: 13px;
+  }
+  .feed-count {
+    font-size: 10px; font-weight: 700; padding: 2px 7px;
+    border-radius: 4px; background: var(--accent-dim); color: var(--accent);
+  }
+
+  /* ── Quick nav ── */
+  .quick-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s4);
+  }
+  .quick-card {
+    display: flex; align-items: center; gap: var(--s4);
+    padding: var(--s5) var(--s6);
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    text-decoration: none; color: var(--text);
+    transition: border-color .2s ease-out, transform .2s ease-out, box-shadow .2s ease-out;
+  }
+  .quick-card:hover {
+    border-color: var(--border-active); transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0,0,0,.18);
+    text-decoration: none;
+  }
+  .quick-card:active { transform: translateY(0); }
+  .quick-ico {
+    width: 40px; height: 40px; border-radius: var(--r-md); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .quick-label { font-size: 13px; font-weight: 650; }
+  .quick-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+  /* eng-row 내부 텍스트 줄바꿈 처리 */
+  .eng-row { flex-wrap: wrap; min-width: 0; }
+  .eng-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .eng-client { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  @media (max-width: 1100px) {
+    .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    .quick-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 900px) {
+    .dash-cols { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    .quick-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .hero-stats { grid-template-columns: 1fr; }
+    .quick-grid { grid-template-columns: 1fr; }
+    .eng-row { font-size: 12px; gap: var(--s2); padding: var(--s2) var(--s3); }
+    .eng-client { display: none; }
+    .eng-pri { display: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ═══ HERO STATS ═══ -->
+<div
+  id="system-summary"
+  hx-get="/dashboard/fragments/system-summary"
+  hx-trigger="every 30s"
+  hx-swap="outerHTML"
+>
+  <div class="hero-stats stagger">
+    <div class="hero-stat reveal lift">
+      <div class="hero-stat-accent" style="background:var(--info);"></div>
+      <div class="stat-val" style="color:var(--info)">{{ status.active_agents }}</div>
+      <div class="stat-lbl">활성 에이전트</div>
+      <div class="stat-tag">in_progress</div>
+    </div>
+    <div class="hero-stat reveal lift">
+      <div class="hero-stat-accent" style="background:var(--err);"></div>
+      <div class="stat-val" style="color:var(--err)">{{ status.needs_human }}</div>
+      <div class="stat-lbl">인간 개입 필요</div>
+      <div class="stat-tag">needs_human</div>
+    </div>
+    <div class="hero-stat reveal lift">
+      <div class="hero-stat-accent" style="background:var(--warn);"></div>
+      <div class="stat-val" style="color:var(--warn)">{{ status.suspended }}</div>
+      <div class="stat-lbl">일시 중단</div>
+      <div class="stat-tag">suspended</div>
+    </div>
+    <div class="hero-stat reveal lift">
+      <div class="hero-stat-accent" style="background:var(--text-3);"></div>
+      <div class="stat-val">{{ "ON" if status.shutting_down else "—" }}</div>
+      <div class="stat-lbl">종료 모드</div>
+      <div class="stat-tag">shutdown</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MAIN TWO-COL ═══ -->
+<div class="dash-cols">
+  <!-- 인게이지먼트 -->
+  <div class="card reveal" style="padding:0;">
+    <div style="padding:var(--s4) var(--s5);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+      <span style="font-size:13px;font-weight:700;letter-spacing:-.01em;">인게이지먼트</span>
+      <a href="/engagements" class="sec-link link-reveal">전체 보기 →</a>
+    </div>
+    <div class="eng-list">
+      {% for e in engagements %}
+      <div class="eng-row" style="flex-wrap:wrap;gap:6px;">
+        <a class="eng-name" href="/engagements/{{ e.id }}">{{ e.name }}</a>
+        <span class="eng-client">{{ e.client_name }}</span>
+        {% if e.status == 'ACTIVE' %}
+          <span class="badge badge-success">진행</span>
+        {% elif e.status == 'INTAKE' %}
+          <span class="badge badge-accent">접수</span>
+        {% elif e.status == 'PAUSED' %}
+          <span class="badge badge-warning">중단</span>
+        {% elif e.status == 'COMPLETED' %}
+          <span class="badge badge-info">완료</span>
+        {% else %}
+          <span class="badge badge-muted">{{ e.status }}</span>
+        {% endif %}
+        <span class="eng-pri" style="color:{% if e.priority == 'HIGH' or e.priority == 'CRITICAL' %}var(--err){% elif e.priority == 'MEDIUM' %}var(--warn){% else %}var(--text-3){% endif %}">{{ e.priority }}</span>
+        <a class="eng-act" href="/engagements/{{ e.id }}/deliverables">산출물</a>
+        <a class="eng-act" href="/engagements/{{ e.id }}/dag">DAG</a>
+        {% if e.verification_badges %}
+        <div style="width:100%;display:flex;gap:4px;flex-wrap:wrap;padding:4px 0 0;font-size:10px;">
+          {% for b in e.verification_badges %}
+          <span title="{{ b.label }}" style="display:inline-flex;align-items:center;gap:2px;padding:2px 6px;border-radius:3px;
+            {% if b.state == 'pass' %}background:var(--st-completed-dim);color:var(--st-completed);border:1px solid var(--st-completed-ring);
+            {% elif b.state == 'warn' %}background:var(--st-awaiting-dim);color:var(--st-awaiting);border:1px solid var(--st-awaiting-ring);
+            {% elif b.state == 'fail' %}background:var(--st-failed-dim);color:var(--st-failed);border:1px solid var(--st-failed);
+            {% else %}background:var(--st-progress-dim);color:var(--st-progress);border:1px solid var(--st-progress);{% endif %}">
+            {% if b.state == 'pass' %}✓{% elif b.state == 'warn' %}⚠{% elif b.state == 'fail' %}✗{% else %}⟳{% endif %}
+            {{ b.label }}{% if b.count %} {{ b.count }}{% endif %}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="eng-empty">
+        인게이지먼트 없음<br>
+        <a href="/intake">인테이크 접수</a>에서 시작하세요
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 이벤트 피드 -->
+  <div class="card reveal" style="padding:0;">
+    <div style="padding:var(--s4) var(--s5);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+      <span style="font-size:13px;font-weight:700;letter-spacing:-.01em;">실시간 이벤트</span>
+      <span class="feed-count" id="event-count">0</span>
+    </div>
+    <div id="event-feed" class="feed">
+      <div class="feed-empty">
+        <div style="font-size:24px;opacity:.2;margin-bottom:var(--s3);">📡</div>
+        WebSocket 연결 대기 중
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ QUICK NAV ═══ -->
+<div class="sec-head reveal">
+  <div class="sec-title">바로가기</div>
+</div>
+<div class="quick-grid stagger">
+  <a class="quick-card reveal lift" href="/intake">
+    <div class="quick-ico" style="background:var(--accent-dim);color:var(--accent);">📋</div>
+    <div>
+      <div class="quick-label">새 인테이크</div>
+      <div class="quick-sub">프로젝트 요청서</div>
+    </div>
+  </a>
+  <a class="quick-card reveal lift" href="/intake/submissions">
+    <div class="quick-ico" style="background:var(--info-dim);color:var(--info);">📊</div>
+    <div>
+      <div class="quick-label">접수 관리</div>
+      <div class="quick-sub">제출 요청 검토</div>
+    </div>
+  </a>
+  <a class="quick-card reveal lift" href="/skills">
+    <div class="quick-ico" style="background:var(--ok-dim);color:var(--ok);">🧩</div>
+    <div>
+      <div class="quick-label">스킬 관리</div>
+      <div class="quick-sub">프롬프트 · 검증</div>
+    </div>
+  </a>
+  <a class="quick-card reveal lift" href="/status">
+    <div class="quick-ico" style="background:var(--warn-dim);color:var(--warn);">⚙️</div>
+    <div>
+      <div class="quick-label">시스템 상태</div>
+      <div class="quick-sub">노드 · 헬스체크</div>
+    </div>
+  </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var feed=document.getElementById('event-feed');
+  var cntEl=document.getElementById('event-count');
+  var cnt=0, MAX=60;
+
+  function add(msg){
+    var d=document.createElement('div');
+    d.className='feed-item';
+    var t=msg.timestamp?new Date(msg.timestamp).toLocaleTimeString('ko-KR'):'';
+    var p=msg.payload?Object.entries(msg.payload).map(function(e){return e[0]+': '+e[1]}).join(', '):'';
+
+    d.innerHTML='<div class="feed-head"><span class="feed-type">'+esc(msg.type||'')+'</span><span class="feed-time">'+esc(t)+'</span></div>'
+      +(p?'<div class="feed-body">'+esc(p.slice(0,140))+'</div>':'');
+
+    var empty=feed.querySelector('.feed-empty');
+    if(empty)empty.remove();
+    if(feed.children.length>=MAX)feed.lastChild.remove();
+    feed.insertBefore(d,feed.firstChild);
+    cnt++;
+    cntEl.textContent=cnt;
+  }
+
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  window.onWsMessage=function(msg){
+    if(msg.type==='ping')return;
+    add(msg);
+    if(['NodeStateChanged','GateTriggered','BudgetWarning70','BudgetWarning90','BudgetExceeded'].indexOf(msg.type)!==-1){
+      htmx.trigger('#system-summary','refresh');
+    }
+  };
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+name: "InstantDB 실시간 쿼리"
+phase: BUILD
+type: code
+model_preference: opus
+backend_requirement: "instantdb"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  InstantDB의 InstaQL 객체 쿼리 + 실시간 구독(subscribeQuery) 패턴을
+  UI 화면별로 완전히 구현하세요. 주요 목록/상세/집계 뷰의 useQuery 훅과
+  optimistic 업데이트 흐름, pagination, cursor 기반 로드를 포함합니다.
+
+  ### InstaQL 특성 반영 (MANDATORY)
+  - `useQuery({ entity: { $: { where, order, limit }, related: {...} } })`
+  - 중첩 쿼리 지원 — 한 번의 요청으로 관계 엔티티 동시 조회
+  - `$.first`, `$.last`, `$.after` 커서 기반 pagination
+  - where 연산자: `{ eq, ne, gt, lt, in, like, isNull }`
+  - 집계는 `$aggregate`, count는 `$count`
+  - Server-side: `db.query(...)` + `db.subscribeQuery(...)`
+
+  ### 필수 섹션 (순서 준수)
+  1. **핵심 쿼리 카탈로그** — 화면 단위로 필요한 쿼리 목록 (입력/출력/갱신주기)
+  2. **커스텀 훅 구현** — `useMyHabits`, `useHabitDetail(id)` 등 useQuery 래핑
+     훅 완성 코드 + 타입
+  3. **Pagination 패턴** — 커서/오프셋 기반 무한 스크롤 또는 페이지 로드
+  4. **Optimistic 업데이트** — transact 호출 → 즉시 UI 반영 → 롤백 패턴
+  5. **서버측 subscribeQuery** — Admin SDK에서 변경 감시 + 외부 시스템 알림
+     (이메일/슬랙) 예시
+  6. **쿼리 성능 및 N+1 방지** — 중첩 쿼리 사용 권장, Cartesian 곱 회피
+
+  ### 품질 기준
+  - 모든 목록 쿼리에 `limit` 명시 (무제한 로드 금지)
+  - 정렬은 `order`로 명시 (DB 순서 의존 금지)
+  - where 필터에 인덱스가 있는 속성 우선 사용
+  - optimistic 실패 시 사용자에게 에러 토스트
+  - 서버 subscribeQuery는 topic 범위를 좁게 (전체 엔티티 감시 금지)
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 6개 필수 섹션 모두 작성 완료
+  □ useQuery 커스텀 훅 3개 이상
+  □ pagination 예시 (무한 스크롤 또는 Load More)
+  □ optimistic update 실패 → 롤백 흐름 코드 포함
+  □ 서버 subscribeQuery 예시 1개 이상
+
+  <!-- SELF_CHECK: {"sections":6,"hooks":N,"pagination":true,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "핵심 쿼리 카탈로그"
+      - "커스텀 훅"
+      - "Pagination"
+      - "Optimistic 업데이트"
+      - "서버측 subscribeQuery"
+      - "쿼리 성능"
+    has_code_blocks: true
+    min_chars: 5000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "모든 useQuery 호출에 limit이 명시되어 무제한 로드를 방지하는지 검증"
+    - "optimistic update 실패 시 롤백 및 사용자 알림 경로가 존재하는지 검증"
+    - "pagination이 커서 기반 또는 페이지 기반 중 하나로 일관되게 구현되는지 검증"
+    - "중첩 쿼리가 N+1 쿼리 대신 사용되는지 검증"
+    - "서버 subscribeQuery가 좁은 topic으로 제한되어 불필요한 알림을 방지하는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

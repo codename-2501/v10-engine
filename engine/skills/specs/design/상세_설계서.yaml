@@ -1,0 +1,77 @@
+name: "상세 설계서"
+phase: DESIGN
+type: document
+model_preference: opus
+
+# Stage 9: Dynamic Layer Selection — 상세 설계는 모든 design artifact 필요
+context_layers:
+  - prd
+  - design_system
+  - current_task
+  - db_schema
+  - api_spec
+  - sibling_artifacts
+
+# F4 섹션 분할 (S1-1) — 모듈/클래스 다수 기술되는 대형 기술 문서.
+sections:
+  - name: "모듈 상세 설계"
+    outline: "각 모듈의 책임·입출력·내부 로직, 의존성·인터페이스 정의"
+    target_tokens: 8000
+    min_items: 5
+  - name: "클래스 다이어그램"
+    outline: "주요 클래스/객체의 속성·메서드·관계(상속/구성/연관) Mermaid classDiagram"
+    target_tokens: 5000
+  - name: "시퀀스 다이어그램"
+    outline: "핵심 유스케이스별 객체 간 메시지 흐름 Mermaid sequenceDiagram. 동기/비동기 구분"
+    target_tokens: 5000
+    min_items: 3
+  - name: "상태 다이어그램"
+    outline: "주요 엔티티 상태 전이 Mermaid stateDiagram. 전이 조건·액션"
+    target_tokens: 4000
+    min_items: 3
+  - name: "에러 처리 설계"
+    outline: "에러 분류·코드 정의·예외 처리 전략·복구·로깅 전략 테이블"
+    target_tokens: 4000
+    min_items: 8
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **모듈 상세 설계** — 각 모듈의 책임, 입출력, 내부 로직을 상세히 기술. 모듈 간 의존성과 인터페이스를 명확히 정의
+  2. **클래스 다이어그램** — 주요 클래스/객체의 속성, 메서드, 관계(상속/구성/연관)를 Mermaid classDiagram으로 표현
+  3. **시퀀스 다이어그램** — 핵심 유스케이스별 객체 간 메시지 흐름을 Mermaid sequenceDiagram으로 표현. 동기/비동기 구분
+  4. **상태 다이어그램** — 주요 엔티티의 상태 전이를 Mermaid stateDiagram으로 표현. 전이 조건과 액션 명시
+  5. **에러 처리 설계** — 에러 분류 체계, 에러 코드 정의, 예외 처리 전략, 복구 메커니즘, 로깅 전략을 표 형태로 정리
+
+  ### 품질 기준
+  - 모든 모듈은 단일 책임 원칙(SRP)을 준수할 것
+  - 다이어그램은 Mermaid 문법으로 렌더링 가능할 것
+  - 에러 코드는 체계적 넘버링(예: E1001~)을 사용할 것
+  - 각 모듈의 입출력 데이터 타입이 명확히 정의될 것
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 모든 모듈의 책임과 경계가 명확한가
+  □ 다이어그램이 Mermaid 문법에 맞는가
+  □ 에러 처리가 모든 주요 실패 시나리오를 포괄하는가
+  □ 모듈 간 순환 의존성이 없는가
+  □ 상태 전이에 누락된 경로가 없는가
+  <!-- SELF_CHECK: {"sections":5,"tables":1,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings: ["모듈 상세 설계", "클래스 다이어그램", "시퀀스 다이어그램", "상태 다이어그램", "에러 처리 설계"]
+    required_tables: 1
+    min_chars: 3000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "모듈 간 의존성이 명확하고 순환 참조가 없는가"
+    - "다이어그램이 실제 렌더링 가능한 Mermaid 문법인가"
+    - "에러 처리가 모든 주요 실패 시나리오를 포괄하는가"
+    - "상태 전이 경로에 누락이 없는가"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준: {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

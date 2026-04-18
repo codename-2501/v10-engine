@@ -1,0 +1,203 @@
+name: "화면 설계서"
+phase: DESIGN
+type: html
+model_preference: opus
+
+# Stage 1: 페이지당 1 chunk 분할 — 단일 호출 244K → 각 chunk 5~10K 토큰
+chunk_items_source:
+  from_spec: "화면 목록 정의서"
+  extract_patterns:
+    - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
+    - "([A-Z]{2,5}-[A-Z]{2,4}-\\d{3,4})"
+
+# Stage 9: Dynamic Layer Selection — 화면 설계서에 불필요한 Layer 제외 (DB schema / API spec 등)
+context_layers:
+  - prd
+  - design_system
+  - current_task
+  - sibling_artifacts
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  아래 HTML 템플릿 구조에 맞춰 완전한 HTML 문서를 출력하세요.
+
+  **절대 금지 단어:** TODO, TBD, 미정, 작성 예정, 추후 작성, 추후 결정
+  → 이 단어가 하나라도 포함되면 검증 실패합니다.
+  → 확정되지 않은 부분이 있으면 합리적인 기본값을 넣으세요.
+  {{PROJECT_NAME}}은 프로젝트명으로, {{DATE}}는 오늘 날짜로, {{PROJECT_ID}}는 프로젝트 ID로 대체하세요.
+  <!-- CONTENT: --> 주석이 있는 위치에 실제 콘텐츠를 채우세요.
+  예시 항목의 패턴을 따라 실제 프로젝트에 맞는 항목들로 채우세요.
+
+  ### 전역 문서 래퍼 (MANDATORY — 화면 박스 밖 텍스트도 스타일 상속 필수)
+  - `<body>` 태그에 직접 `background-color`와 `color`가 적용되도록 CSS 규칙을
+    선언할 것: `body { background: #111318; color: #eaedf2; ... }` 형태
+  - 화면 박스(`.screen-card` 등) **바깥**에 있는 `<h1>/<h2>/<h3>/<p>/<ul>/<li>/<table>` 등
+    모든 기본 요소도 `body`로부터 색/폰트/여백 상속을 받아 다크 테마로 렌더되어야 함
+  - 글로벌 `max-width`, 가운데 정렬 `margin: 0 auto`, `padding: 40px 24px` 등
+    문서 전체 컨테이너 레이아웃을 `body` 또는 최상위 wrapper `<main>` 에 부여
+  - **주의**: `section.screen`, `.screen-card` 같은 selector만 스타일링하고 body 기본을
+    비워두면 설명 텍스트가 흰 배경 + 검은 글자 + Times 폰트 기본값으로 렌더되어 FAIL
+
+  ### HTML 템플릿:
+  ```html
+  <!DOCTYPE html>
+  <html lang="ko">
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{PROJECT_NAME}} — 화면 설계서</title>
+  <style>/* __INJECT_BASE_CSS__ */
+  :root { --max-w: 1100px; }
+  .screen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin: 16px 0; }
+  .screen-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .screen-card:hover { transform: translateY(-2px); }
+  .screen-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .screen-id { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+  .screen-name { font-size: 14px; font-weight: 600; }
+  .screen-body { padding: 16px; }
+  .screen-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+  .screen-components { font-size: 12px; }
+  .screen-components li { margin: 4px 0; color: var(--text); }
+  .screen-tag { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; margin: 0 2px; }
+  .tag-p0 { background: rgba(248,81,73,0.15); color: var(--red); }
+  .tag-p1 { background: rgba(210,153,34,0.15); color: var(--amber); }
+  .tag-p2 { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .tag-role { background: rgba(188,140,255,0.15); color: var(--purple); }
+  </style>
+  </head>
+  <body>
+  <div class="toolbar">
+    <a class="back" href="javascript:history.back()">← 돌아가기</a>
+    <span style="flex:1"></span>
+    <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+  </div>
+
+  <h1>{{PROJECT_NAME}} — 화면 설계서 (와이어프레임)</h1>
+  <div class="meta">
+    <span>작성일: {{DATE}}</span>
+    <span>프로젝트 ID: {{PROJECT_ID}}</span>
+  </div>
+
+  <div class="summary">
+    <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">전체 화면</div></div>
+    <div class="summary-item"><div class="summary-num red">0</div><div class="summary-label">P0 필수</div></div>
+    <div class="summary-item"><div class="summary-num amber">0</div><div class="summary-label">P1 중요</div></div>
+    <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">P2 일반</div></div>
+  </div>
+
+  <div class="section">
+    <h2>1. 화면 목록 요약</h2>
+    <!-- CONTENT: 전체 화면 요약 테이블 -->
+    <table>
+      <thead><tr><th>ID</th><th>화면명</th><th>우선순위</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td><code>SCR-001</code></td><td>홈</td><td><span class="screen-tag tag-p0">P0</span></td><td>메인 랜딩 화면</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>2. 화면 카드</h2>
+    <div class="screen-grid">
+      <!-- CONTENT: 화면 카드. 아래 패턴 반복 -->
+      <div class="screen-card">
+        <div class="screen-header">
+          <div><span class="screen-id">SCR-001</span><br><span class="screen-name">홈</span></div>
+          <div><span class="screen-tag tag-p0">P0</span> <span class="screen-tag tag-role">전체</span></div>
+        </div>
+        <div class="screen-body">
+          <div class="screen-desc">메인 화면. 핵심 기능 진입점과 요약 정보를 제공한다.</div>
+          <div class="screen-components">
+            <strong>구성 요소:</strong>
+            <ul>
+              <li>상단 네비게이션 바</li>
+              <li>메인 콘텐츠 영역</li>
+              <li>하단 탭 바</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>3. 스토리보드 — 사용자 시나리오별 화면 흐름</h2>
+    <!-- CONTENT: 주요 사용자 시나리오별 화면 전환 흐름. 시나리오 ID, 이름, 설명, 관련 화면 ID 순서 나열 -->
+    <table>
+      <thead><tr><th>시나리오</th><th>화면 흐름</th><th>트리거</th></tr></thead>
+      <tbody>
+        <tr><td>S-01 신규 가입</td><td>SCR-010 → SCR-001 → SCR-011</td><td>가입 완료 후 홈 이동</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>4. 화면별 상태 전환</h2>
+    <!-- CONTENT: 각 화면의 상태(기본/로딩/에러/빈 상태)별 동작 정의 -->
+    <table>
+      <thead><tr><th>화면</th><th>상태</th><th>조건</th><th>동작</th></tr></thead>
+      <tbody>
+        <tr><td>SCR-001 홈</td><td>기본</td><td>정상 로드</td><td>콘텐츠 표시</td></tr>
+        <tr><td>SCR-001 홈</td><td>에러</td><td>API 실패</td><td>재시도 버튼</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>5. 반응형 브레이크포인트</h2>
+    <!-- CONTENT: 반응형 규격 -->
+    <table>
+      <thead><tr><th>구간</th><th>너비</th><th>레이아웃 변경</th></tr></thead>
+      <tbody>
+        <tr><td>모바일</td><td>375px</td><td>1열, 햄버거 메뉴</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  </body>
+  </html>
+  ```
+
+  ### 품질 기준
+  - 화면 목록은 고유 ID 체계(예: SCR-001)를 사용할 것
+  - 와이어프레임 설명은 각 영역의 크기 비율과 정렬 방식을 포함할 것
+  - 스토리보드는 주요 사용자 시나리오(최소 5개)의 화면 전환 흐름을 포함할 것
+  - 화면별 상태 전환(기본/로딩/에러/빈 상태)을 최소 주요 화면 5개 이상 정의할 것
+  - 입력 필드 유효성 규칙은 정규식 또는 구체적 조건으로 명시할 것
+  - 반응형 대응은 최소 3개 브레이크포인트를 정의할 것
+
+  ### 디자인 퀄리티 규칙
+  - 반드시 다크 테마: 배경 #111318, 카드 #1a1d24, 텍스트 #eaedf2. 라이트 테마(흰 배경/밝은 배경) 절대 금지
+  - body background는 반드시 #111318 계열 다크 톤. #f로 시작하는 밝은 배경색 사용 시 검증 실패
+  - Pretendard Variable 웹폰트 사용: font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif
+  - @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+  - 보라색 그라디언트, 기본 시스템 폰트(Segoe UI), AI스러운 정형화 레이아웃 금지
+  - pure black(#000) 금지 — dark grey (#111318~#1c1f27) 사용
+  - 넉넉한 여백: 섹션 간 40px 이상, 카드 padding 24px 이상
+  - 대담한 타이포 계층: 제목 weight 700~800, letter-spacing -.02em
+  - 프로젝트 맥락에 맞는 독창적 톤 적용
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 모든 화면이 고유 ID(SCR-XXX)를 가지고 있는가
+  □ 와이어프레임 설명이 구현에 충분한 정보를 제공하는가
+  □ 스토리보드(사용자 시나리오별 화면 흐름)가 최소 5개 포함되어 있는가
+  □ 화면별 상태 전환(기본/로딩/에러/빈 상태)이 주요 화면에 정의되어 있는가
+  □ 화면 전환도에 고아 화면(접근 불가)이 없는가
+  □ 모든 입력 필드에 유효성 규칙이 정의되어 있는가
+  □ 반응형 대응이 주요 브레이크포인트를 모두 포괄하는가
+
+validation:
+  structural:
+    min_chars: 8000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성", "Segoe UI", "background: #f", "background:#f"]
+  semantic:
+    - "<style> 태그 내에 body 또는 html 또는 :root selector 규칙이 존재하고 background-color/color가 선언되는지 검증"
+    - "화면 박스(.screen-card, section.screen) 바깥에 있는 설명 텍스트(h1~h6, ul, li, p, table)도 동일 디자인 토큰으로 스타일링되어 렌더 시 흰 배경 기본 스타일로 노출되지 않는지 검증"
+    - "문서 최상위에 max-width 또는 중앙 정렬 컨테이너가 적용되어 좌우 여백이 확보되는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준: {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

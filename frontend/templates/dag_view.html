@@ -1,0 +1,523 @@
+{% extends "base.html" %}
+{% block title %}DAG 시각화 — {{ engagement.name }}{% endblock %}
+{% block page_title %}DAG — {{ engagement.name }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  #dag-svg-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    /* 뷰포트 꽉 채우기: topbar 56px + padding 3rem + legend ~40px */
+    height: calc(100vh - 56px - 3rem - 50px);
+    min-height: 500px;
+    position: relative;
+    overflow: hidden;
+  }
+  #dag-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .node-group { cursor: pointer; }
+  .node-rect {
+    rx: 8; ry: 8;
+    stroke-width: 1.5;
+    transition: opacity 0.2s;
+  }
+  .node-rect:hover { opacity: 0.85; filter: brightness(1.15); }
+  .node-label { font-size: 10px; fill: #fff; font-weight: 600; pointer-events: none; }
+  .node-type-badge { font-size: 8px; fill: rgba(255,255,255,0.55); pointer-events: none; }
+  .node-state-label { font-size: 8px; fill: rgba(255,255,255,0.7); pointer-events: none; }
+  .edge-path { stroke-width: 1.2; fill: none; }
+  .edge-path.qa-pair { stroke-dasharray: 4 3; }
+
+  /* State fills */
+  .fill-COMPLETED        { fill: var(--st-completed); stroke: #059669; }
+  .fill-IN_PROGRESS      { fill: var(--st-progress); stroke: #2563eb; }
+  .fill-NEEDS_HUMAN      { fill: var(--st-failed); stroke: #dc2626; }
+  .fill-AWAITING_APPROVAL{ fill: var(--st-awaiting); stroke: #d97706; }
+  .fill-BLOCKED          { fill: #374151; stroke: var(--st-blocked-stroke); }
+  .fill-INVALID          { fill: #78350f; stroke: #92400e; }
+  .fill-SUSPENDED        { fill: #d97706; stroke: #b45309; }
+  .fill-FAILED           { fill: #991b1b; stroke: #7f1d1d; }
+  .fill-READY            { fill: var(--st-ready); stroke: #0099cc; }
+  .fill-NOT_STARTED      { fill: #1f2937; stroke: #374151; }
+
+  .edge-path { stroke: var(--st-blocked-stroke); }
+
+  /* Phase columns */
+  .phase-header { font-size: 13px; font-weight: 700; fill: var(--text-muted); }
+  .phase-divider { stroke: var(--border); stroke-dasharray: 4 4; stroke-width: 0.5; }
+
+  #dag-controls {
+    position: absolute; top: 12px; right: 12px;
+    display: flex; gap: 0.5rem; z-index: 10;
+  }
+  #node-tooltip {
+    position: fixed; pointer-events: none;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.6rem 0.8rem;
+    font-size: 0.78rem; color: var(--text);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    display: none; z-index: 9999; max-width: 280px;
+  }
+  .legend-bar {
+    display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--text-muted);
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 뷰 전환 -->
+<div style="margin-bottom:10px;display:flex;gap:8px;">
+  <span style="padding:4px 12px;border-radius:6px;background:var(--bg-secondary);font-size:12px;">SVG 뷰 (현재)</span>
+  <a href="/engagements/{{ engagement.id }}/flow" class="btn" style="font-size:12px;padding:4px 12px;">
+    🌐 Flow 뷰 (n8n 스타일 실시간)
+  </a>
+</div>
+
+<!-- 범례 -->
+<div class="legend-bar">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--st-completed);"></div> 완료</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--st-progress);"></div> 진행중</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--st-ready);"></div> 준비</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--st-awaiting);"></div> 승인대기</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--st-failed);"></div> 설계자 개입</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#374151;"></div> 대기</div>
+  <div class="legend-item" style="margin-left:auto;font-size:0.75rem;">
+    총 {{ nodes|length }}개 노드 ·
+    <span style="border-bottom:1px solid var(--st-blocked);">실선</span>=의존
+    <span style="border-bottom:1px dashed var(--st-blocked);">점선</span>=QA쌍
+  </div>
+</div>
+
+<!-- DAG SVG 영역 -->
+<div id="dag-svg-container">
+  <div id="dag-controls">
+    <button class="btn" onclick="fitAll()">전체</button>
+    <button class="btn" onclick="resetZoom()">리셋</button>
+    <button class="btn" onclick="zoomIn()">+</button>
+    <button class="btn" onclick="zoomOut()">−</button>
+  </div>
+  <svg id="dag-svg"></svg>
+</div>
+
+<!-- 노드 툴팁 -->
+<div id="node-tooltip"></div>
+
+<!-- 데이터 -->
+<script id="dag-data" type="application/json">
+{
+  "nodes": {{ nodes_json | safe }},
+  "edges": {{ edges_json | safe }}
+}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const raw = JSON.parse(document.getElementById('dag-data').textContent);
+  const nodes = raw.nodes;
+  const edges = raw.edges;
+  const tooltip = document.getElementById('node-tooltip');
+
+  // ── Phase 순서 정의 ──
+  const PHASE_ORDER = ['DEFINE','DESIGN','BUILD','VERIFY','DELIVER'];
+  const PHASE_LABEL = {
+    DEFINE:'정의', DESIGN:'설계', BUILD:'구현', VERIFY:'검증', DELIVER:'납품·운영'
+  };
+  const _cs = getComputedStyle(document.documentElement);
+  const PHASE_COLORS = {
+    DEFINE: _cs.getPropertyValue('--st-progress').trim(),
+    DESIGN: '#06b6d4',
+    BUILD:  _cs.getPropertyValue('--st-completed').trim(),
+    VERIFY: _cs.getPropertyValue('--st-awaiting').trim(),
+    DELIVER:_cs.getPropertyValue('--st-ready').trim()
+  };
+
+  // ── 노드 분류: Phase별로 그룹 ──
+  const nodeMap = {};
+  nodes.forEach(n => { nodeMap[n.id] = n; });
+
+  // Phase별 노드 모으기
+  const phaseNodes = {};
+  PHASE_ORDER.forEach(p => { phaseNodes[p] = []; });
+  nodes.forEach(n => {
+    const p = n.phase || 'PLANNING';
+    if (!phaseNodes[p]) phaseNodes[p] = [];
+    phaseNodes[p].push(n);
+  });
+
+  // 활성 Phase만 (노드가 있는)
+  const activePhases = PHASE_ORDER.filter(p => phaseNodes[p] && phaseNodes[p].length > 0);
+
+  // ── Phase 내 정렬: priority → node_type 순 ──
+  function sortPhaseNodes(phNodes) {
+    return [...phNodes].sort((a, b) => {
+      const typeOrder = {TASK: 0, QA: 1, GATE: 2};
+      const ta = typeOrder[a.node_type] ?? 0, tb = typeOrder[b.node_type] ?? 0;
+      // priority 먼저
+      if ((a.priority || 0) !== (b.priority || 0)) return (a.priority || 0) - (b.priority || 0);
+      // 같은 priority면 TASK → QA → GATE
+      return ta - tb;
+    });
+  }
+
+  // ── 레이아웃 상수 ──
+  const NODE_W = 180, NODE_H = 42, PAD_Y = 16;
+  const QA_GAP = 20;   // TASK↔QA 가로 간격
+  const PHASE_PAD = 50; // Phase 컬럼 간 간격
+  const HEADER_H = 60;
+  const TOP_PAD = 24;
+  const LEFT_PAD = 40;
+
+  // ── Phase별 TASK-QA 쌍 묶기 ──
+  function groupTaskQa(sortedNodes) {
+    const rows = [];
+    const used = new Set();
+
+    // TASK 기준 QA쌍 찾기 (qa_pair_node_id 또는 edge)
+    const taskNodes = sortedNodes.filter(n => n.node_type === 'TASK');
+    taskNodes.forEach(n => {
+      if (used.has(n.id)) return;
+      used.add(n.id);
+      // QA 쌍: edge 또는 같은 이름 매칭
+      const qaEdge = edges.find(e => e.from_node_id === n.id && nodeMap[e.to_node_id]?.node_type === 'QA');
+      let qa = qaEdge ? nodeMap[qaEdge.to_node_id] : null;
+      if (!qa) {
+        // 이름 매칭 fallback
+        qa = sortedNodes.find(q => q.node_type === 'QA' && !used.has(q.id) && q.name.includes(n.name));
+      }
+      if (qa && !used.has(qa.id)) {
+        used.add(qa.id);
+        rows.push({ task: n, qa });
+      } else {
+        rows.push({ task: n, qa: null });
+      }
+    });
+    // GATE
+    sortedNodes.filter(n => n.node_type === 'GATE').forEach(n => {
+      if (!used.has(n.id)) { used.add(n.id); rows.push({ task: n, qa: null, isGate: true }); }
+    });
+    // 남은 QA
+    sortedNodes.filter(n => n.node_type === 'QA').forEach(n => {
+      if (!used.has(n.id)) { used.add(n.id); rows.push({ task: n, qa: null }); }
+    });
+    return rows;
+  }
+
+  // 각 Phase 컬럼 폭, 행 계산
+  const phaseLayout = [];
+  let curX = LEFT_PAD;
+
+  activePhases.forEach(phase => {
+    const sorted = sortPhaseNodes(phaseNodes[phase]);
+    const rows = groupTaskQa(sorted);
+    const hasPairs = rows.some(r => r.qa);
+    const colW = hasPairs ? NODE_W * 2 + QA_GAP : NODE_W;
+
+    phaseLayout.push({ phase, rows, x: curX, colW, hasPairs });
+    curX += colW + PHASE_PAD;
+  });
+
+  const totalW = Math.max(curX + LEFT_PAD, 800);
+  const maxRows = Math.max(...phaseLayout.map(p => p.rows.length), 1);
+  const totalH = HEADER_H + TOP_PAD + maxRows * (NODE_H + PAD_Y) + 80;
+
+  // ── 노드 좌표 할당 ──
+  phaseLayout.forEach(pl => {
+    pl.rows.forEach((row, ri) => {
+      const y = HEADER_H + TOP_PAD + ri * (NODE_H + PAD_Y);
+      if (row.task) {
+        row.task._x = pl.x;
+        row.task._y = y;
+      }
+      if (row.qa) {
+        row.qa._x = pl.x + NODE_W + QA_GAP;
+        row.qa._y = y;
+      }
+    });
+  });
+
+  // 좌표 미할당 노드 fallback (안전장치)
+  nodes.forEach(n => {
+    if (n._x === undefined || n._y === undefined) {
+      const pl = phaseLayout.find(p => p.phase === (n.phase || 'PLANNING'));
+      if (pl) {
+        const existingCount = nodes.filter(nn => nn.phase === n.phase && nn._x !== undefined).length;
+        n._x = pl.x;
+        n._y = HEADER_H + TOP_PAD + existingCount * (NODE_H + PAD_Y);
+      } else {
+        n._x = LEFT_PAD;
+        n._y = HEADER_H + TOP_PAD;
+      }
+    }
+  });
+
+  // ── SVG 렌더링 ──
+  const container = document.getElementById('dag-svg-container');
+  const svgEl = document.getElementById('dag-svg');
+
+  // viewBox = DAG 데이터 크기, SVG가 컨테이너에 맞게 스케일
+  const svg = d3.select(svgEl)
+    .attr('viewBox', `0 0 ${totalW} ${totalH}`)
+    .attr('preserveAspectRatio', 'xMinYMin meet');
+
+  // Arrow markers
+  const defs = svg.append('defs');
+  defs.append('marker')
+    .attr('id', 'arrow').attr('viewBox', '0 -5 10 10')
+    .attr('refX', 10).attr('refY', 0)
+    .attr('markerWidth', 5).attr('markerHeight', 5)
+    .attr('orient', 'auto')
+    .append('path').attr('d', 'M0,-4L10,0L0,4').attr('fill', '#4b5563');
+  defs.append('marker')
+    .attr('id', 'arrow-qa').attr('viewBox', '0 -5 10 10')
+    .attr('refX', 10).attr('refY', 0)
+    .attr('markerWidth', 5).attr('markerHeight', 5)
+    .attr('orient', 'auto')
+    .append('path').attr('d', 'M0,-4L10,0L0,4').attr('fill', '#6b7280');
+
+  // Zoom
+  const g = svg.append('g').attr('class', 'zoom-group');
+  const zoom = d3.zoom().scaleExtent([0.15, 3]).on('zoom', e => {
+    g.attr('transform', e.transform);
+  });
+  svg.call(zoom);
+  // 초기 줌 — 세로 방향 fit (가로는 드래그로 탐색)
+  function fitVertical() {
+    const cH = container.clientHeight || 600;
+    const s = Math.min(cH / totalH, 1.0);  // 세로만 맞추되 100% 이상은 안 감
+    return d3.zoomIdentity.translate(LEFT_PAD, 5).scale(Math.max(s, 0.6));
+  }
+  // 전체 보기
+  function fitAll() {
+    const cW = container.clientWidth || 900;
+    const cH = container.clientHeight || 600;
+    const s = Math.min(cW / totalW, cH / totalH) * 0.95;
+    const tx = Math.max((cW - totalW * s) / 2, 5);
+    const ty = Math.max((cH - totalH * s) / 2, 5);
+    return d3.zoomIdentity.translate(tx, ty).scale(s);
+  }
+  svg.call(zoom.transform, fitVertical());
+
+  window.resetZoom = () => svg.transition().duration(300).call(zoom.transform, fitVertical());
+  window.zoomIn  = () => svg.transition().duration(200).call(zoom.scaleBy, 1.3);
+  window.zoomOut = () => svg.transition().duration(200).call(zoom.scaleBy, 0.77);
+  window.fitAll  = () => svg.transition().duration(300).call(zoom.transform, fitAll());
+
+  // ── Phase 헤더 + 구분선 ──
+  const headerG = g.append('g').attr('class', 'phase-headers');
+  phaseLayout.forEach(pl => {
+    // 배경 밴드
+    headerG.append('rect')
+      .attr('x', pl.x - 10).attr('y', 0)
+      .attr('width', pl.colW + 20)
+      .attr('height', HEADER_H - 8)
+      .attr('rx', 8)
+      .attr('fill', PHASE_COLORS[pl.phase] || '#374151')
+      .attr('opacity', 0.12);
+
+    headerG.append('text')
+      .attr('class', 'phase-header')
+      .attr('x', pl.x + pl.colW / 2).attr('y', 20)
+      .attr('text-anchor', 'middle')
+      .attr('fill', PHASE_COLORS[pl.phase] || '#9ca3af')
+      .text(PHASE_LABEL[pl.phase] || pl.phase);
+
+    headerG.append('text')
+      .attr('x', pl.x + pl.colW / 2).attr('y', 35)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', '10px')
+      .attr('fill', 'var(--text-muted)')
+      .text(`${phaseNodes[pl.phase].length}개 노드`);
+
+    // 구분선
+    if (pl !== phaseLayout[phaseLayout.length - 1]) {
+      headerG.append('line')
+        .attr('class', 'phase-divider')
+        .attr('x1', pl.x + pl.colW + PHASE_PAD / 2)
+        .attr('y1', 0)
+        .attr('x2', pl.x + pl.colW + PHASE_PAD / 2)
+        .attr('y2', totalH);
+    }
+  });
+
+  // ── Edge 렌더링 ──
+  const edgeG = g.append('g').attr('class', 'edges');
+  edges.forEach(e => {
+    const from = nodeMap[e.from_node_id], to = nodeMap[e.to_node_id];
+    if (!from || !to || from._x === undefined || to._x === undefined) return;
+
+    const isQaPair = (from.node_type === 'TASK' && to.node_type === 'QA') ||
+                     (from.node_type === 'QA' && to.node_type === 'TASK');
+    const samePhase = from.phase === to.phase;
+
+    let x1, y1, x2, y2;
+    if (isQaPair && samePhase) {
+      // QA 쌍: 가로 연결
+      x1 = from._x + NODE_W;
+      y1 = from._y + NODE_H / 2;
+      x2 = to._x;
+      y2 = to._y + NODE_H / 2;
+      edgeG.append('line')
+        .attr('class', 'edge-path qa-pair')
+        .attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+        .attr('stroke', '#6b7280')
+        .attr('marker-end', 'url(#arrow-qa)');
+    } else if (samePhase) {
+      // 같은 Phase 내 세로 연결
+      x1 = from._x + NODE_W / 2;
+      y1 = from._y + NODE_H;
+      x2 = to._x + NODE_W / 2;
+      y2 = to._y;
+      const cy = (y1 + y2) / 2;
+      edgeG.append('path')
+        .attr('class', 'edge-path')
+        .attr('d', `M${x1},${y1} C${x1},${cy} ${x2},${cy} ${x2},${y2}`)
+        .attr('stroke', PHASE_COLORS[from.phase] || '#4b5563')
+        .attr('marker-end', 'url(#arrow)');
+    } else {
+      // Cross-phase: 곡선 연결
+      x1 = from._x + NODE_W;
+      y1 = from._y + NODE_H / 2;
+      x2 = to._x;
+      y2 = to._y + NODE_H / 2;
+      const cx = (x1 + x2) / 2;
+      edgeG.append('path')
+        .attr('class', 'edge-path')
+        .attr('d', `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`)
+        .attr('stroke', _cs.getPropertyValue('--st-ready').trim())
+        .attr('opacity', 0.5)
+        .attr('marker-end', 'url(#arrow)');
+    }
+  });
+
+  // ── Node 렌더링 ──
+  const nodeG = g.append('g').attr('class', 'nodes');
+  nodes.forEach(n => {
+    const isGate = n.node_type === 'GATE';
+    const isQa = n.node_type === 'QA';
+    const w = NODE_W, h = NODE_H;
+
+    const grp = nodeG.append('g')
+      .attr('class', 'node-group')
+      .attr('transform', `translate(${n._x},${n._y})`)
+      .on('mousemove', (evt) => showTooltip(evt, n))
+      .on('mouseleave', () => { tooltip.style.display = 'none'; });
+
+    if (isGate) {
+      // Gate: 다이아몬드 모양
+      const cx = w / 2, cy = h / 2, rx = w / 2 - 4, ry = h / 2 - 2;
+      grp.append('polygon')
+        .attr('points', `${cx},${cy-ry} ${cx+rx},${cy} ${cx},${cy+ry} ${cx-rx},${cy}`)
+        .attr('class', `fill-${n.state}`)
+        .attr('stroke-width', 1.5);
+      grp.append('text')
+        .attr('class', 'node-label')
+        .attr('x', cx).attr('y', cy + 3)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '9px')
+        .text('GATE');
+    } else {
+      grp.append('rect')
+        .attr('class', `node-rect fill-${n.state}`)
+        .attr('width', w).attr('height', h)
+        .attr('opacity', isQa ? 0.75 : 1);
+
+      // Type badge
+      if (isQa) {
+        grp.append('rect')
+          .attr('x', 3).attr('y', 3).attr('width', 18).attr('height', 12).attr('rx', 3)
+          .attr('fill', 'rgba(0,0,0,0.3)');
+        grp.append('text')
+          .attr('class', 'node-type-badge')
+          .attr('x', 12).attr('y', 12).attr('text-anchor', 'middle')
+          .text('QA');
+      }
+
+      // Label
+      const maxChars = isQa ? 14 : 16;
+      let label = n.name.replace(/^\[QA\]\s*/, '');
+      if (label.length > maxChars) label = label.slice(0, maxChars) + '…';
+      grp.append('text')
+        .attr('class', 'node-label')
+        .attr('x', isQa ? 26 : 8).attr('y', 15)
+        .attr('text-anchor', 'start')
+        .text(label);
+
+      // State
+      grp.append('text')
+        .attr('class', 'node-state-label')
+        .attr('x', 8).attr('y', 28)
+        .text(n.state.replace(/_/g, ' '));
+    }
+  });
+
+  // ── 툴팁 ──
+  function showTooltip(evt, n) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = (evt.clientX + 14) + 'px';
+    tooltip.style.top  = (evt.clientY - 10) + 'px';
+    const stateColors = {
+      COMPLETED:_cs.getPropertyValue('--st-completed').trim(),
+      IN_PROGRESS:_cs.getPropertyValue('--st-progress').trim(),
+      READY:_cs.getPropertyValue('--st-ready').trim(),
+      BLOCKED:_cs.getPropertyValue('--st-blocked').trim(),
+      FAILED:_cs.getPropertyValue('--st-failed').trim(),
+      AWAITING_APPROVAL:_cs.getPropertyValue('--st-awaiting').trim(),
+      NEEDS_HUMAN:_cs.getPropertyValue('--st-failed').trim(),
+      NOT_STARTED:_cs.getPropertyValue('--st-muted').trim()
+    };
+    tooltip.innerHTML = `
+      <div style="font-weight:600;margin-bottom:6px;">${esc(n.name)}</div>
+      <div style="display:flex;gap:12px;font-size:0.72rem;">
+        <span>상태: <span style="color:${stateColors[n.state]||'#9ca3af'};font-weight:600;">${n.state}</span></span>
+        <span>유형: ${n.node_type}</span>
+      </div>
+      <div style="font-size:0.72rem;margin-top:2px;">Phase: ${PHASE_LABEL[n.phase] || n.phase}</div>
+      <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">${n.id.slice(0,20)}…</div>
+    `;
+  }
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ── WebSocket 실시간 갱신 ──
+  const eid = "{{ engagement.id }}";
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws/engagements/${eid}/stream`);
+  ws.onmessage = (evt) => {
+    try {
+      const msg = JSON.parse(evt.data);
+      if (msg.type === 'ping') { ws.send('ping'); return; }
+      if (msg.type === 'NodeStateChanged' && msg.payload?.node_id) {
+        const n = nodeMap[msg.payload.node_id];
+        if (n && msg.payload.to) {
+          n.state = msg.payload.to;
+          // 색상 업데이트
+          nodeG.selectAll('.node-group').each(function() {
+            const grp = d3.select(this);
+            const t = grp.attr('transform');
+            const nx = parseFloat(t.match(/translate\(([^,]+)/)?.[1] || 0);
+            const ny = parseFloat(t.match(/,([^)]+)/)?.[1] || 0);
+            if (Math.abs(nx - n._x) < 1 && Math.abs(ny - n._y) < 1) {
+              grp.select('.node-rect').attr('class', `node-rect fill-${n.state}`);
+              grp.select('.node-state-label').text(n.state.replace(/_/g, ' '));
+              // Gate polygon
+              grp.select('polygon').attr('class', `fill-${n.state}`);
+            }
+          });
+        }
+      }
+    } catch(e) {}
+  };
+})();
+</script>
+{% endblock %}

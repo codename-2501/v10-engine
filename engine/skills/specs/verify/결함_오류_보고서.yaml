@@ -1,0 +1,49 @@
+name: "결함 오류 보고서"
+phase: VERIFY
+type: document
+model_preference: sonnet
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **결함 목록** — 테이블(#/결함ID/심각도(Critical/Major/Minor/Trivial)/모듈/결함설명/재현단계/상태(Open/InProgress/Resolved/Closed)/담당자/발견일/해결일) 작성. 모든 결함 누락 없이 기재.
+  2. **통계 요약** — 심각도별 결함 수, 모듈별 결함 수, 상태별 결함 수를 요약. 결함 밀도, 해결률 등 핵심 지표 포함.
+  3. **미해결 결함 추적** — 미해결(Open/InProgress) 결함의 현재 상태, 예상 해결일, 차단 요인, 에스컬레이션 여부 서술.
+
+  ### 품질 기준
+  - 결함 ID 체계 일관성 (예: BUG-001)
+  - 모든 결함에 재현 단계 포함
+  - 통계 요약에 해결률(%) 포함
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 3개 필수 섹션 모두 작성 완료
+  □ 테이블 1개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ 결함 ID 체계 일관성 확인
+  □ 해결률(%) 명시
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":3,"tables":1,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "결함 목록"
+      - "통계 요약"
+      - "미해결 결함 추적"
+    required_tables: 1
+    min_chars: 2000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "모든 결함에 재현 가능한 단계가 기술되어 있는지 검증"
+    - "통계 요약이 결함 목록의 실제 데이터와 일치하는지 검증"
+    - "미해결 결함에 대한 해결 계획과 예상 일정이 현실적인지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

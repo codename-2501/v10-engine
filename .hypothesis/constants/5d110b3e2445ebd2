@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/core/budget_enforcer.py
+# hypothesis_version: 6.141.1
+
+[0.25, 0.9, 1.15, 1.7, 100, 16000, 150000, 500000, 600000, 900000, 1200000, 'BUILD', 'DEFINE', 'DELIVER', 'DESIGN', 'VERIFY', 'max_input', 'max_input_override', 'max_output', 'max_output_override', 'phase_limit', 'phase_limit_override', 'total', '一', '\u9fff']

@@ -1,0 +1,78 @@
+name: "InstantDB 프론트엔드 통합"
+phase: BUILD
+type: code
+model_preference: opus
+backend_requirement: "instantdb"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  InstantDB SDK를 프론트엔드(React/Next.js/React Native) 프로젝트에
+  완전히 통합하세요. 초기 setup 부터 상태 관리 패턴, 오프라인 UX,
+  에러 바운더리까지 포함합니다.
+
+  ### 통합 특성 반영 (MANDATORY)
+  - `@instantdb/react` (웹) 또는 `@instantdb/react-native` (모바일)
+  - `init({ appId, schema })` 한 번 호출 → 전역 db 인스턴스
+  - Next.js: `'use client'` 지시어 필수 (Client Component에서만 사용)
+  - React Native: AsyncStorage 플러그인 설정
+  - 오프라인 캐시는 IndexedDB(웹) / AsyncStorage(모바일) 자동
+  - SSR 전용 데이터가 필요하면 `@instantdb/admin` + getServerSideProps
+
+  ### 필수 섹션 (순서 준수)
+  1. **패키지 설치 및 초기화** — package.json deps, lib/db.ts 초기화,
+     타입 연결 (import type from schema.ts)
+  2. **전역 Provider 구성** — App 루트에서 init, Client Component 분리,
+     에러 바운더리 감싸기
+  3. **상태 관리 원칙** — useQuery 를 단일 소스로, Zustand/Redux 대체
+     가능한 패턴 제시
+  4. **오프라인 UX** — 오프라인 상태 배너, 동기화 pending 표시,
+     동기화 실패 재시도 UI
+  5. **SSR/SSG 전략** — Next.js 기준 서버 렌더 vs 클라이언트 하이드레이션
+     판단 기준, admin SDK 사용 케이스
+  6. **에러/로딩 패턴** — Suspense 경계, error boundary,
+     로딩 스켈레톤 템플릿
+
+  ### 품질 기준
+  - 모든 db.xxx 호출은 클라이언트 컴포넌트 (`'use client'`) 안에서만
+  - 전역 db 인스턴스는 싱글턴 (재생성 금지)
+  - useQuery 로딩/에러 상태 모든 화면에서 처리
+  - 오프라인 상태를 사용자가 인지할 수 있는 UI 지표
+  - TypeScript 타입이 schema.ts와 동기화됨 (InstantSchemaDef 활용)
+  - 빌드시 환경변수(NEXT_PUBLIC_INSTANT_APP_ID 등) 검증 스크립트
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 6개 필수 섹션 모두 작성 완료
+  □ 코드 블록 6개 이상
+  □ 'use client' 지시어 사용 명시
+  □ 에러 바운더리 구현 포함
+  □ 오프라인 UI 지표 구현
+  □ 타입 안정성 (InstantSchemaDef import) 사용
+
+  <!-- SELF_CHECK: {"sections":6,"components":N,"error_boundary":true,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "패키지 설치"
+      - "전역 Provider"
+      - "상태 관리"
+      - "오프라인 UX"
+      - "SSR"
+      - "에러"
+    has_code_blocks: true
+    min_chars: 5500
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "전역 db 인스턴스가 싱글턴으로 관리되어 재생성이 방지되는지 검증"
+    - "Next.js 환경에서 'use client' 지시어가 필요한 위치에 명시되는지 검증"
+    - "오프라인 상태를 사용자에게 알리는 UI 지표가 구현되는지 검증"
+    - "TypeScript 타입이 schema.ts와 연결되어 런타임 오류를 컴파일 타임에 잡는지 검증"
+    - "에러 바운더리가 App 루트 또는 주요 섹션을 감싸 앱 크래시를 방지하는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

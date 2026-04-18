@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/validators/content.py
+# hypothesis_version: 6.141.1
+
+['##\\s*자체\\s*검증.*$', '\\bTBD\\b', '\\bTODO\\b', '\\b미정\\b', '^.*금지\\s*키워드.*없음.*$', '```', 'forbidden_patterns', 'has_code_blocks', 'max_chars', 'min_chars']

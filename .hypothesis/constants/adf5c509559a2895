@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/qa/self_consistency.py
+# hypothesis_version: 6.141.1
+
+[0.0, 1.0, 100, 'API 설계서', 'DB 설계서', 'FAIL', 'PASS', 'PRD', '\\bFAIL\\b', '\\bPASS\\b', 'content', 'name', 'pass', 'raw', 'response', 'score', 'self_consistency_n', '리스크 관리 계획서', '보안 설계서', '상세 설계서', '요구사항 정의서', '정보 구조 설계서', '화면 목록 정의서']

@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/qa/harness_auto_fix.py
+# hypothesis_version: 6.141.1
+
+['; ', '<!--[\\s\\S]*?-->', '\\[[^\\]]*\\]\\([^)]*\\)', '^#+\\s.*$', '`[^`\\n]*`', 'empty_content', 'exceeds_max', 'https?://\\S+', 'no_matches', '다음 단계 진행 예정', '다음 단계에서 진행', '다음 단계에서 진행: ', '미지정', '미지정으로', '미지정은', '미지정을', '미지정의', '미지정이', '수정 필요', '수정 필요: ', '향후 정책 확정 시 반영']

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} — 스토리보드</title>
+<style>/* __INJECT_BASE_CSS__ */
+:root { --max-w: 1100px; --err-dim: rgba(248,113,113,.08); --ok-dim: rgba(52,211,153,.10); }
+.flow-row { display: flex; align-items: center; gap: 0; overflow-x: auto; padding: 12px 0; margin: 12px 0; }
+.flow-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; min-width: 180px; max-width: 220px; flex-shrink: 0; transition: all .15s ease-out; }
+.flow-card:hover { border-color: var(--border-h); transform: translateY(-2px); }
+.flow-card .fc-id { font-size: 11px; color: var(--text-3); font-family: monospace; }
+.flow-card .fc-name { font-size: 14px; font-weight: 600; margin: 4px 0; }
+.flow-card .fc-desc { font-size: 12px; color: var(--text-2); }
+.flow-arrow { font-size: 20px; color: var(--text-3); padding: 0 8px; flex-shrink: 0; }
+.scenario-title { font-size: 14px; font-weight: 600; margin: 16px 0 4px; }
+.scenario-desc { font-size: 13px; color: var(--text-2); margin: 0 0 8px; }
+.state-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin: 2px; }
+.state-default { background: var(--accent-dim); color: var(--accent); }
+.state-error { background: var(--err-dim); color: var(--err); }
+.state-success { background: var(--ok-dim); color: var(--ok); }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a class="back" href="javascript:history.back()">← 돌아가기</a>
+  <span style="flex:1"></span>
+  <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+</div>
+
+<h1>{{PROJECT_NAME}} — 스토리보드 (화면 전환 흐름)</h1>
+<div class="meta">
+  <span>작성일: {{DATE}}</span>
+  <span>프로젝트 ID: {{PROJECT_ID}}</span>
+</div>
+
+<div class="summary">
+  <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">시나리오</div></div>
+  <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">화면 전환</div></div>
+  <div class="summary-item"><div class="summary-num red">0</div><div class="summary-label">예외 흐름</div></div>
+</div>
+
+<div class="section">
+  <h2>1. 사용자 시나리오</h2>
+  <!-- CONTENT: 시나리오 목록. 아래 패턴 반복 -->
+  <div class="scenario-title">S-01. 회원가입 후 첫 이용</div>
+  <div class="scenario-desc">신규 사용자가 회원가입 후 온보딩을 거쳐 메인 화면에 도달하는 흐름</div>
+</div>
+
+<div class="section">
+  <h2>2. 화면 흐름</h2>
+  <!-- CONTENT: 화면 전환 흐름. 아래 flow-row 패턴 반복 -->
+  <p style="font-size:13px;color:var(--text-2);margin:0 0 4px;">S-01. 회원가입 후 첫 이용</p>
+  <div class="flow-row">
+    <div class="flow-card">
+      <div class="fc-id">SCR-001</div>
+      <div class="fc-name">스플래시</div>
+      <div class="fc-desc">앱 진입 시 로딩 화면</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-card">
+      <div class="fc-id">SCR-002</div>
+      <div class="fc-name">회원가입</div>
+      <div class="fc-desc">이메일/소셜 가입</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-card">
+      <div class="fc-id">SCR-003</div>
+      <div class="fc-name">홈</div>
+      <div class="fc-desc">메인 대시보드</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>3. 상태 전환</h2>
+  <!-- CONTENT: 화면별 상태(기본/로딩/에러/빈 상태) 정의 -->
+  <table>
+    <thead><tr><th>화면</th><th>상태</th><th>조건</th><th>동작</th></tr></thead>
+    <tbody>
+      <tr><td>홈</td><td><span class="state-badge state-default">기본</span></td><td>데이터 로드 완료</td><td>콘텐츠 표시</td></tr>
+      <tr><td>홈</td><td><span class="state-badge state-error">에러</span></td><td>네트워크 오류</td><td>재시도 버튼 표시</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>4. 예외 흐름</h2>
+  <!-- CONTENT: 오류, 권한 없음, 세션 만료 등 예외 케이스 흐름 -->
+</div>
+
+</body>
+</html>

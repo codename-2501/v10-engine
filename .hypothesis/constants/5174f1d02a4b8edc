@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/core/failure_classifier.py
+# hypothesis_version: 6.141.1
+
+[100, 120, 'ECONNRESET', '\\bnetwork\\b', '\\btimeout\\b', 'authentication', 'billing', 'capacity', 'connection refused', 'connection reset', 'forbidden', 'hit your limit', 'hit_your_limit', 'invalid api key', 'invalid argument', 'invalid_request', 'overloaded', 'permanent', 'quota exceeded', 'rate.?limit', 'server busy', 'transient', 'unresolved']

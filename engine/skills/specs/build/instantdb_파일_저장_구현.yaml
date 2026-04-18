@@ -1,0 +1,75 @@
+name: "InstantDB 파일 저장 구현"
+phase: BUILD
+type: code
+model_preference: opus
+backend_requirement: "instantdb"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  InstantDB File Storage를 사용해 이미지/문서/기타 파일 업로드,
+  다운로드, 엔티티 연결(link), CASCADE 삭제를 완전히 구현하세요.
+
+  ### InstantDB File Storage 특성 반영 (MANDATORY)
+  - `db.storage.uploadFile(path, file, opts)` → 서버가 URL 반환
+  - 파일은 별도 엔티티 `$files` 로 관리 — 다른 엔티티와 link 가능
+  - 엔티티 삭제 시 CASCADE 설정 가능 (권한 규칙으로 제어)
+  - 권한은 permissions.ts 에서 `$files` 에 적용
+  - Signed URL 만료 시간 조정 가능
+
+  ### 필수 섹션 (순서 준수)
+  1. **파일 카테고리 정의** — 타입(avatar/attachment/export), 크기 제한,
+     허용 확장자, 저장 경로 전략
+  2. **업로드 UI & 훅** — drag-and-drop + 미리보기, 진행률, 에러 처리
+     (useFileUpload 커스텀 훅)
+  3. **엔티티-파일 link 로직** — 습관에 이미지 첨부, 프로필 아바타 등
+     구체 엔티티 연결 transact 예시
+  4. **다운로드/표시** — signed URL 획득, 이미지 lazy load,
+     CDN 캐싱 전략
+  5. **CASCADE 삭제** — 부모 엔티티 삭제 시 linked files 자동 제거 또는
+     수동 정리 스크립트
+  6. **보안 및 권한** — `$files` permissions.ts 규칙, MIME 검증,
+     이미지 리사이즈/썸네일
+
+  ### 품질 기준
+  - 클라이언트 업로드 전 MIME 타입 + 크기 검증
+  - 대용량 파일 (>10MB) 은 chunked 업로드 경고
+  - signed URL 은 짧은 만료 (1~24시간)
+  - 공개 파일 vs 비공개 파일 권한 명확히 분리
+  - 썸네일/리사이즈는 admin SDK 서버 측 작업으로 분리
+  - 파일 확장자/MIME 화이트리스트로 악성 업로드 차단
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 6개 필수 섹션 모두 작성 완료
+  □ 코드 블록 6개 이상 (upload/download/link/delete)
+  □ MIME + 크기 검증 코드 포함
+  □ signed URL 만료 시간 명시
+  □ $files permissions.ts 규칙 포함
+
+  <!-- SELF_CHECK: {"sections":6,"code_blocks":N,"file_types":M,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "파일 카테고리"
+      - "업로드"
+      - "엔티티-파일 link"
+      - "다운로드"
+      - "CASCADE 삭제"
+      - "보안 및 권한"
+    has_code_blocks: true
+    min_chars: 5000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "업로드 전 MIME 타입과 파일 크기 검증이 클라이언트측에 구현되는지 검증"
+    - "$files에 대한 permissions.ts CEL 규칙이 정의되어 공개/비공개 경계가 명확한지 검증"
+    - "signed URL 만료 시간이 명시되고 무기한이 아닌지 검증"
+    - "부모 엔티티 삭제 시 linked files 처리 전략(CASCADE 또는 수동)이 명확한지 검증"
+    - "허용 확장자 화이트리스트가 정의되어 악성 파일 업로드를 방지하는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

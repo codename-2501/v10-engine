@@ -1,0 +1,93 @@
+name: 실버케어 / 시니어 서비스
+keywords:
+  - 실버
+  - 시니어
+  - 노인
+  - 요양
+  - 간병
+  - 케어
+  - 돌봄
+  - elderly
+  - silver
+  - senior
+
+terminology:
+  - 보호자: 환자 가족 — 결제·동의 주체
+  - 돌봄제공자: caregiver — 실제 서비스 제공
+  - 어르신: 서비스 수혜자 — 환자/시니어
+  - 방문요양: 가정 방문 케어
+  - 시설요양: 주야간/장기 시설 입소
+
+regulations:
+  - 노인장기요양보험법
+  - 개인정보보호법(PIPA)
+  - 의료법(서비스 범위 따라)
+  - 요양보호사 자격 관리
+
+screen_estimate:
+  small: 30   # 핵심 기능만
+  medium: 50  # 표준
+  large: 80   # 다지점·관리자 분리
+
+spec_overrides:
+  보안_설계서:
+    extra_required:
+      - 환자정보 암호화
+      - 보호자 동의 흐름
+      - 의료기록 보존 정책
+  화면_목록_정의서:
+    group_prefix_examples:
+      - "SC-AU: 인증/회원"
+      - "SC-CW: 보호자 워크플로우"
+      - "SC-WA: 방문요양"
+      - "SC-AB: 어르신 본인"
+      - "SC-CB: 돌봄제공자"
+
+design_tone:
+  palette: "따뜻한 베이지·녹색·차분한 톤"
+  font_size: "기본 16px+ (시니어 가독성)"
+  contrast: "WCAG AAA 권장"
+  forbidden:
+    - "보라색 그라디언트"
+    - "차가운 모노톤"
+    - "작은 폰트(12px 미만)"
+
+# S13: 이 도메인에서 컴포넌트 라이브러리 카테고리 override (split_categories 대체).
+# 미지정 시 컴포넌트_라이브러리.yaml 의 기본 split_categories 사용.
+component_categories:
+  - name: "layout"
+    chunk_items:
+      - page_header
+      - page_footer
+      - sidebar
+      - care_navigation
+  - name: "content"
+    chunk_items:
+      - care_card
+      - elder_profile_card
+      - caregiver_card
+      - service_item
+      - info_panel
+  - name: "form"
+    chunk_items:
+      - care_request_form
+      - schedule_form
+      - consent_form
+      - input_field
+      - button
+  - name: "feedback"
+    chunk_items:
+      - care_alert_modal
+      - confirm_dialog
+      - toast
+      - empty_state
+      - loading_spinner
+  # 실버케어 전용 도메인 카테고리
+  - name: "care"
+    chunk_items:
+      - care_journal
+      - medication_chart
+      - visit_schedule
+      - health_monitoring
+      - emergency_alert
+      - family_note

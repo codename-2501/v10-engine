@@ -1,0 +1,16 @@
+name: "서브에이전트 오케스트레이션 패턴"
+type: reference
+description: |
+  obra/superpowers 기반 개발 오케스트레이션 아키텍처.
+  현재 DAGAdvancer가 이 패턴을 따름.
+principles:
+  - "태스크당 1 에이전트 — 컨텍스트 오염 방지"
+  - "2단계 리뷰: 스펙 준수 검증 → 코드 품질 검증"
+  - "상태 코드: DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED"
+  - "모델 선택: 단순 작업 → sonnet, 아키텍처 → opus"
+  - "git worktree 격리 — 작업 간 간섭 없음"
+mapping:
+  task_per_agent: "DAGAdvancer._run_node_safe() — 노드당 독립 실행"
+  two_stage_review: "TASK → QA 쌍 (Rule 9)"
+  status_codes: "NodeState: COMPLETED, FAILED, BLOCKED, NEEDS_HUMAN"
+  model_selection: "NODE_TEMPLATES의 model_preference: opus/sonnet"

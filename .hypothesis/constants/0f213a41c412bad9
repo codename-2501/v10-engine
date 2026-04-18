@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/gotchas_learning.py
+# hypothesis_version: 6.141.1
+
+[2000, 'description', 'design_match_fail', 'id_group_confusion', 'min_items_short', 'missing_section', 'page_count_mismatch', 'screen_coverage_low', 'table_row_short']

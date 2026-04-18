@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} — 화면 설계서</title>
+<style>/* __INJECT_BASE_CSS__ */
+:root { --max-w: 1100px; --err-dim: rgba(248,113,113,.08); --warn-dim: rgba(251,191,36,.10); }
+.screen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin: 16px 0; }
+.screen-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; transition: all .15s ease-out; }
+.screen-card:hover { transform: translateY(-2px); border-color: var(--border-h); }
+.screen-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.screen-id { font-size: 11px; color: var(--text-3); font-family: monospace; }
+.screen-name { font-size: 14px; font-weight: 600; }
+.screen-body { padding: 16px; }
+.screen-desc { font-size: 13px; color: var(--text-2); margin-bottom: 12px; }
+.screen-components { font-size: 12px; }
+.screen-components li { margin: 4px 0; color: var(--text); }
+.screen-tag { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; margin: 0 2px; }
+.tag-p0 { background: var(--err-dim); color: var(--err); }
+.tag-p1 { background: var(--warn-dim); color: var(--warn); }
+.tag-p2 { background: var(--accent-dim); color: var(--accent); }
+.tag-role { background: rgba(192,132,252,.10); color: var(--purple); }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a class="back" href="javascript:history.back()">← 돌아가기</a>
+  <span style="flex:1"></span>
+  <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+</div>
+
+<h1>{{PROJECT_NAME}} — 화면 설계서 (와이어프레임)</h1>
+<div class="meta">
+  <span>작성일: {{DATE}}</span>
+  <span>프로젝트 ID: {{PROJECT_ID}}</span>
+</div>
+
+<div class="summary">
+  <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">전체 화면</div></div>
+  <div class="summary-item"><div class="summary-num red">0</div><div class="summary-label">P0 필수</div></div>
+  <div class="summary-item"><div class="summary-num amber">0</div><div class="summary-label">P1 중요</div></div>
+  <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">P2 일반</div></div>
+</div>
+
+<div class="section">
+  <h2>1. 화면 목록 요약</h2>
+  <!-- CONTENT: 전체 화면 요약 테이블 -->
+  <table>
+    <thead><tr><th>ID</th><th>화면명</th><th>우선순위</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td><code>SCR-001</code></td><td>홈</td><td><span class="screen-tag tag-p0">P0</span></td><td>메인 랜딩 화면</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>2. 화면 카드</h2>
+  <div class="screen-grid">
+    <!-- CONTENT: 화면 카드. 아래 패턴 반복 -->
+    <div class="screen-card">
+      <div class="screen-header">
+        <div><span class="screen-id">SCR-001</span><br><span class="screen-name">홈</span></div>
+        <div><span class="screen-tag tag-p0">P0</span> <span class="screen-tag tag-role">전체</span></div>
+      </div>
+      <div class="screen-body">
+        <div class="screen-desc">메인 화면. 핵심 기능 진입점과 요약 정보를 제공한다.</div>
+        <div class="screen-components">
+          <strong>구성 요소:</strong>
+          <ul>
+            <li>상단 네비게이션 바</li>
+            <li>메인 콘텐츠 영역</li>
+            <li>하단 탭 바</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>3. 반응형 브레이크포인트</h2>
+  <!-- CONTENT: 반응형 규격 -->
+  <table>
+    <thead><tr><th>구간</th><th>너비</th><th>레이아웃 변경</th></tr></thead>
+    <tbody>
+      <tr><td>모바일</td><td>375px</td><td>1열, 햄버거 메뉴</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

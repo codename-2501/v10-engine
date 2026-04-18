@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>프로젝트 접수 — AX FACTORY</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f2f2f2;
+    --card: #ffffff;
+    --border: #e0e0e0;
+    --text: #1a1a1a;
+    --text-dim: #999;
+    --accent: #1a1a1a;
+    --accent-bg: #1a1a1a;
+    --accent-text: #fff;
+    --green: #22c55e;
+    --red: #e55;
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    padding-bottom: 100px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 720px;
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    padding-top: 40px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .step-indicator { font-size: 13px; color: var(--text-dim); margin-bottom: 8px; font-weight: 500; }
+  .question { font-size: 32px; font-weight: 800; line-height: 1.35; margin-bottom: 8px; }
+  .question-sub { font-size: 14px; color: var(--text-dim); margin-bottom: 40px; }
+
+  /* Option pills */
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .options.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .options.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .opt-btn {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 60px;
+    padding: 18px 32px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    color: var(--text);
+    font-family: inherit;
+  }
+  .opt-btn:hover { border-color: var(--accent); }
+  .opt-btn.selected { background: var(--accent-bg); color: var(--accent-text); border-color: var(--accent-bg); }
+  .opt-btn.sm { padding: 10px 18px; font-size: 13px; border-radius: 20px; }
+
+  /* Mode cards */
+  .mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .mode-card {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 40px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 260px;
+  }
+  .mode-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+  .mode-card.selected { background: var(--accent-bg); color: var(--accent-text); border-color: var(--accent-bg); }
+  .mode-card-icon { font-size: 40px; margin-bottom: 16px; }
+  .mode-card-title { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+  .mode-card-desc { font-size: 14px; opacity: 0.6; line-height: 1.5; }
+
+  /* Text input */
+  .text-input {
+    width: 100%;
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    font-size: 16px;
+    color: var(--text);
+    outline: none;
+    margin-bottom: 10px;
+    font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .text-input:focus { border-color: var(--accent); }
+  .text-input::placeholder { color: var(--text-dim); }
+  .text-input.error { border-color: var(--red); }
+  textarea.text-input { min-height: 100px; resize: vertical; border-radius: var(--radius); }
+  select.text-input { cursor: pointer; appearance: none; -webkit-appearance: none; }
+  .field-error { font-size: 12px; color: var(--red); margin-top: -6px; margin-bottom: 8px; display: none; }
+  .field-error.show { display: block; }
+
+  /* Date picker */
+  .date-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .date-row label { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; display: block; }
+  .date-row select {
+    width: 100%;
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 16px;
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+    appearance: none; -webkit-appearance: none;
+    transition: border-color 0.15s;
+  }
+  .date-row select:focus { border-color: var(--accent); }
+
+  /* Section label */
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* Sub-options */
+  .sub-opts {
+    background: rgba(26,26,26,0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin: 4px 0 8px;
+  }
+  .sub-opts-label { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+  .sub-opts-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  /* Yes/No toggle row */
+  .yn-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 15px;
+    gap: 12px;
+  }
+  .yn-row:last-child { border-bottom: none; }
+  .yn-q { flex: 1; }
+  .yn-q-sub { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+  .yn-btns { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* Collapsible section */
+  .collapsible-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--accent);
+    cursor: pointer;
+    font-weight: 600;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    user-select: none;
+    padding: 6px 0;
+  }
+  .collapsible-toggle .arrow {
+    display: inline-block;
+    transition: transform 0.25s ease;
+    font-size: 11px;
+  }
+  .collapsible-toggle.open .arrow { transform: rotate(180deg); }
+  .collapsible-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.25s ease;
+    opacity: 0;
+  }
+  .collapsible-body.open {
+    max-height: 2000px;
+    opacity: 1;
+  }
+
+  /* File upload */
+  .file-drop {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 32px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--card);
+    margin-bottom: 10px;
+  }
+  .file-drop:hover, .file-drop.dragover { border-color: var(--accent); background: rgba(26,26,26,0.03); }
+  .file-drop-text { font-size: 14px; color: var(--text-dim); }
+  .file-drop-text strong { color: var(--text); }
+  .file-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .file-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; font-size: 13px;
+  }
+  .file-item-remove { cursor: pointer; color: var(--red); font-weight: 700; font-size: 16px; }
+
+  /* Reference slot */
+  .ref-slot {
+    display: flex; gap: 8px; margin-bottom: 8px;
+  }
+  .ref-slot input { flex: 1; }
+
+  /* Summary card */
+  .summary-card {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 12px;
+  }
+  .summary-card h3 {
+    font-size: 14px; font-weight: 700; margin-bottom: 12px;
+    color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-label { color: var(--text-dim); }
+  .summary-value { font-weight: 600; text-align: right; max-width: 65%; word-break: break-word; }
+
+  .check-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; font-size: 14px; }
+  .check-row input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--accent); }
+
+  /* Navigation */
+  .nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between;
+    padding: 20px 40px;
+    background: linear-gradient(transparent, var(--bg) 30%);
+    pointer-events: none;
+  }
+  .nav-btn {
+    pointer-events: auto;
+    padding: 16px 40px;
+    border-radius: 60px;
+    font-size: 16px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+    border: 2px solid var(--border);
+    background: var(--card); color: var(--text);
+    font-family: inherit;
+  }
+  .nav-btn:hover { border-color: var(--accent); }
+  .nav-btn.primary { background: var(--accent-bg); color: var(--accent-text); border-color: var(--accent-bg); }
+  .nav-btn.primary:hover { opacity: 0.85; }
+  .nav-btn:disabled { opacity: 0.3; pointer-events: none; }
+  .nav-btn.hidden { visibility: hidden; }
+
+  /* Progress */
+  .progress-wrap {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100; background: var(--bg);
+  }
+  .progress-bar-bg { height: 3px; background: var(--border); }
+  .progress-bar-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; border-radius: 0 2px 2px 0; }
+  .progress-steps { display: flex; justify-content: center; gap: 6px; padding: 10px 16px 6px; flex-wrap: wrap; }
+  .progress-dot {
+    font-size: 11px; color: var(--text-dim);
+    padding: 2px 8px; border-radius: 12px;
+    white-space: nowrap; transition: all 0.2s; cursor: default;
+  }
+  .progress-dot.active { color: var(--accent); font-weight: 700; background: rgba(26,26,26,0.08); }
+  .progress-dot.done { color: var(--text); cursor: pointer; }
+
+  /* Done */
+  .done-screen { text-align: center; padding: 64px 0; }
+  .done-icon { font-size: 64px; margin-bottom: 24px; }
+  .done-title { font-size: 28px; font-weight: 800; margin-bottom: 12px; }
+  .done-desc { font-size: 16px; color: var(--text-dim); line-height: 1.6; }
+  .done-ref {
+    display: inline-block; margin-top: 24px;
+    background: rgba(26,26,26,0.06); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 20px;
+    font-size: 14px; font-weight: 700;
+  }
+
+  /* Feature category */
+  .feat-cat-title {
+    font-size: 13px; font-weight: 700; color: var(--text-dim);
+    margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .feat-cat-title:first-child { margin-top: 0; }
+
+  /* Collapsible step wrapper (design step) */
+  .step-collapsible-wrap {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .step-collapsible-wrap:hover { border-color: var(--accent); }
+  .step-collapsible-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .step-collapsible-header h3 { font-size: 16px; font-weight: 700; }
+  .step-collapsible-header .badge {
+    font-size: 12px; color: var(--text-dim);
+    background: rgba(26,26,26,0.06); border-radius: 8px; padding: 4px 10px;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 16px; padding-bottom: 100px; }
+    .question { font-size: 24px; }
+    .mode-cards { grid-template-columns: 1fr; }
+    .mode-card { min-height: 160px; padding: 32px 24px; border-radius: 24px; }
+    .options.grid-2 { grid-template-columns: 1fr; }
+    .options.grid-3 { grid-template-columns: 1fr 1fr; }
+    .opt-btn { padding: 14px 20px; font-size: 15px; }
+    .nav { padding: 16px 20px; }
+    .nav-btn { padding: 14px 28px; font-size: 15px; }
+    .date-row { grid-template-columns: 1fr; }
+    .yn-row { flex-wrap: wrap; }
+    .ref-slot { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-wrap" id="progressWrap" style="display:none;">
+  <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+  <div class="progress-steps" id="progressSteps"></div>
+</div>
+
+<div class="container" id="app" style="padding-top:8px;"></div>
+
+<div class="nav" id="nav" style="display:none;">
+  <button class="nav-btn" id="btnPrev" onclick="prevStep()">이전</button>
+  <button class="nav-btn primary" id="btnNext" onclick="nextStep()">다음</button>
+</div>
+
+<!-- Hidden file input -->
+<input type="file" id="fileInput" multiple style="display:none;" onchange="handleFiles(this.files)">
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let mode = null;
+let step = 0;
+let uploadedFiles = [];
+
+let fd = {
+  mode: null,
+  // 서비스
+  projectName: '', projectSummary: '', projectDesc: '', projectPurpose: '',
+  // 서비스 유형 (뭘 만드는가)
+  serviceType: [],
+  // Yes/No questions (guided)
+  needAI: null, needPrediction: null, needIntegration: null,
+  needRealtime: null, needCustomModel: null,
+  // 범위
+  scope: [],
+  // 유형 + 세부
+  projectTypes: [], projectSubTypes: {},
+  // 타겟/활용
+  targetUsers: [], useCases: [], expectedKpi: '', deployType: [],
+  // 기능 상세 (expert)
+  features: [], userScenarios: ['','',''], featuresExtra: '',
+  // 데이터
+  dataTypes: [], dataReadiness: null, dataVolume: null,
+  aiExperience: null, hasExistingDocs: null,
+  // 기술 (expert)
+  techPreference: null, mlFrameworks: [], dataTools: [], mlopsTools: [],
+  infraEnv: [], cicd: [], securityReqs: [], integrations: '', techNotes: '',
+  // 백엔드 선택 (Phase F-4)
+  backendChoice: 'sql',
+  // 디자인
+  designTone: [], references: [{url:'',purpose:'both',reason:''}],
+  colorPreference: null, keyScreens: '', brandGuide: '', hasBrandGuide: null,
+  // 예산
+  budget: null, maintenanceBudget: null,
+  startDate: { year: '2026', month: '04', period: '월초' },
+  endDate: { year: '2026', month: '10', period: '월초' },
+  flexSchedule: null, priority: null,
+  // 담당자
+  contactName: '', contactCompany: '', contactIndustry: '', contactEmail: '',
+  contactPhone: '', contactTitle: '', contactDept: '',
+  additionalDesc: '', agreePrivacy: false,
+};
+
+// Track collapsible states
+let collapsibles = {};
+
+// ============================================================
+// STEPS
+// ============================================================
+function getSteps() {
+  if (!mode) return ['mode'];
+  if (mode === 'expert') {
+    return ['mode','service','platform','scope','type','target','features','tech','design','budget','contact','confirm'];
+  } else {
+    return ['mode','service','platform','problem','data','design','budget','contact','confirm'];
+  }
+}
+function getCurId() { return getSteps()[step]; }
+function getStepNum() {
+  const id = getCurId();
+  if (id === 'mode') return null;
+  const steps = getSteps();
+  const idx = steps.indexOf(id);
+  return idx + ' / ' + (steps.length - 1);
+}
+const LABELS = {
+  service:'서비스', platform:'유형', scope:'범위', type:'분야', target:'활용', features:'기능',
+  problem:'문제', data:'데이터', tech:'기술', design:'디자인',
+  budget:'예산', contact:'연락처', confirm:'확인'
+};
+
+// ============================================================
+// RENDER
+// ============================================================
+function render(keep) {
+  const app = document.getElementById('app');
+  const nav = document.getElementById('nav');
+  const id = getCurId();
+  const sy = keep ? window.scrollY : null;
+
+  nav.style.display = id === 'mode' ? 'none' : 'flex';
+  document.getElementById('btnPrev').className = id === 'mode' ? 'nav-btn hidden' : 'nav-btn';
+
+  const pw = document.getElementById('progressWrap');
+  if (id === 'mode') {
+    pw.style.display = 'none';
+    app.style.paddingTop = '8px';
+  } else {
+    pw.style.display = 'block';
+    app.style.paddingTop = '52px';
+    const steps = getSteps();
+    const ci = steps.indexOf(id);
+    document.getElementById('progressFill').style.width = Math.round(ci/(steps.length-1)*100)+'%';
+    document.getElementById('progressSteps').innerHTML = steps.filter(s=>s!=='mode').map(s=>{
+      const ai = steps.indexOf(s);
+      const cls = ai===ci?'active':ai<ci?'done':'';
+      return `<span class="progress-dot ${cls}" onclick="${cls==='done'?'jump('+ai+')':''}">${LABELS[s]||s}</span>`;
+    }).join('');
+  }
+
+  const isConfirm = id === 'confirm';
+  const btn = document.getElementById('btnNext');
+  btn.textContent = isConfirm ? '제출하기' : '다음';
+  btn.disabled = !canGo();
+
+  if (!keep) {
+    app.style.animation = 'none'; void app.offsetHeight; app.style.animation = 'fadeIn 0.3s ease';
+  }
+  app.innerHTML = '';
+
+  const renders = {
+    mode: rMode, service: rService, platform: rPlatform, scope: rScope, type: rType,
+    target: rTarget, features: rFeatures, tech: rTech,
+    problem: rProblem, data: rData, design: rDesign,
+    budget: rBudget, contact: rContact, confirm: rConfirm,
+  };
+  if (renders[id]) renders[id](app);
+  if (sy !== null) window.scrollTo(0, sy);
+}
+
+function jump(i) { if (i < step) { step = i; render(); window.scrollTo(0,0); } }
+
+// ============================================================
+// VALIDATION
+// ============================================================
+function canGo() {
+  switch(getCurId()) {
+    case 'mode': return !!mode;
+    case 'service': return fd.projectName.trim()!=='' && fd.projectSummary.trim()!=='';
+    case 'platform': return fd.serviceType.length > 0;
+    case 'scope': return fd.scope.length > 0;
+    case 'type': return fd.projectTypes.length > 0;
+    case 'target': return fd.targetUsers.length > 0 && fd.deployType.length > 0;
+    case 'features': return true;
+    case 'tech': return true;
+    case 'problem': return true;
+    case 'data': return true;
+    case 'design': return true;
+    case 'budget': return !!fd.budget && !!fd.flexSchedule;
+    case 'contact': return fd.contactName.trim()&&fd.contactCompany.trim()&&fd.contactEmail.trim()&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fd.contactEmail);
+    case 'confirm': return fd.agreePrivacy;
+    default: return true;
+  }
+}
+function chk() { document.getElementById('btnNext').disabled = !canGo(); }
+
+// ============================================================
+// NAV
+// ============================================================
+function nextStep() {
+  if (!canGo()) return;
+  const steps = getSteps();
+  if (step < steps.length - 1) { step++; render(); window.scrollTo(0,0); }
+  else submit();
+}
+function prevStep() { if (step > 0) { step--; render(); window.scrollTo(0,0); } }
+
+// ============================================================
+// COLLAPSIBLE HELPER
+// ============================================================
+function toggleCollapsible(key) {
+  collapsibles[key] = !collapsibles[key];
+  const body = document.getElementById('coll-body-'+key);
+  const toggle = document.getElementById('coll-toggle-'+key);
+  if (body) body.classList.toggle('open', !!collapsibles[key]);
+  if (toggle) toggle.classList.toggle('open', !!collapsibles[key]);
+}
+function collapsibleHTML(key, label) {
+  const open = !!collapsibles[key];
+  return `<div class="collapsible-toggle ${open?'open':''}" id="coll-toggle-${key}" onclick="toggleCollapsible('${key}')">
+    ${label} <span class="arrow">&#9660;</span>
+  </div>
+  <div class="collapsible-body ${open?'open':''}" id="coll-body-${key}">`;
+}
+
+// ============================================================
+// STEP RENDERERS
+// ============================================================
+
+// MODE
+function rMode(el) {
+  el.innerHTML = `
+    <div class="question">안녕하세요,<br>어떤 방식으로<br>진행할까요?</div>
+    <div class="question-sub"></div>
+    <div class="mode-cards">
+      <div class="mode-card ${mode==='guided'?'selected':''}" onclick="selMode('guided')">
+        <div class="mode-card-icon">💬</div>
+        <div class="mode-card-title">맞춤 추천</div>
+        <div class="mode-card-desc">몇 가지 질문에 답하시면<br>저희가 구성해드립니다</div>
+      </div>
+      <div class="mode-card ${mode==='expert'?'selected':''}" onclick="selMode('expert')">
+        <div class="mode-card-icon">🎯</div>
+        <div class="mode-card-title">직접 구성</div>
+        <div class="mode-card-desc">AI 프로젝트 요구사항을<br>직접 상세하게 입력합니다</div>
+      </div>
+    </div>`;
+}
+function selMode(m) { mode=m; fd.mode=m; step=1; render(); window.scrollTo(0,0); }
+
+// SERVICE (shared step 1)
+function rService(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">어떤 프로젝트를<br>의뢰하시나요?</div><div class="question-sub">프로젝트명과 한 줄 요약이 필요합니다</div>`;
+  h += `<input class="text-input" placeholder="프로젝트명 * (예: 생산라인 불량 예측 AI 시스템)" value="${x(fd.projectName)}" oninput="fd.projectName=this.value;chk()" id="f-projectName">`;
+  h += `<input class="text-input" placeholder="한 줄 요약 * (예: 비전 AI로 불량률 90% 감소를 목표로 하는 제조 품질 관리 시스템)" value="${x(fd.projectSummary)}" oninput="fd.projectSummary=this.value;chk()">`;
+  h += `<div class="section-label" style="margin-top:24px;">상세 설명 (선택)</div>`;
+  h += `<textarea class="text-input" rows="3" placeholder="해결하려는 문제, 배경, 기대 성과를 자유롭게 적어주세요" oninput="fd.projectDesc=this.value">${x(fd.projectDesc)}</textarea>`;
+  h += `<div class="section-label" style="margin-top:8px;">프로젝트 목적 (선택)</div>`;
+  h += `<input class="text-input" placeholder="예: 제조 공정 자동화, 고객 이탈 방지, 내부 업무 효율화" value="${x(fd.projectPurpose)}" oninput="fd.projectPurpose=this.value">`;
+  el.innerHTML = h;
+}
+
+// ============================================================
+// PLATFORM / SERVICE TYPE (공통 — 양쪽 모드)
+// ============================================================
+const SERVICE_TYPES = [
+  { v:'web_service',   l:'웹 서비스',         d:'반응형 웹, SPA, SSR, 대시보드', icon:'🌐' },
+  { v:'mobile_app',    l:'모바일 앱',         d:'iOS, Android, 하이브리드, React Native', icon:'📱' },
+  { v:'web_and_app',   l:'웹 + 앱',           d:'반응형 웹 + 네이티브/하이브리드 앱 동시', icon:'💻' },
+  { v:'api_service',   l:'API / 마이크로서비스', d:'REST API, GraphQL, gRPC 백엔드', icon:'⚡' },
+  { v:'admin_backoffice', l:'관리자 / 백오피스', d:'CMS, ERP, CRM, 어드민 패널', icon:'🏢' },
+  { v:'chatbot_agent', l:'챗봇 / AI 에이전트', d:'대화형 인터페이스, 자동 응답 시스템', icon:'🤖' },
+  { v:'data_platform', l:'데이터 플랫폼',     d:'분석 대시보드, BI, 데이터 레이크하우스', icon:'📊' },
+  { v:'kiosk_embedded',l:'키오스크 / 임베디드', d:'현장 단말기, POS, 산업용 디스플레이', icon:'🖥️' },
+  { v:'desktop_sw',    l:'데스크톱 소프트웨어', d:'Windows/Mac 설치형 애플리케이션', icon:'💾' },
+  { v:'iot_edge',      l:'IoT / 엣지',        d:'센서 연동, 엣지 컴퓨팅, 게이트웨이', icon:'📡' },
+  { v:'plugin_module', l:'기존 시스템 연동',   d:'ERP/MES/SAP 플러그인, 모듈 형태', icon:'🔌' },
+  { v:'consulting',    l:'컨설팅 / PoC',       d:'전략 수립, 타당성 검토, 프로토타입', icon:'📋' },
+];
+
+function rPlatform(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">어떤 형태의 서비스를<br>만드시나요?</div><div class="question-sub">복수 선택 가능합니다 (예: 웹 서비스 + 모바일 앱)</div>`;
+  h += '<div class="options">';
+  SERVICE_TYPES.forEach(t => {
+    const sel = fd.serviceType.includes(t.v);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.serviceType,'${t.v}');render(true)" style="text-align:left;padding:16px 20px;border-radius:16px;">
+      <div style="font-weight:600;">${t.icon} ${t.l}</div>
+      <div style="font-size:12px;${sel?'color:rgba(255,255,255,0.6)':'color:var(--text-dim)'};margin-top:4px;">${t.d}</div>
+    </div>`;
+  });
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+// ============================================================
+// GUIDED MODE STEPS
+// ============================================================
+
+// PROBLEM (guided step 2) — v3-style Yes/No
+function rProblem(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">어떤 문제를<br>해결하고 싶으세요?</div><div class="question-sub">해당하는 항목에 Yes/No로 답해주세요</div>`;
+
+  const yns = [
+    { key:'needAI', q:'AI/자동화가 필요하신가요?', d:'머신러닝, 딥러닝 또는 업무 자동화' },
+    { key:'needPrediction', q:'데이터 분석/예측이 필요하신가요?', d:'데이터 기반 인사이트, 미래 예측' },
+    { key:'needIntegration', q:'기존 시스템과 연동이 필요하신가요?', d:'ERP, CRM, MES 등 기존 시스템 연동' },
+    { key:'needRealtime', q:'실시간 처리가 필요하신가요?', d:'수 초 내 예측 결과 응답, 스트리밍 처리' },
+    { key:'needCustomModel', q:'커스텀 AI 모델 개발이 필요하신가요?', d:'기존 API보다 우리 데이터로 학습한 전용 모델' },
+  ];
+  h += '<div style="background:var(--card);border:2px solid var(--border);border-radius:var(--radius);padding:8px 24px;">';
+  yns.forEach(item => {
+    const v = fd[item.key];
+    h += `<div class="yn-row">
+      <div class="yn-q"><div style="font-weight:600;">${item.q}</div><div class="yn-q-sub">${item.d}</div></div>
+      <div class="yn-btns">
+        <div class="opt-btn ${v==='yes'?'selected':''}" style="padding:8px 20px;font-size:13px;border-radius:40px;" onclick="fd.${item.key}='yes';render(true)">Yes</div>
+        <div class="opt-btn ${v==='no'?'selected':''}" style="padding:8px 20px;font-size:13px;border-radius:40px;" onclick="fd.${item.key}='no';render(true)">No</div>
+      </div>
+    </div>`;
+  });
+  h += '</div>';
+
+  // Collapsible: scope pills
+  h += collapsibleHTML('problem_scope', '자세히 설정');
+  h += '<div class="section-label" style="margin-top:8px;">업무 범위 (선택)</div>';
+  h += '<div class="options">';
+  SCOPES.forEach(s => {
+    const sel = fd.scope.includes(s.v);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.scope,'${s.v}');render(true)" style="text-align:left;padding:14px 20px;border-radius:16px;">
+      <div style="font-weight:600;">${s.l}</div>
+      <div style="font-size:12px;${sel?'color:rgba(255,255,255,0.6)':'color:var(--text-dim)'};margin-top:4px;">${s.d}</div>
+    </div>`;
+  });
+  h += '</div></div>'; // close collapsible body
+
+  el.innerHTML = h;
+}
+
+// DATA (guided step 3)
+const DATA_TYPES = ['정형 데이터 (DB/Excel)','이미지·영상','텍스트·문서','센서·IoT 로그','음성·오디오','소셜·웹 데이터','없음 / 미보유'];
+const DATA_VOLS = ['1GB 미만','1GB–100GB','100GB–1TB','1TB 이상','모름'];
+function rData(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">데이터·환경을<br>알려주세요</div><div class="question-sub">보유 데이터에 따라 프로젝트 방향이 달라집니다</div>`;
+
+  // AI experience
+  h += '<div class="section-label">AI 도입 경험</div><div class="options">';
+  [{v:'처음 도입',d:'AI 프로젝트 경험 없음'},{v:'PoC 경험 있음',d:'소규모 실험 완료'},{v:'운영중 AI 있음',d:'고도화 또는 확장 필요'}].forEach(e => {
+    const sel=fd.aiExperience===e.v;
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="fd.aiExperience='${e.v}';render(true)" style="text-align:left;padding:14px 20px;border-radius:16px;">
+      <span style="font-weight:600;">${e.v}</span>
+      <span style="display:block;font-size:12px;${sel?'color:rgba(255,255,255,0.6)':'color:var(--text-dim)'};margin-top:4px;">${e.d}</span>
+    </div>`;
+  });
+  h += '</div>';
+
+  // Existing docs
+  h += '<div class="section-label" style="margin-top:24px;">기존 자료 보유 여부</div><div class="options grid-3">';
+  ['없음','일부 있음','대부분 있음'].forEach(v => {
+    h += `<div class="opt-btn ${fd.hasExistingDocs===v?'selected':''}" onclick="fd.hasExistingDocs='${v}';render(true)" style="border-radius:16px;padding:14px 16px;font-size:14px;">${v}</div>`;
+  });
+  h += '</div>';
+
+  // Collapsible: detailed data settings
+  h += collapsibleHTML('data_detail', '자세히 설정');
+
+  h += '<div class="section-label" style="margin-top:8px;">보유 데이터 유형 (복수 선택)</div><div class="options grid-2">';
+  DATA_TYPES.forEach(d => {
+    const sel=fd.dataTypes.includes(d);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.dataTypes,'${d}');render(true)" style="border-radius:16px;padding:14px 16px;font-size:13px;">${d}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:16px;">데이터 준비도</div><div class="options">';
+  [{v:'없음',d:'데이터 수집부터 시작 필요'},{v:'일부',d:'일부 있으나 전처리·레이블링 필요'},{v:'충분',d:'학습 가능한 수준으로 확보됨'}].forEach(r => {
+    const sel=fd.dataReadiness===r.v;
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="fd.dataReadiness='${r.v}';render(true)" style="text-align:left;padding:14px 20px;border-radius:16px;">
+      <span style="font-weight:600;">${r.v}</span>
+      <span style="display:block;font-size:12px;${sel?'color:rgba(255,255,255,0.6)':'color:var(--text-dim)'};margin-top:4px;">${r.d}</span>
+    </div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:16px;">데이터 규모</div><div class="options grid-2">';
+  DATA_VOLS.forEach(v => {
+    h += `<div class="opt-btn ${fd.dataVolume===v?'selected':''}" onclick="fd.dataVolume='${v}';render(true)" style="border-radius:16px;padding:12px 16px;font-size:13px;">${v}</div>`;
+  });
+  h += '</div>';
+
+  // File upload (show if hasExistingDocs != '없음')
+  if (fd.hasExistingDocs && fd.hasExistingDocs !== '없음') {
+    h += '<div class="section-label" style="margin-top:16px;">자료 업로드</div>';
+    h += renderFileUpload();
+  }
+
+  h += '</div>'; // close collapsible body
+
+  el.innerHTML = h;
+  if (fd.hasExistingDocs && fd.hasExistingDocs !== '없음' && collapsibles['data_detail']) {
+    initDropZone();
+  }
+}
+
+// ============================================================
+// EXPERT MODE STEPS
+// ============================================================
+
+// SCOPE (expert step 2)
+const SCOPES = [
+  { v:'ai_model',      l:'AI 모델 개발',    d:'ML/DL 모델 설계·학습·최적화·배포' },
+  { v:'mlops',         l:'MLOps 구축',      d:'CI/CD, 모델 서빙, 모니터링 파이프라인' },
+  { v:'data_pipeline', l:'데이터 파이프라인',d:'수집·전처리·피처 엔지니어링·레이크하우스' },
+  { v:'llm',           l:'LLM 적용',        d:'GPT/Claude 등 대형 언어모델 파인튜닝·RAG·에이전트' },
+  { v:'si',            l:'시스템 통합(SI)', d:'AI 모듈을 ERP/MES/CRM 등 기존 시스템에 연동' },
+  { v:'vision',        l:'비전·영상 분석',  d:'이미지·영상 기반 검사·인식·분류 시스템' },
+  { v:'prediction',    l:'예측·이상감지',   d:'시계열 예측, 이상 탐지, 리스크 모델링' },
+  { v:'chatbot',       l:'챗봇·자동화',     d:'대화형 AI, 업무 자동화, RPA 연동' },
+  { v:'consulting',    l:'컨설팅·PoC',      d:'AI 전략 수립, 타당성 검토, 개념 검증' },
+  { v:'public',        l:'관공서·공공',     d:'공공기관 SI — 착수보고서, PMP 등 행정 산출물 포함' },
+];
+function rScope(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">필요한 업무 범위를<br>선택해주세요</div><div class="question-sub">복수 선택 가능합니다</div>`;
+  const allSel = fd.scope.length === SCOPES.length;
+  h += `<div style="text-align:right;margin-bottom:8px;"><span style="font-size:13px;color:var(--accent);cursor:pointer;font-weight:600;" onclick="allScope()">${allSel?'전체 해제':'전체 선택'}</span></div>`;
+  h += '<div class="options">';
+  SCOPES.forEach(s => {
+    const sel = fd.scope.includes(s.v);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.scope,'${s.v}');render(true)" style="text-align:left;padding:16px 24px;border-radius:16px;">
+      <div style="font-weight:600;">${s.l}</div>
+      <div style="font-size:12px;${sel?'color:rgba(255,255,255,0.6)':'color:var(--text-dim)'};margin-top:4px;">${s.d}</div>
+    </div>`;
+  });
+  h += '</div>';
+  el.innerHTML = h;
+}
+function allScope() { fd.scope = fd.scope.length===SCOPES.length ? [] : SCOPES.map(s=>s.v); render(true); }
+
+// TYPE (expert step 3)
+const TYPES = [
+  { v:'제조·품질', d:'생산공정 최적화, 불량 탐지, 예지보전', subs:['비전 기반 불량 검출','설비 고장 예측','공정 파라미터 최적화','에너지 사용 최적화'] },
+  { v:'금융·리스크', d:'신용평가, 사기탐지, 투자 예측', subs:['대출 신용평가','사기·이상 거래 탐지','시장 가격 예측','규제 준수 자동화'] },
+  { v:'유통·물류', d:'수요예측, 재고최적화, 배송 경로', subs:['수요·판매량 예측','재고 자동 발주','물류 경로 최적화','고객 이탈 예측'] },
+  { v:'의료·바이오', d:'진단 보조, 신약 발견, 의료영상 분석', subs:['의료영상 판독 보조','임상 데이터 분석','약물 부작용 예측','환자 재입원 예측'] },
+  { v:'커머스·마케팅', d:'추천 시스템, 개인화, 고객 행동 분석', subs:['상품 추천 엔진','고객 세그멘테이션','광고 효율 최적화','리뷰·감성 분석'] },
+  { v:'공공·안전', d:'교통·환경 모니터링, 범죄 예측, 재난 관리', subs:['교통 흐름 예측','환경 오염 감지','CCTV 이상 행동 감지','재난 대응 시뮬레이션'] },
+  { v:'IT·인프라', d:'장애 예측, 보안 위협 탐지, 자원 최적화', subs:['서버 장애 예측','보안 위협 탐지(SIEM)','클라우드 비용 최적화','로그 이상 감지'] },
+  { v:'언어·문서', d:'자동 분류, 요약, 번역, 문서 이해', subs:['계약서·문서 자동 분류','회의록 요약·정리','다국어 번역 자동화','챗봇·FAQ 자동 응답'] },
+  { v:'기타', d:'위 업종에 해당하지 않는 경우', subs:[] },
+];
+function togSub(type, sub) {
+  if (!fd.projectSubTypes[type]) fd.projectSubTypes[type]=[];
+  const a=fd.projectSubTypes[type], i=a.indexOf(sub);
+  if(i>=0) a.splice(i,1); else a.push(sub);
+  render(true);
+}
+function rType(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">어떤 분야의<br>AI 프로젝트인가요?</div><div class="question-sub">복수 선택 가능 — 선택 시 세부 항목이 나타납니다</div>`;
+  h += '<div class="options">';
+  TYPES.forEach(t => {
+    const sel = fd.projectTypes.includes(t.v);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.projectTypes,'${t.v}');render(true)" style="text-align:left;padding:16px 24px;border-radius:16px;">
+      <span style="font-weight:600;">${t.v}</span>
+      <span style="display:block;font-size:12px;${sel?'color:rgba(255,255,255,0.6)':'color:var(--text-dim)'};margin-top:4px;">${t.d}</span>
+    </div>`;
+    if (sel && t.subs.length) {
+      h += `<div class="sub-opts"><div class="sub-opts-label">${t.v} — 세부 항목 (선택)</div><div class="sub-opts-row">`;
+      t.subs.forEach(s => {
+        const ss=(fd.projectSubTypes[t.v]||[]).includes(s);
+        h += `<div class="opt-btn ${ss?'selected':''}" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="togSub('${t.v}','${s}')">${s}</div>`;
+      });
+      h += '</div></div>';
+    }
+  });
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+// TARGET (expert step 4)
+const TARGET_USERS = ['현장·운영 직원','데이터 분석가','경영진·의사결정자','IT·개발팀','외부 고객','내부 전 직원'];
+const USE_CASES = ['실시간 예측 대시보드','배치 분석 리포트','API 연동 (타 시스템에 결과 제공)','모바일·현장 단말 앱','대화형 인터페이스 (챗봇)','알림·경보 시스템'];
+const DEPLOY_TYPES = ['웹 대시보드','REST API 서비스','기존 시스템 내 모듈','모바일 앱','온프레미스 설치형','SaaS/클라우드 서비스'];
+function rTarget(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">누가, 어떻게<br>활용하나요?</div><div class="question-sub">AI 시스템의 사용자와 활용 방식을 알려주세요</div>`;
+
+  h += '<div class="section-label">주요 사용자 *</div><div class="options grid-2">';
+  TARGET_USERS.forEach(u => {
+    const sel=fd.targetUsers.includes(u);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.targetUsers,'${u}');render(true)" style="border-radius:16px;padding:14px 16px;font-size:14px;">${u}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">활용 방식 (배포 형태) *</div><div class="options grid-2">';
+  DEPLOY_TYPES.forEach(d => {
+    const sel=fd.deployType.includes(d);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.deployType,'${d}');render(true)" style="border-radius:16px;padding:14px 16px;font-size:14px;">${d}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">주요 사용 시나리오</div><div class="options grid-2">';
+  USE_CASES.forEach(u => {
+    const sel=fd.useCases.includes(u);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.useCases,'${u}');render(true)" style="border-radius:16px;padding:12px 14px;font-size:13px;">${u}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">기대 성과 / KPI (선택)</div>';
+  h += `<textarea class="text-input" rows="2" placeholder="예: 불량률 30% 감소, 분류 정확도 95% 이상, 처리 시간 50% 단축" oninput="fd.expectedKpi=this.value">${x(fd.expectedKpi)}</textarea>`;
+
+  el.innerHTML = h;
+}
+
+// FEATURES (expert step 5) — NEW v3-inspired
+const FEATURE_CATS = [
+  { cat: '데이터', items: ['데이터 수집·정제','데이터 라벨링','데이터 분석 대시보드'] },
+  { cat: 'AI/ML', items: ['모델 학습·훈련','추론 API 서비스','실시간 예측','이상 감지'] },
+  { cat: '자동화', items: ['문서 자동 분류','챗봇·FAQ 자동응답','워크플로우 자동화'] },
+  { cat: '연동', items: ['기존 시스템 API 연동','외부 AI API 연동','IoT·센서 연동'] },
+  { cat: '모니터링', items: ['모델 성능 모니터링','데이터 드리프트 감지','비용 모니터링'] },
+];
+function rFeatures(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">필요한 기능을<br>선택해주세요</div><div class="question-sub">카테고리별 필요 기능을 복수 선택할 수 있습니다</div>`;
+
+  FEATURE_CATS.forEach(cat => {
+    h += `<div class="feat-cat-title">${cat.cat}</div>`;
+    h += '<div class="options grid-2">';
+    cat.items.forEach(item => {
+      const sel = fd.features.includes(item);
+      h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.features,'${x(item)}');render(true)" style="border-radius:16px;padding:12px 16px;font-size:13px;">${item}</div>`;
+    });
+    h += '</div>';
+  });
+
+  h += '<div class="section-label" style="margin-top:28px;">사용 시나리오 (최대 3개)</div>';
+  for (let i = 0; i < 3; i++) {
+    h += `<input class="text-input" placeholder="시나리오 ${i+1} (예: 사용자가 불량 이미지를 업로드하면 AI가 결함 유형을 분류)" value="${x(fd.userScenarios[i]||'')}" oninput="fd.userScenarios[${i}]=this.value">`;
+  }
+
+  h += '<div class="section-label" style="margin-top:8px;">기능 관련 추가 요청 (선택)</div>';
+  h += `<textarea class="text-input" rows="2" placeholder="추가 기능 요구사항이나 참고사항" oninput="fd.featuresExtra=this.value">${x(fd.featuresExtra)}</textarea>`;
+
+  el.innerHTML = h;
+}
+
+// TECH (expert step 6)
+const ML_FRAMEWORKS = ['PyTorch','TensorFlow','scikit-learn','XGBoost/LightGBM','HuggingFace','LangChain','OpenAI API','Claude API','맡기겠음'];
+const DATA_TOOLS = ['Apache Spark','Apache Kafka','Airflow','dbt','Flink','Databricks','Snowflake','맡기겠음'];
+const MLOPS_TOOLS = ['MLflow','Kubeflow','SageMaker','Vertex AI','Azure ML','BentoML','Seldon','맡기겠음'];
+const SECURITY_OPTS = ['망분리 환경','개인정보보호법 준수','의료정보 보안(HIPAA급)','금융보안 (ISMS-P)','데이터 암호화 필수','모델 설명 가능성 요구','감사 로그 필수'];
+function rTech(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">기술 환경을<br>알려주세요</div><div class="question-sub">프레임워크, 인프라, 보안 요구사항을 설정합니다</div>`;
+
+  h += '<div class="section-label">ML 프레임워크 선호</div><div class="options grid-2">';
+  ML_FRAMEWORKS.forEach(f => {
+    const sel=fd.mlFrameworks.includes(f);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.mlFrameworks,'${f}');render(true)" style="border-radius:16px;padding:12px 16px;font-size:13px;">${f}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">데이터 플랫폼 / 파이프라인 도구</div><div class="options grid-2">';
+  DATA_TOOLS.forEach(d => {
+    const sel=fd.dataTools.includes(d);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.dataTools,'${d}');render(true)" style="border-radius:16px;padding:12px 16px;font-size:13px;">${d}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">MLOps / 모델 관리 도구</div><div class="options grid-2">';
+  MLOPS_TOOLS.forEach(t => {
+    const sel=fd.mlopsTools.includes(t);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.mlopsTools,'${t}');render(true)" style="border-radius:16px;padding:12px 16px;font-size:13px;">${t}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">인프라 / 클라우드 환경</div><div class="options grid-2">';
+  ['온프레미스','AWS','GCP','Azure','KT Cloud','네이버 클라우드','하이브리드','미정'].forEach(i => {
+    const sel=fd.infraEnv.includes(i);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.infraEnv,'${i}');render(true)" style="border-radius:16px;padding:12px 16px;font-size:13px;">${i}</div>`;
+  });
+  h += '</div>';
+
+  // Phase F-4: 백엔드 선택 (SQL / InstantDB / Firebase / Supabase)
+  h += '<div class="section-label" style="margin-top:24px;">백엔드 선택 (하나)</div><div class="options grid-2">';
+  const BACKEND_OPTS = [
+    {v:'sql',       l:'SQL (기본)',   d:'전통적 관계형 (PostgreSQL/MySQL/SQLite) — 안정 범용'},
+    {v:'instantdb', l:'InstantDB',    d:'실시간 동기화 + 오프라인 내장, AI 코딩 친화'},
+    {v:'firebase',  l:'Firebase',     d:'Google 생태계 (Firestore/Auth/Functions)'},
+    {v:'supabase',  l:'Supabase',     d:'오픈소스, Postgres + 실시간 + Edge Functions'},
+  ];
+  BACKEND_OPTS.forEach(b => {
+    const sel = fd.backendChoice === b.v;
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="fd.backendChoice='${b.v}';render(true)" style="text-align:left;padding:14px 18px;border-radius:16px;">
+      <div style="font-weight:600;font-size:14px;">${b.l}</div>
+      <div style="font-size:12px;${sel?'color:rgba(255,255,255,0.6)':'color:var(--text-dim)'};margin-top:4px;">${b.d}</div>
+    </div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">보안 · 규제 요구사항</div><div class="options grid-2">';
+  SECURITY_OPTS.forEach(s => {
+    const sel=fd.securityReqs.includes(s);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.securityReqs,'${s}');render(true)" style="border-radius:16px;padding:12px 14px;font-size:12px;">${s}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">연동할 기존 시스템</div>';
+  h += `<input class="text-input" placeholder="ERP, MES, CRM, BI, DB 등 연동 대상" value="${x(fd.integrations)}" oninput="fd.integrations=this.value">`;
+  h += '<div class="section-label" style="margin-top:8px;">기타 기술 요구사항</div>';
+  h += `<textarea class="text-input" rows="2" placeholder="성능 요구사항, 응답 속도, 가용성 SLA 등" oninput="fd.techNotes=this.value">${x(fd.techNotes)}</textarea>`;
+  el.innerHTML = h;
+}
+
+// ============================================================
+// DESIGN (shared step — collapsible in guided, full in expert)
+// ============================================================
+const DESIGN_TONES = ['미니멀','모던','프리미엄','친근한','기업형','캐주얼'];
+const COLOR_PREFS = ['밝은 톤','어두운 톤','브랜드 컬러','맡기겠음'];
+
+function rDesign(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+
+  if (mode === 'guided') {
+    // Guided: entire step is collapsible, collapsed = "맡기겠음"
+    h += `<div class="question">디자인·UI</div><div class="question-sub">건너뛰시면 '맡기겠음'으로 처리됩니다</div>`;
+
+    const isOpen = !!collapsibles['design_main'];
+    h += `<div class="step-collapsible-wrap" onclick="toggleCollapsible('design_main');render(true)">
+      <div class="step-collapsible-header">
+        <h3>디자인 설정</h3>
+        <span class="badge">${isOpen ? '접기' : (fd.designTone.length || fd.colorPreference ? '설정됨' : '맡기겠음')}</span>
+      </div>
+    </div>`;
+
+    h += `<div class="collapsible-body ${isOpen?'open':''}" id="coll-body-design_main">`;
+    h += renderDesignFields();
+    h += '</div>';
+  } else {
+    // Expert: full design step
+    h += `<div class="question">디자인을<br>설정해주세요</div><div class="question-sub">톤, 레퍼런스, 색상 등을 지정합니다</div>`;
+    h += renderDesignFields();
+  }
+
+  el.innerHTML = h;
+  // Re-apply collapsible state for nested collapsible
+  setTimeout(() => {
+    const body = document.getElementById('coll-body-design_detail');
+    const toggle = document.getElementById('coll-toggle-design_detail');
+    if (body && collapsibles['design_detail']) { body.classList.add('open'); }
+    if (toggle && collapsibles['design_detail']) { toggle.classList.add('open'); }
+  }, 0);
+}
+
+function renderDesignFields() {
+  let h = '';
+  h += '<div class="section-label" style="margin-top:12px;">디자인 톤 (복수 선택)</div><div class="options grid-3">';
+  DESIGN_TONES.forEach(t => {
+    const sel = fd.designTone.includes(t);
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="tog(fd.designTone,'${t}');render(true)" style="border-radius:16px;padding:12px 14px;font-size:13px;">${t}</div>`;
+  });
+  h += '</div>';
+
+  // References
+  h += '<div class="section-label" style="margin-top:20px;">레퍼런스</div>';
+  const maxRefs = mode === 'expert' ? 3 : Math.max(1, fd.references.length);
+  for (let i = 0; i < fd.references.length; i++) {
+    const ref = fd.references[i];
+    h += `<div class="ref-slot">
+      <input class="text-input" style="margin-bottom:0;flex:2;" placeholder="URL (예: https://example.com)" value="${x(ref.url)}" oninput="fd.references[${i}].url=this.value">
+      <select class="text-input" style="margin-bottom:0;flex:0 0 110px;padding:8px;" onchange="fd.references[${i}].purpose=this.value">
+        <option value="both" ${ref.purpose==='both'?'selected':''}>디자인+기능</option>
+        <option value="design" ${ref.purpose==='design'?'selected':''}>디자인 참고</option>
+        <option value="feature" ${ref.purpose==='feature'?'selected':''}>기능 참고</option>
+        <option value="competitor" ${ref.purpose==='competitor'?'selected':''}>경쟁사</option>
+      </select>
+      <input class="text-input" style="margin-bottom:0;max-width:160px;" placeholder="메모 (선택)" value="${x(ref.reason)}" oninput="fd.references[${i}].reason=this.value">
+    </div>`;
+  }
+  const canAddRef = mode === 'expert' ? fd.references.length < 3 : fd.references.length < 3;
+  if (canAddRef) {
+    h += `<div style="margin-top:4px;"><span style="font-size:13px;color:var(--accent);cursor:pointer;font-weight:600;" onclick="addRef()">+ 레퍼런스 추가</span></div>`;
+  }
+
+  // Color preference
+  h += '<div class="section-label" style="margin-top:20px;">색상 선호</div><div class="options grid-2">';
+  COLOR_PREFS.forEach(c => {
+    h += `<div class="opt-btn ${fd.colorPreference===c?'selected':''}" onclick="fd.colorPreference='${c}';render(true)" style="border-radius:16px;padding:12px 14px;font-size:13px;">${c}</div>`;
+  });
+  h += '</div>';
+
+  // Collapsible: detailed design settings
+  h += collapsibleHTML('design_detail', '자세히 설정');
+  h += '<div class="section-label" style="margin-top:8px;">주요 화면 (선택)</div>';
+  h += `<textarea class="text-input" rows="2" placeholder="예: 대시보드, 로그인, 데이터 입력 화면, 리포트 등" oninput="fd.keyScreens=this.value">${x(fd.keyScreens)}</textarea>`;
+  h += '<div class="section-label" style="margin-top:8px;">브랜드 가이드</div>';
+  h += `<textarea class="text-input" rows="2" placeholder="브랜드 컬러, 폰트, 로고 가이드라인 등" oninput="fd.brandGuide=this.value">${x(fd.brandGuide)}</textarea>`;
+  if (mode === 'expert') {
+    h += '<div class="section-label" style="margin-top:8px;">브랜드 가이드 보유 여부</div><div class="options grid-2">';
+    ['있음','없음'].forEach(v => {
+      h += `<div class="opt-btn ${fd.hasBrandGuide===v?'selected':''}" onclick="fd.hasBrandGuide='${v}';render(true)" style="border-radius:16px;padding:10px 14px;font-size:13px;">${v}</div>`;
+    });
+    h += '</div>';
+  }
+  h += '</div>'; // close collapsible body
+
+  return h;
+}
+
+function addRef() {
+  if (fd.references.length < 3) {
+    fd.references.push({url:'',purpose:'both',reason:''});
+    render(true);
+  }
+}
+
+// ============================================================
+// BUDGET (shared)
+// ============================================================
+const BUDGET_OPTS = [
+  {v:'3천만원 미만',d:'소규모 PoC / 실험'},
+  {v:'3천만~1억원',d:'파일럿 프로젝트'},
+  {v:'1억~3억원',d:'중규모 구축'},
+  {v:'3억~10억원',d:'본격 엔터프라이즈'},
+  {v:'10억원 이상',d:'대규모 플랫폼'},
+  {v:'미정 / 협의',d:'별도 논의 필요'},
+];
+const MAINT_OPTS = ['없음 (일회성)','월 100만원 미만','월 100~300만원','월 300~1000만원','월 1000만원 이상','미정'];
+function rBudget(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">예산과 일정을<br>알려주세요</div><div class="question-sub">개발 예산, 운영 비용, 일정을 설정합니다</div>`;
+
+  h += '<div class="section-label">개발 예산 범위 *</div><div class="options">';
+  BUDGET_OPTS.forEach(b => {
+    const sel=fd.budget===b.v;
+    h += `<div class="opt-btn ${sel?'selected':''}" onclick="fd.budget='${b.v}';render(true)" style="text-align:left;padding:16px 24px;border-radius:16px;">
+      <span style="font-weight:600;">${b.v}</span>
+      <span style="display:block;font-size:12px;${sel?'color:rgba(255,255,255,0.6)':'color:var(--text-dim)'};margin-top:4px;">${b.d}</span>
+    </div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">운영·유지보수 예산 (월)</div><div class="options grid-2">';
+  MAINT_OPTS.forEach(m => {
+    h += `<div class="opt-btn ${fd.maintenanceBudget===m?'selected':''}" onclick="fd.maintenanceBudget='${m}';render(true)" style="border-radius:16px;padding:12px 14px;font-size:13px;">${m}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">시작 희망일</div>';
+  h += datePicker('startDate');
+  h += '<div class="section-label" style="margin-top:16px;">완료 희망일</div>';
+  h += datePicker('endDate');
+
+  h += '<div class="section-label" style="margin-top:24px;">일정 조율 가능 여부 *</div><div class="options grid-2">';
+  ['가능','불가 (고정 일정)'].forEach(v => {
+    h += `<div class="opt-btn ${fd.flexSchedule===v?'selected':''}" onclick="fd.flexSchedule='${v}';chk();render(true)" style="border-radius:16px;padding:14px 16px;font-size:14px;">${v}</div>`;
+  });
+  h += '</div>';
+
+  h += '<div class="section-label" style="margin-top:24px;">우선순위</div><div class="options grid-2">';
+  ['일정 (빠른 출시)','예산 (비용 절감)','품질 (완성도 우선)','균형 (맡기겠음)'].forEach(p => {
+    h += `<div class="opt-btn ${fd.priority===p?'selected':''}" onclick="fd.priority='${p}';render(true)" style="border-radius:16px;padding:12px 14px;font-size:13px;">${p}</div>`;
+  });
+  h += '</div>';
+
+  el.innerHTML = h;
+}
+
+function datePicker(key) {
+  const d = fd[key];
+  const years=['2025','2026','2027','2028'];
+  const months=Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0'));
+  const periods=['월초','월중','월말'];
+  return `<div class="date-row">
+    <div><label>년</label><select onchange="fd.${key}.year=this.value">${years.map(y=>`<option ${d.year===y?'selected':''}>${y}</option>`).join('')}</select></div>
+    <div><label>월</label><select onchange="fd.${key}.month=this.value">${months.map(m=>`<option ${d.month===m?'selected':''}>${m}</option>`).join('')}</select></div>
+    <div><label>시기</label><select onchange="fd.${key}.period=this.value">${periods.map(p=>`<option ${d.period===p?'selected':''}>${p}</option>`).join('')}</select></div>
+  </div>`;
+}
+
+// ============================================================
+// CONTACT (shared)
+// ============================================================
+const INDUSTRIES = ['제조','금융','유통/물류','의료','공공','IT','건설','기타'];
+function rContact(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">담당자 정보를<br>알려주세요</div><div class="question-sub">접수 확인 및 상담 연락에 사용됩니다</div>`;
+  h += `<input class="text-input" placeholder="담당자 이름 *" value="${x(fd.contactName)}" oninput="fd.contactName=this.value;chk()">`;
+  h += `<input class="text-input" placeholder="회사명 *" value="${x(fd.contactCompany)}" oninput="fd.contactCompany=this.value;chk()">`;
+  h += `<input class="text-input" placeholder="이메일 *" type="email" value="${x(fd.contactEmail)}" oninput="fd.contactEmail=this.value;chk()">`;
+  h += `<input class="text-input" placeholder="연락처 (010-0000-0000)" value="${x(fd.contactPhone)}" oninput="fd.contactPhone=fmtPhone(this.value);this.value=fd.contactPhone" maxlength="13">`;
+  h += `<input class="text-input" placeholder="직함·직책 (선택)" value="${x(fd.contactTitle)}" oninput="fd.contactTitle=this.value">`;
+  if (mode === 'expert') {
+    h += `<input class="text-input" placeholder="부서 (선택)" value="${x(fd.contactDept)}" oninput="fd.contactDept=this.value">`;
+  }
+  h += '<div class="section-label" style="margin-top:8px;">업종</div><div class="options grid-2">';
+  INDUSTRIES.forEach(ind => {
+    h += `<div class="opt-btn ${fd.contactIndustry===ind?'selected':''}" onclick="fd.contactIndustry='${ind}';render(true)" style="border-radius:16px;padding:12px 14px;font-size:13px;">${ind}</div>`;
+  });
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+// ============================================================
+// CONFIRM (shared)
+// ============================================================
+function rConfirm(el) {
+  let h = `<div class="step-indicator">${getStepNum()}</div>`;
+  h += `<div class="question">내용을<br>확인해주세요</div><div class="question-sub">제출 전 입력하신 내용을 검토해주세요</div>`;
+
+  const sections = [
+    { title:'프로젝트', rows:[
+      ['프로젝트명', fd.projectName],
+      ['한 줄 요약', fd.projectSummary],
+      ...(fd.projectDesc?[['상세 설명', fd.projectDesc.slice(0,80)+(fd.projectDesc.length>80?'...':'')]]: []),
+      ...(fd.projectPurpose?[['프로젝트 목적', fd.projectPurpose]]: []),
+    ]},
+  ];
+
+  // 서비스 유형 (공통)
+  if (fd.serviceType.length) {
+    sections.push({title:'서비스 유형', rows:[
+      ['플랫폼', fd.serviceType.map(v=>{const t=SERVICE_TYPES.find(s=>s.v===v);return t?t.l:v;}).join(', ')],
+    ]});
+  }
+
+  if (mode==='expert') {
+    sections.push({title:'범위 · 분야', rows:[
+      ['업무 범위', fd.scope.map(v=>{const s=SCOPES.find(sc=>sc.v===v);return s?s.l:v;}).join(', ')||'--'],
+      ['AI 분야', fd.projectTypes.join(', ')||'--'],
+      ...(fd.targetUsers.length?[['사용자', fd.targetUsers.join(', ')]]: []),
+      ...(fd.deployType.length?[['배포 형태', fd.deployType.join(', ')]]: []),
+      ...(fd.expectedKpi?[['기대 KPI', fd.expectedKpi.slice(0,60)]]: []),
+    ]});
+    if (fd.features.length) {
+      sections.push({title:'기능 상세', rows:[
+        ['선택 기능', fd.features.join(', ')],
+        ...(fd.userScenarios.filter(s=>s.trim()).length?[['사용 시나리오', fd.userScenarios.filter(s=>s.trim()).join(' / ')]]: []),
+      ]});
+    }
+    sections.push({title:'기술 환경', rows:[
+      ['인프라', fd.infraEnv.join(', ')||'미정'],
+      ...(fd.mlFrameworks.length?[['ML 프레임워크', fd.mlFrameworks.join(', ')]]: []),
+      ...(fd.mlopsTools.length?[['MLOps', fd.mlopsTools.join(', ')]]: []),
+      ...(fd.securityReqs.length?[['보안 요건', fd.securityReqs.join(', ')]]: []),
+      ...(fd.integrations?[['연동 시스템', fd.integrations]]: []),
+    ]});
+  } else {
+    // Guided mode summary
+    const ynMap = {yes:'Yes', no:'No'};
+    sections.push({title:'문제 정의', rows:[
+      ...(fd.needAI?[['AI/자동화 필요', ynMap[fd.needAI]||'--']]: []),
+      ...(fd.needPrediction?[['데이터 분석/예측', ynMap[fd.needPrediction]||'--']]: []),
+      ...(fd.needIntegration?[['시스템 연동', ynMap[fd.needIntegration]||'--']]: []),
+      ...(fd.needRealtime?[['실시간 처리', ynMap[fd.needRealtime]||'--']]: []),
+      ...(fd.needCustomModel?[['커스텀 모델', ynMap[fd.needCustomModel]||'--']]: []),
+      ...(fd.scope.length?[['업무 범위', fd.scope.map(v=>{const s=SCOPES.find(sc=>sc.v===v);return s?s.l:v;}).join(', ')]]: []),
+    ]});
+    sections.push({title:'데이터·환경', rows:[
+      ...(fd.aiExperience?[['AI 경험', fd.aiExperience]]: []),
+      ...(fd.hasExistingDocs?[['자료 보유', fd.hasExistingDocs]]: []),
+      ...(fd.dataTypes.length?[['데이터 유형', fd.dataTypes.join(', ')]]: []),
+      ...(fd.dataReadiness?[['준비도', fd.dataReadiness]]: []),
+      ...(fd.dataVolume?[['규모', fd.dataVolume]]: []),
+      ...(uploadedFiles.length?[['첨부 파일', uploadedFiles.map(f=>f.name).join(', ')]]: []),
+    ]});
+  }
+
+  // Design
+  const designRows = [];
+  if (fd.designTone.length) designRows.push(['디자인 톤', fd.designTone.join(', ')]);
+  if (fd.colorPreference) designRows.push(['색상', fd.colorPreference]);
+  const validRefs = fd.references.filter(r=>r.url.trim());
+  if (validRefs.length) designRows.push(['레퍼런스', validRefs.map(r=>r.url).join(', ')]);
+  if (fd.keyScreens) designRows.push(['주요 화면', fd.keyScreens.slice(0,60)]);
+  if (designRows.length) {
+    sections.push({title:'디자인', rows: designRows});
+  }
+
+  sections.push({title:'예산 · 일정', rows:[
+    ['예산', fd.budget||'--'],
+    ...(fd.maintenanceBudget?[['운영 예산', fd.maintenanceBudget]]: []),
+    ['시작', fd.startDate.year+'.'+fd.startDate.month+' '+fd.startDate.period],
+    ['완료', fd.endDate.year+'.'+fd.endDate.month+' '+fd.endDate.period],
+    ['일정 조율', fd.flexSchedule||'--'],
+    ...(fd.priority?[['우선순위', fd.priority]]: []),
+  ]});
+  sections.push({title:'담당자', rows:[
+    ['이름', fd.contactName],
+    ['회사', fd.contactCompany],
+    ...(fd.contactIndustry?[['업종', fd.contactIndustry]]: []),
+    ['이메일', fd.contactEmail],
+    ...(fd.contactPhone?[['연락처', fd.contactPhone]]: []),
+    ...(fd.contactTitle?[['직함', fd.contactTitle]]: []),
+    ...(fd.contactDept?[['부서', fd.contactDept]]: []),
+  ]});
+
+  sections.forEach(s => {
+    h += `<div class="summary-card"><h3>${s.title}</h3>`;
+    s.rows.forEach(([k,v]) => {
+      h += `<div class="summary-row"><span class="summary-label">${k}</span><span class="summary-value">${x(v)}</span></div>`;
+    });
+    h += '</div>';
+  });
+
+  // Additional desc
+  h += '<div class="section-label" style="margin-top:16px;">추가 요청사항 (선택)</div>';
+  h += `<textarea class="text-input" rows="2" placeholder="기타 요청, 미팅 희망 일정, 보안 요건 등" oninput="fd.additionalDesc=this.value">${x(fd.additionalDesc)}</textarea>`;
+
+  h += `<div class="summary-card" style="margin-top:12px;">
+    <div class="check-row">
+      <input type="checkbox" id="agree" ${fd.agreePrivacy?'checked':''} onchange="fd.agreePrivacy=this.checked;chk()">
+      <label for="agree" style="cursor:pointer;font-size:14px;">수집된 정보는 프로젝트 상담 목적으로만 사용되며 제3자에게 제공되지 않습니다.</label>
+    </div>
+  </div>`;
+
+  el.innerHTML = h;
+}
+
+// ============================================================
+// SUBMIT
+// ============================================================
+async function submit() {
+  const btn = document.getElementById('btnNext');
+  btn.disabled = true;
+  btn.textContent = '제출 중...';
+
+  const subTypes = Object.entries(fd.projectSubTypes).map(([k,v])=>k+': '+v.join(', ')).join(' | ');
+  const validRefs = fd.references.filter(r=>r.url.trim());
+
+  try {
+    const res = await fetch('/api/v1/intake/public', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contact_name: fd.contactName,
+        contact_role: fd.contactTitle,
+        contact_email: fd.contactEmail,
+        contact_phone: fd.contactPhone,
+        contact_dept: fd.contactDept,
+        company_name: fd.contactCompany,
+        industry: fd.contactIndustry,
+        project_name: fd.projectName,
+        project_summary: fd.projectSummary,
+        project_purpose: fd.projectPurpose,
+        problem_desc: fd.projectDesc,
+        mode: fd.mode,
+        service_type: fd.serviceType,
+        scope: fd.scope,
+        project_types: fd.projectTypes,
+        project_subtypes: subTypes,
+        // guided yes/no
+        need_ai: fd.needAI,
+        need_prediction: fd.needPrediction,
+        need_integration: fd.needIntegration,
+        need_realtime: fd.needRealtime,
+        need_custom_model: fd.needCustomModel,
+        ai_experience: fd.aiExperience,
+        has_existing_docs: fd.hasExistingDocs,
+        // expert
+        target_users: fd.targetUsers,
+        deploy_type: fd.deployType,
+        use_cases: fd.useCases,
+        expected_kpi: fd.expectedKpi,
+        features: fd.features,
+        user_scenarios: fd.userScenarios.filter(s=>s.trim()),
+        features_extra: fd.featuresExtra,
+        ml_frameworks: fd.mlFrameworks,
+        data_tools: fd.dataTools,
+        mlops_tools: fd.mlopsTools,
+        infra_env: fd.infraEnv,
+        security_reqs: fd.securityReqs,
+        integrations: fd.integrations,
+        tech_notes: fd.techNotes,
+        // design
+        design_tone: fd.designTone,
+        references: validRefs,
+        color_preference: fd.colorPreference,
+        key_screens: fd.keyScreens,
+        brand_guide: fd.brandGuide,
+        has_brand_guide: fd.hasBrandGuide,
+        // data
+        data_types: fd.dataTypes,
+        data_readiness: fd.dataReadiness,
+        data_volume: fd.dataVolume,
+        // budget
+        budget_range: fd.budget,
+        maintenance_budget: fd.maintenanceBudget,
+        start_date: fd.startDate.year+'.'+fd.startDate.month+' '+fd.startDate.period,
+        end_date: fd.endDate.year+'.'+fd.endDate.month+' '+fd.endDate.period,
+        flex_schedule: fd.flexSchedule,
+        priority: fd.priority,
+        additional_notes: fd.additionalDesc,
+        uploaded_files: uploadedFiles.map(f=>f.name),
+      }),
+    });
+    if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e.detail||'서버 오류'); }
+    const data = await res.json();
+    showDone(data.id);
+  } catch(err) {
+    alert(err.message);
+    btn.disabled = false;
+    btn.textContent = '제출하기';
+  }
+}
+
+function showDone(id) {
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('nav').style.display = 'none';
+  const app = document.getElementById('app');
+  app.style.animation = 'none'; void app.offsetHeight; app.style.animation = 'fadeIn 0.4s ease';
+  const ref = id ? id.slice(0,8).toUpperCase() : '--';
+  app.innerHTML = `<div class="done-screen">
+    <div class="done-icon">✅</div>
+    <div class="done-title">접수가 완료됐습니다</div>
+    <div class="done-desc">담당 컨설턴트가 1-2 영업일 내 연락 드리겠습니다.<br>제출하신 이메일로 확인 메일이 발송됩니다.</div>
+    <div class="done-ref">접수 번호: ${ref}</div>
+    <div style="margin-top:32px;">
+      <button class="opt-btn" style="padding:14px 36px;font-size:15px;border-radius:60px;" onclick="location.reload()">새 접수 신청</button>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// FILE UPLOAD
+// ============================================================
+function renderFileUpload() {
+  let h = `<div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+    <div class="file-drop-text"><strong>파일을 드래그하거나 클릭</strong>하여 업로드<br><span style="font-size:12px;">PDF, Excel, 이미지 등</span></div>
+  </div>`;
+  if (uploadedFiles.length) {
+    h += '<div class="file-list">';
+    uploadedFiles.forEach((f, i) => {
+      h += `<div class="file-item"><span>${x(f.name)} <span style="color:var(--text-dim);font-size:11px;">(${fmtSize(f.size)})</span></span><span class="file-item-remove" onclick="removeFile(${i})">✕</span></div>`;
+    });
+    h += '</div>';
+  }
+  return h;
+}
+
+function initDropZone() {
+  const drop = document.getElementById('fileDrop');
+  if (!drop) return;
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', () => { drop.classList.remove('dragover'); });
+  drop.addEventListener('drop', e => {
+    e.preventDefault();
+    drop.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+}
+
+function handleFiles(fileList) {
+  for (let i = 0; i < fileList.length; i++) {
+    uploadedFiles.push(fileList[i]);
+  }
+  render(true);
+}
+
+function removeFile(idx) {
+  uploadedFiles.splice(idx, 1);
+  render(true);
+}
+
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + 'KB';
+  return (bytes/1048576).toFixed(1) + 'MB';
+}
+
+// ============================================================
+// PHONE FORMATTING
+// ============================================================
+function fmtPhone(val) {
+  const nums = val.replace(/\D/g, '').slice(0, 11);
+  if (nums.length <= 3) return nums;
+  if (nums.length <= 7) return nums.slice(0,3) + '-' + nums.slice(3);
+  return nums.slice(0,3) + '-' + nums.slice(3,7) + '-' + nums.slice(7);
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function tog(arr, val) {
+  const i=arr.indexOf(val);
+  if(i>=0) arr.splice(i,1); else arr.push(val);
+  render(true);
+}
+function x(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+render();
+</script>
+</body>
+</html>

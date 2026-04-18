@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/validators/plugins/semantic_structural.py
+# hypothesis_version: 6.141.1
+
+['"\' ', '(no-id)', '.', '<section', '=', '[]', 'class_contains', 'explicit', 'forbidden_elements', 'heading_contains', 'id_prefix', 'key', 'match_by', 'required_elements', 'semantic_structural', '|']

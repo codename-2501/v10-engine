@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/ai/model_router.py
+# hypothesis_version: 6.141.1
+
+['BUILD', 'DEFINE', 'DELIVER', 'DESIGN', 'VERIFY', 'ai_code', 'auto', 'claude-', 'claude-haiku', 'claude-opus', 'claude-opus-4-6', 'claude-sonnet', 'claude-sonnet-4-6', 'design', 'document', 'fallback_sonnet', 'haiku', 'json', 'max_tokens', 'model_preference', 'opus', 'phase', 'phase_bias', 'programmatic', 'qa', 'retry', 'retry_escalation', 'rule', 'sonnet', 'spec', 'spec_pref', 'spec_preference', 'truncation', 'truncation_history', 'type', 'type_default', 'verification', '절단']

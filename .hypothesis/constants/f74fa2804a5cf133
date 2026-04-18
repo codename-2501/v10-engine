@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/qa/self_consistency.py
+# hypothesis_version: 6.141.1
+
+[0.0, 1.0, 100, 'FAIL', 'PASS', '\\bFAIL\\b', '\\bPASS\\b', 'content', 'name', 'pass', 'raw', 'response', 'score', 'self_consistency_n']

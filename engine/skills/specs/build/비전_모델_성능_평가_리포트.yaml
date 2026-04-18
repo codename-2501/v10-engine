@@ -1,0 +1,51 @@
+name: "비전 모델 성능 평가 리포트"
+phase: BUILD
+type: document
+model_preference: opus
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **mAP/IoU** — 주요 평가 메트릭(mAP@0.5, mAP@0.5:0.95, IoU, Precision, Recall) 결과를 클래스별 테이블(클래스/mAP/IoU/Precision/Recall)로 정리. 전체 평균 포함.
+  2. **혼동 행렬** — 클래스별 혼동 행렬, 오분류 패턴 분석, 클래스 간 혼동 빈도 상위 케이스 서술.
+  3. **시각화** — 탐지/분류 결과 시각화 예시 설명, 정탐/오탐/미탐 사례별 분석, 신뢰도 분포 서술.
+  4. **실패 케이스 분석** — 주요 실패 유형(오탐/미탐/오분류), 원인 분석, 실패 샘플 특성을 테이블(유형/빈도/원인/대응방안)로 정리. 환경 조건별(조명/각도/가림) 분석 포함.
+
+  ### 품질 기준
+  - mAP/IoU 결과가 클래스별로 상세 분석
+  - 실패 케이스에 구체적 원인과 대응 방안 포함
+  - 환경 조건별 성능 차이 분석 포함
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 4개 필수 섹션 모두 작성 완료
+  □ 테이블 2개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ 클래스별 mAP/IoU 수치 존재
+  □ 실패 케이스 대응 방안 명시
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":4,"tables":2,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "mAP/IoU"
+      - "혼동 행렬"
+      - "시각화"
+      - "실패 케이스 분석"
+    required_tables: 2
+    min_chars: 2500
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "mAP/IoU 결과가 클래스별로 상세 분석되어 있는지 검증"
+    - "실패 케이스에 구체적 원인과 대응 방안이 포함되어 있는지 검증"
+    - "환경 조건별 성능 차이 분석이 포함되어 있는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

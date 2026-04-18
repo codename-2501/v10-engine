@@ -1,0 +1,842 @@
+{% extends "base.html" %}
+{% block title %}인테이크 접수 — AX FACTORY{% endblock %}
+{% block page_title %}인테이크 접수{% endblock %}
+
+{% block head_extra %}
+<style>
+  .step-indicator {
+    display: flex; align-items: center; margin-bottom: 2rem; gap: 0;
+  }
+  .step-item {
+    display: flex; flex-direction: column; align-items: center;
+    flex: 1; position: relative;
+  }
+  .step-item:not(:last-child)::after {
+    content: ''; position: absolute; top: 16px; left: 50%;
+    width: 100%; height: 2px; background: var(--border); z-index: 0;
+  }
+  .step-item.completed:not(:last-child)::after { background: var(--success); }
+  .step-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 2px solid var(--border); background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700; z-index: 1; position: relative;
+    color: var(--text-muted); transition: all 0.2s;
+  }
+  .step-item.active .step-circle { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .step-item.completed .step-circle { border-color: var(--success); background: var(--success); color: #fff; }
+  .step-label { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.4rem; text-align: center; white-space: nowrap; }
+  .step-item.active .step-label { color: var(--accent); font-weight: 600; }
+  .step-item.completed .step-label { color: var(--success); }
+
+  .form-group { margin-bottom: 1.25rem; }
+  .form-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; }
+  .form-label .required { color: var(--danger); margin-left: 2px; }
+  .form-input, .form-select, .form-textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); padding: 0.5rem 0.75rem;
+    font-size: 0.875rem; font-family: inherit; transition: border-color 0.15s; outline: none;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-select { appearance: none; cursor: pointer; }
+
+  /* Chip checkboxes */
+  .chip-group { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .chip-label { display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+  .chip-label input[type="checkbox"] { display: none; }
+  .chip-label span {
+    display: inline-block; padding: 0.3rem 0.7rem; border-radius: 20px;
+    border: 1px solid var(--border); font-size: 0.78rem;
+    color: var(--text-muted); background: var(--surface); transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .chip-label input[type="checkbox"]:checked + span {
+    background: var(--accent-border); border-color: var(--accent); color: var(--accent); font-weight: 600;
+  }
+
+  /* Radio chips */
+  .radio-group { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .radio-label { display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+  .radio-label input[type="radio"] { display: none; }
+  .radio-label span {
+    display: inline-block; padding: 0.3rem 0.7rem; border-radius: 20px;
+    border: 1px solid var(--border); font-size: 0.78rem;
+    color: var(--text-muted); background: var(--surface); transition: all 0.15s;
+  }
+  .radio-label input[type="radio"]:checked + span {
+    background: var(--accent-border); border-color: var(--accent); color: var(--accent); font-weight: 600;
+  }
+
+  /* Sub-options */
+  .sub-options {
+    display: none; margin-top: 0.5rem; padding: 0.6rem 0.75rem;
+    background: var(--accent-glow); border-radius: 6px; border: 1px solid var(--accent-border);
+  }
+  .sub-options.visible { display: block; }
+  .sub-options .chip-group { margin-top: 0.25rem; }
+
+  /* Step panels */
+  .step-panel { display: none; }
+  .step-panel.active { display: block; }
+
+  /* Nav buttons */
+  .form-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+  /* Review table */
+  .review-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+  .review-table td { padding: 0.45rem 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .review-table td:first-child { color: var(--text-muted); width: 35%; padding-right: 1rem; }
+  .review-table td:last-child { color: var(--text); }
+
+  /* Section header within panel */
+  .section-header {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-muted); margin: 1.25rem 0 0.6rem;
+    padding-bottom: 0.35rem; border-bottom: 1px solid var(--border);
+  }
+  .section-header:first-child { margin-top: 0; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;padding:.65rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-width:860px;margin:0 auto 1rem;">
+  <span style="font-size:.82rem;color:var(--text-muted);flex:1;">고객에게 직접 접수 링크를 공유할 수 있습니다.</span>
+  <a href="/intake/new" target="_blank" class="btn btn-primary" style="text-decoration:none;font-size:.78rem;white-space:nowrap;">🔗 고객 접수 폼 열기</a>
+  <button onclick="navigator.clipboard.writeText(location.origin+'/intake/new').then(()=>this.textContent='복사됨!').catch(()=>{})" class="btn" style="font-size:.78rem;white-space:nowrap;">링크 복사</button>
+</div>
+<div class="card" style="max-width:860px;margin:0 auto;">
+
+  <!-- Step indicator -->
+  <div class="step-indicator" id="stepIndicator"></div>
+
+  <!-- Step 1: 프로젝트 개요 -->
+  <div class="step-panel active" id="panel-1">
+    <div class="section-header">프로젝트 개요</div>
+    <div class="form-group">
+      <label class="form-label">프로젝트명 <span class="required">*</span></label>
+      <input class="form-input" id="projectName" placeholder="예: 제조 공정 불량 예측 AI 시스템">
+    </div>
+    <div class="form-group">
+      <label class="form-label">한 줄 요약 <span class="required">*</span></label>
+      <input class="form-input" id="projectSummary" placeholder="예: 비전 AI 기반 실시간 불량 감지 및 예측 모델 개발">
+    </div>
+    <div class="form-group">
+      <label class="form-label">프로젝트 배경 및 목적</label>
+      <textarea class="form-textarea" id="projectDesc" placeholder="현재 겪고 있는 문제, 도입 배경, 기대 효과 등을 자유롭게 기술해주세요." style="min-height:100px"></textarea>
+    </div>
+    <div class="section-header">AI SI 서비스 범위 <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(복수 선택 가능)</span></div>
+    <div class="form-group">
+      <div class="chip-group" id="scopeGroup">
+        <label class="chip-label"><input type="checkbox" name="scope" value="ai_model"><span>AI 모델 개발</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="mlops"><span>MLOps 구축</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="data_pipeline"><span>데이터 파이프라인</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="llm"><span>LLM 적용</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="si"><span>시스템 통합(SI)</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="vision"><span>비전·영상 분석</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="prediction"><span>예측·이상감지</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="chatbot"><span>챗봇·자동화</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="consulting"><span>컨설팅·PoC</span></label>
+        <label class="chip-label"><input type="checkbox" name="scope" value="public"><span>관공서·공공</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: 프로젝트 유형 & 세부사항 -->
+  <div class="step-panel" id="panel-2">
+    <div class="section-header">프로젝트 유형 <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(해당하는 항목 선택)</span></div>
+
+    <!-- AI 모델 개발 -->
+    <div class="form-group">
+      <label class="chip-label" style="margin-bottom:0.4rem;">
+        <input type="checkbox" id="type-ai" onchange="toggleSub('sub-ai',this.checked)">
+        <span style="font-weight:600">AI 모델 개발</span>
+      </label>
+      <div class="sub-options" id="sub-ai">
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:0.3rem;">세부 유형</div>
+        <div class="chip-group">
+          <label class="chip-label"><input type="checkbox" name="type_ai_sub" value="classification"><span>분류</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_ai_sub" value="regression"><span>회귀·예측</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_ai_sub" value="anomaly"><span>이상감지</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_ai_sub" value="nlp"><span>자연어처리</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_ai_sub" value="cv"><span>컴퓨터비전</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_ai_sub" value="recommendation"><span>추천시스템</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_ai_sub" value="generative"><span>생성형 AI</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_ai_sub" value="rl"><span>강화학습</span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- MLOps -->
+    <div class="form-group">
+      <label class="chip-label" style="margin-bottom:0.4rem;">
+        <input type="checkbox" id="type-mlops" onchange="toggleSub('sub-mlops',this.checked)">
+        <span style="font-weight:600">MLOps 구축</span>
+      </label>
+      <div class="sub-options" id="sub-mlops">
+        <div class="chip-group">
+          <label class="chip-label"><input type="checkbox" name="type_mlops_sub" value="pipeline"><span>학습 파이프라인</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_mlops_sub" value="serving"><span>모델 서빙</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_mlops_sub" value="monitoring"><span>모델 모니터링</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_mlops_sub" value="ci_cd"><span>CI/CD 자동화</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_mlops_sub" value="experiment"><span>실험 관리</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_mlops_sub" value="feature_store"><span>Feature Store</span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- LLM -->
+    <div class="form-group">
+      <label class="chip-label" style="margin-bottom:0.4rem;">
+        <input type="checkbox" id="type-llm" onchange="toggleSub('sub-llm',this.checked)">
+        <span style="font-weight:600">LLM 적용</span>
+      </label>
+      <div class="sub-options" id="sub-llm">
+        <div class="chip-group">
+          <label class="chip-label"><input type="checkbox" name="type_llm_sub" value="rag"><span>RAG 시스템</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_llm_sub" value="finetuning"><span>파인튜닝</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_llm_sub" value="agent"><span>AI Agent</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_llm_sub" value="chatbot"><span>챗봇 구축</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_llm_sub" value="summarize"><span>문서 요약·분석</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_llm_sub" value="code_gen"><span>코드 생성</span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 비전 -->
+    <div class="form-group">
+      <label class="chip-label" style="margin-bottom:0.4rem;">
+        <input type="checkbox" id="type-vision" onchange="toggleSub('sub-vision',this.checked)">
+        <span style="font-weight:600">비전·영상 분석</span>
+      </label>
+      <div class="sub-options" id="sub-vision">
+        <div class="chip-group">
+          <label class="chip-label"><input type="checkbox" name="type_vision_sub" value="defect"><span>불량·결함 검출</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_vision_sub" value="object"><span>객체 인식·추적</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_vision_sub" value="ocr"><span>OCR·문서 인식</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_vision_sub" value="segmentation"><span>세그멘테이션</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_vision_sub" value="3d"><span>3D 재구성·포인트클라우드</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_vision_sub" value="face"><span>얼굴인식·감정분석</span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 예측·이상감지 -->
+    <div class="form-group">
+      <label class="chip-label" style="margin-bottom:0.4rem;">
+        <input type="checkbox" id="type-pred" onchange="toggleSub('sub-pred',this.checked)">
+        <span style="font-weight:600">예측·이상감지</span>
+      </label>
+      <div class="sub-options" id="sub-pred">
+        <div class="chip-group">
+          <label class="chip-label"><input type="checkbox" name="type_pred_sub" value="demand"><span>수요 예측</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_pred_sub" value="failure"><span>설비 고장 예측</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_pred_sub" value="fraud"><span>이상거래 탐지</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_pred_sub" value="quality"><span>품질 예측</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_pred_sub" value="churn"><span>이탈 예측</span></label>
+          <label class="chip-label"><input type="checkbox" name="type_pred_sub" value="log"><span>로그 이상감지</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header">핵심 기능 및 현행 프로세스</div>
+    <div class="form-group">
+      <label class="form-label">핵심 기능 목록 <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(구체적으로 만들고 싶은 기능)</span></label>
+      <textarea class="form-textarea" id="coreFeatures" placeholder="예:&#10;1. 고객 회원가입/로그인 (소셜 로그인 포함)&#10;2. 서비스 신청 폼 (방문요양/주간보호/돌봄 선택)&#10;3. 실시간 방문 일정 캘린더&#10;4. 돌봄 일지 열람 (사진/메모)&#10;5. AI 챗봇 상담 (FAQ + 긴급 호출)&#10;6. 관리자 인력 배정 대시보드&#10;&#10;가능한 구체적으로, 많이 적어주세요." style="min-height:140px"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">현행 업무 프로세스 (AS-IS) <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(지금 어떻게 일하고 계신지)</span></label>
+      <textarea class="form-textarea" id="currentProcess" placeholder="예:&#10;- 고객 접수: 전화 → 상담원이 엑셀에 수기 입력&#10;- 일정 관리: 화이트보드 + 카카오톡 공유&#10;- 돌봄 일지: 종이 양식 → 주 1회 팩스 제출&#10;- 급여 청구: 공단 사이트에 수동 입력 (월 3일 소요)&#10;&#10;현재 불편한 점, 비효율적인 부분을 자유롭게 적어주세요." style="min-height:120px"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">레퍼런스 / 벤치마크 <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(URL을 입력하면 AI가 자동 분석합니다)</span></label>
+      <div id="refList"></div>
+      <button type="button" class="btn" style="font-size:.75rem;margin-top:.4rem;" onclick="addRefRow()">+ 레퍼런스 추가</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">경쟁사 대비 차별화 포인트 <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(우리가 다른 점)</span></label>
+      <textarea class="form-textarea" id="competitors" placeholder="예:&#10;- 센터 운영 전체를 커버하는 올인원 (접수→배정→방문→일지→청구→정산)&#10;- 국민건강보험공단 API 직접 연동 + AI 챗봇 24시간 상담&#10;&#10;비워두셔도 됩니다."></textarea>
+    </div>
+
+    <div class="section-header">활용 사례 및 기대 KPI</div>
+    <div class="form-group">
+      <label class="form-label">주요 활용 사례</label>
+      <textarea class="form-textarea" id="useCases" placeholder="예: 생산 라인의 카메라 이미지로 표면 불량 실시간 검출, 정확도 98% 이상 목표"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">기대 KPI / 성능 목표 <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(현재값 → 목표값 형식 권장)</span></label>
+      <input class="form-input" id="expectedKpi" placeholder="예: 수기 접수 30분 → 앱 접수 3분, 일지 누락률 40% → 5% 미만, 챗봇 응답률 80%+">
+    </div>
+  </div>
+
+  <!-- Step 3: 대상 & 데이터 -->
+  <div class="step-panel" id="panel-3">
+    <div class="section-header">서비스 대상 & 배포 환경</div>
+    <div class="form-group">
+      <label class="form-label">서비스 대상 사용자</label>
+      <input class="form-input" id="targetUsers" placeholder="예: 제조 현장 작업자, 품질관리팀, 경영진 대시보드">
+    </div>
+    <div class="form-group">
+      <label class="form-label">배포 / 운영 환경</label>
+      <div class="chip-group" id="deployTypeGroup">
+        <label class="chip-label"><input type="checkbox" name="deployType" value="cloud"><span>퍼블릭 클라우드</span></label>
+        <label class="chip-label"><input type="checkbox" name="deployType" value="onprem"><span>온프레미스</span></label>
+        <label class="chip-label"><input type="checkbox" name="deployType" value="hybrid"><span>하이브리드</span></label>
+        <label class="chip-label"><input type="checkbox" name="deployType" value="edge"><span>엣지/임베디드</span></label>
+        <label class="chip-label"><input type="checkbox" name="deployType" value="saas"><span>SaaS</span></label>
+        <label class="chip-label"><input type="checkbox" name="deployType" value="mobile"><span>모바일</span></label>
+      </div>
+    </div>
+
+    <div class="section-header">데이터 현황</div>
+    <div class="grid-2" style="margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">데이터 보유 현황</label>
+        <select class="form-select" id="dataReadiness">
+          <option value="">선택</option>
+          <option value="none">없음 (수집부터 필요)</option>
+          <option value="partial">일부 있음 (추가 수집 필요)</option>
+          <option value="sufficient">충분히 있음</option>
+          <option value="labeled">레이블링된 데이터 있음</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">예상 데이터 규모</label>
+        <select class="form-select" id="dataVolume">
+          <option value="">선택</option>
+          <option value="small">소규모 (1GB 미만)</option>
+          <option value="medium">중규모 (1GB~1TB)</option>
+          <option value="large">대규모 (1TB 이상)</option>
+          <option value="realtime">실시간 스트리밍</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">데이터 유형 <span style="font-weight:400;font-size:0.7rem">(복수 선택)</span></label>
+      <div class="chip-group">
+        <label class="chip-label"><input type="checkbox" name="dataTypes" value="structured"><span>정형 (DB/CSV)</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTypes" value="image"><span>이미지/영상</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTypes" value="text"><span>텍스트/문서</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTypes" value="timeseries"><span>시계열/센서</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTypes" value="audio"><span>오디오</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTypes" value="log"><span>로그</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTypes" value="graph"><span>그래프/관계</span></label>
+      </div>
+    </div>
+
+    <div class="section-header">보안 & 컴플라이언스</div>
+    <div class="form-group">
+      <div class="chip-group">
+        <label class="chip-label"><input type="checkbox" name="securityReqs" value="no_cloud"><span>클라우드 사용 불가</span></label>
+        <label class="chip-label"><input type="checkbox" name="securityReqs" value="encryption"><span>데이터 암호화 필수</span></label>
+        <label class="chip-label"><input type="checkbox" name="securityReqs" value="audit"><span>감사 로그 필요</span></label>
+        <label class="chip-label"><input type="checkbox" name="securityReqs" value="isms"><span>ISMS 인증</span></label>
+        <label class="chip-label"><input type="checkbox" name="securityReqs" value="privacy"><span>개인정보보호</span></label>
+        <label class="chip-label"><input type="checkbox" name="securityReqs" value="iso27001"><span>ISO 27001</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: 기술 스택 -->
+  <div class="step-panel" id="panel-4">
+    <div class="section-header">ML / AI 프레임워크</div>
+    <div class="form-group">
+      <div class="chip-group">
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="pytorch"><span>PyTorch</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="tensorflow"><span>TensorFlow</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="sklearn"><span>scikit-learn</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="xgboost"><span>XGBoost / LightGBM</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="huggingface"><span>HuggingFace</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="langchain"><span>LangChain</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="openai"><span>OpenAI API</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="claude"><span>Claude API</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="jax"><span>JAX</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="onnx"><span>ONNX</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlFrameworks" value="undecided_ml"><span>미정</span></label>
+      </div>
+    </div>
+
+    <div class="section-header">MLOps 도구</div>
+    <div class="form-group">
+      <div class="chip-group">
+        <label class="chip-label"><input type="checkbox" name="mlopsTools" value="mlflow"><span>MLflow</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlopsTools" value="kubeflow"><span>Kubeflow</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlopsTools" value="sagemaker"><span>SageMaker</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlopsTools" value="vertex"><span>Vertex AI</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlopsTools" value="azureml"><span>Azure ML</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlopsTools" value="bentoml"><span>BentoML</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlopsTools" value="triton"><span>Triton Inference</span></label>
+        <label class="chip-label"><input type="checkbox" name="mlopsTools" value="undecided_mlops"><span>미정</span></label>
+      </div>
+    </div>
+
+    <div class="section-header">데이터 도구</div>
+    <div class="form-group">
+      <div class="chip-group">
+        <label class="chip-label"><input type="checkbox" name="dataTools" value="spark"><span>Spark</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTools" value="kafka"><span>Kafka</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTools" value="airflow"><span>Airflow</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTools" value="dbt"><span>dbt</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTools" value="databricks"><span>Databricks</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTools" value="snowflake"><span>Snowflake</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTools" value="flink"><span>Flink</span></label>
+        <label class="chip-label"><input type="checkbox" name="dataTools" value="undecided_data"><span>미정</span></label>
+      </div>
+    </div>
+
+    <div class="section-header">인프라 / 클라우드 환경</div>
+    <div class="form-group">
+      <div class="chip-group">
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="aws"><span>AWS</span></label>
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="gcp"><span>GCP</span></label>
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="azure"><span>Azure</span></label>
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="naver"><span>Naver Cloud</span></label>
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="kubernetes"><span>Kubernetes</span></label>
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="docker"><span>Docker</span></label>
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="baremetal"><span>베어메탈 서버</span></label>
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="gpu"><span>GPU 클러스터</span></label>
+        <label class="chip-label"><input type="checkbox" name="infraEnv" value="undecided_infra"><span>미정</span></label>
+      </div>
+    </div>
+
+    <div class="section-header">연동 대상 시스템</div>
+    <div class="form-group">
+      <div class="chip-group">
+        <label class="chip-label"><input type="checkbox" name="integrations" value="erp"><span>ERP (SAP 등)</span></label>
+        <label class="chip-label"><input type="checkbox" name="integrations" value="mes"><span>MES</span></label>
+        <label class="chip-label"><input type="checkbox" name="integrations" value="scada"><span>SCADA / PLC</span></label>
+        <label class="chip-label"><input type="checkbox" name="integrations" value="crm"><span>CRM</span></label>
+        <label class="chip-label"><input type="checkbox" name="integrations" value="bi"><span>BI / 대시보드</span></label>
+        <label class="chip-label"><input type="checkbox" name="integrations" value="db"><span>기존 DB 연동</span></label>
+        <label class="chip-label"><input type="checkbox" name="integrations" value="api"><span>외부 API</span></label>
+        <label class="chip-label"><input type="checkbox" name="integrations" value="none"><span>없음</span></label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">기술 특이사항 / 제약 조건</label>
+      <textarea class="form-textarea" id="techNotes" placeholder="사용 중인 특정 솔루션, 기술적 제약, 레거시 시스템 등"></textarea>
+    </div>
+  </div>
+
+  <!-- Step 5: 예산 & 일정 -->
+  <div class="step-panel" id="panel-5">
+    <div class="section-header">예산</div>
+    <div class="form-group">
+      <label class="form-label">총 개발 예산 (VAT 별도)</label>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="budget" value="under_3000"><span>3,000만원 미만</span></label>
+        <label class="radio-label"><input type="radio" name="budget" value="3000_5000"><span>3,000~5,000만원</span></label>
+        <label class="radio-label"><input type="radio" name="budget" value="5000_1e"><span>5,000만원~1억</span></label>
+        <label class="radio-label"><input type="radio" name="budget" value="1e_3e"><span>1억~3억</span></label>
+        <label class="radio-label"><input type="radio" name="budget" value="3e_5e"><span>3억~5억</span></label>
+        <label class="radio-label"><input type="radio" name="budget" value="over_5e"><span>5억 이상</span></label>
+        <label class="radio-label"><input type="radio" name="budget" value="undecided"><span>미정/협의</span></label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">운영 유지보수 예산 (연간)</label>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="maintenanceBudget" value="none"><span>없음</span></label>
+        <label class="radio-label"><input type="radio" name="maintenanceBudget" value="under_1000"><span>1,000만원 미만</span></label>
+        <label class="radio-label"><input type="radio" name="maintenanceBudget" value="1000_3000"><span>1,000~3,000만원</span></label>
+        <label class="radio-label"><input type="radio" name="maintenanceBudget" value="3000_5000"><span>3,000~5,000만원</span></label>
+        <label class="radio-label"><input type="radio" name="maintenanceBudget" value="over_5000"><span>5,000만원 이상</span></label>
+        <label class="radio-label"><input type="radio" name="maintenanceBudget" value="undecided"><span>미정/협의</span></label>
+      </div>
+    </div>
+
+    <div class="section-header">일정</div>
+    <div class="grid-3" style="margin-bottom:0.75rem;">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">시작 연도</label>
+        <select class="form-select" id="startYear">
+          <option value="">연도</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+          <option value="2028">2028</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">시작 월</label>
+        <select class="form-select" id="startMonth">
+          <option value="">월</option>
+          {% for m in range(1,13) %}<option value="{{ m }}">{{ m }}월</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">시작 시기</label>
+        <select class="form-select" id="startPeriod">
+          <option value="">시기</option>
+          <option value="early">월초</option>
+          <option value="mid">월중</option>
+          <option value="late">월말</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-3" style="margin-bottom:0.75rem;">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">완료 연도</label>
+        <select class="form-select" id="endYear">
+          <option value="">연도</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+          <option value="2028">2028</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">완료 월</label>
+        <select class="form-select" id="endMonth">
+          <option value="">월</option>
+          {% for m in range(1,13) %}<option value="{{ m }}">{{ m }}월</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">우선순위</label>
+        <select class="form-select" id="priority">
+          <option value="3">보통 (3)</option>
+          <option value="1">긴급 (1)</option>
+          <option value="2">높음 (2)</option>
+          <option value="4">낮음 (4)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">일정 유연성</label>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="flexSchedule" value="fixed"><span>고정</span></label>
+        <label class="radio-label"><input type="radio" name="flexSchedule" value="flexible"><span>유연</span></label>
+        <label class="radio-label"><input type="radio" name="flexSchedule" value="phase"><span>단계적 조정 가능</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 6: 담당자 정보 -->
+  <div class="step-panel" id="panel-6">
+    <div class="section-header">담당자 정보</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">담당자명 <span class="required">*</span></label>
+        <input class="form-input" id="contactName" placeholder="홍길동">
+      </div>
+      <div class="form-group">
+        <label class="form-label">직함 / 직책</label>
+        <input class="form-input" id="contactTitle" placeholder="AI 전략팀 팀장">
+      </div>
+      <div class="form-group">
+        <label class="form-label">회사명 <span class="required">*</span></label>
+        <input class="form-input" id="contactCompany" placeholder="(주)스마트팩토리">
+      </div>
+      <div class="form-group">
+        <label class="form-label">산업 분야</label>
+        <select class="form-select" id="contactIndustry">
+          <option value="">선택</option>
+          <option value="manufacturing">제조</option>
+          <option value="finance">금융·보험</option>
+          <option value="healthcare">의료·헬스케어</option>
+          <option value="retail">유통·리테일</option>
+          <option value="logistics">물류·운송</option>
+          <option value="energy">에너지·유틸리티</option>
+          <option value="public">공공·정부</option>
+          <option value="media">미디어·콘텐츠</option>
+          <option value="education">교육</option>
+          <option value="it">IT·소프트웨어</option>
+          <option value="telecom">통신</option>
+          <option value="construction">건설·부동산</option>
+          <option value="other">기타</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">이메일 <span class="required">*</span></label>
+        <input class="form-input" id="contactEmail" type="email" placeholder="hong@company.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">연락처</label>
+        <input class="form-input" id="contactPhone" type="tel" placeholder="010-0000-0000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">추가 전달사항</label>
+      <textarea class="form-textarea" id="additionalDesc" placeholder="참고사항, 선호 협업 방식, 기타 요청사항 등" style="min-height:80px"></textarea>
+    </div>
+  </div>
+
+  <!-- Step 7: 검토 & 제출 -->
+  <div class="step-panel" id="panel-7">
+    <div class="section-header">제출 내용 검토</div>
+    <table class="review-table" id="reviewTable"></table>
+    <div style="margin-top:1.25rem;padding:0.75rem 1rem;background:rgba(0,212,255,0.07);border-radius:6px;border:1px solid var(--accent-border);font-size:0.8rem;color:var(--text-muted);">
+      제출 후 영업일 기준 2일 이내 담당자가 연락드립니다.
+    </div>
+    <p id="submit-error" style="color:var(--danger);font-size:0.82rem;margin-top:0.75rem;min-height:1em;"></p>
+  </div>
+
+  <!-- Navigation -->
+  <div class="form-nav">
+    <button class="btn" id="prevBtn" onclick="prevStep()" style="visibility:hidden">← 이전</button>
+    <span id="stepCount" style="font-size:0.78rem;color:var(--text-muted)"></span>
+    <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">다음 →</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STEPS = [
+  { label: '개요', id: 1 },
+  { label: '유형', id: 2 },
+  { label: '대상', id: 3 },
+  { label: '기술', id: 4 },
+  { label: '예산', id: 5 },
+  { label: '담당자', id: 6 },
+  { label: '검토', id: 7 },
+];
+let currentStep = 1;
+const TOTAL = STEPS.length;
+
+// Build step indicator
+(function buildIndicator() {
+  const container = document.getElementById('stepIndicator');
+  STEPS.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'step-item' + (i === 0 ? ' active' : '');
+    div.id = 'step-item-' + s.id;
+    div.innerHTML = `<div class="step-circle">${s.id}</div><div class="step-label">${s.label}</div>`;
+    container.appendChild(div);
+  });
+})();
+
+function updateIndicator() {
+  STEPS.forEach(s => {
+    const el = document.getElementById('step-item-' + s.id);
+    el.className = 'step-item';
+    if (s.id < currentStep) el.classList.add('completed');
+    else if (s.id === currentStep) el.classList.add('active');
+  });
+  document.getElementById('stepCount').textContent = `${currentStep} / ${TOTAL}`;
+  document.getElementById('prevBtn').style.visibility = currentStep > 1 ? 'visible' : 'hidden';
+  document.getElementById('nextBtn').textContent = currentStep === TOTAL ? '제출하기' : '다음 →';
+}
+
+function showPanel(n) {
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + n).classList.add('active');
+}
+
+function validate() {
+  if (currentStep === 1) {
+    const name = document.getElementById('projectName').value.trim();
+    const summary = document.getElementById('projectSummary').value.trim();
+    if (!name) { alert('프로젝트명을 입력해주세요.'); return false; }
+    if (!summary) { alert('한 줄 요약을 입력해주세요.'); return false; }
+  }
+  if (currentStep === 6) {
+    const n = document.getElementById('contactName').value.trim();
+    const c = document.getElementById('contactCompany').value.trim();
+    const e = document.getElementById('contactEmail').value.trim();
+    if (!n || !c || !e) { alert('담당자 이름, 회사명, 이메일은 필수입니다.'); return false; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { alert('이메일 형식을 확인해주세요.'); return false; }
+  }
+  return true;
+}
+
+function getChecked(name) {
+  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(el => el.value);
+}
+
+// ── 레퍼런스 URL 동적 행 관리 ──
+let _refCounter = 0;
+function addRefRow(url, purpose, note) {
+  _refCounter++;
+  const id = _refCounter;
+  const div = document.createElement('div');
+  div.id = 'ref-row-' + id;
+  div.style.cssText = 'display:flex;gap:.4rem;align-items:flex-start;margin-bottom:.5rem;flex-wrap:wrap;';
+  div.innerHTML = `
+    <input class="form-input ref-url" placeholder="https://example.com" value="${url||''}" style="flex:2;min-width:200px;font-size:.8rem;">
+    <select class="form-select ref-purpose" style="flex:0 0 120px;font-size:.78rem;">
+      <option value="both" ${purpose==='both'||!purpose?'selected':''}>디자인+기능</option>
+      <option value="design" ${purpose==='design'?'selected':''}>디자인 참고</option>
+      <option value="feature" ${purpose==='feature'?'selected':''}>기능 참고</option>
+      <option value="competitor" ${purpose==='competitor'?'selected':''}>경쟁사</option>
+    </select>
+    <input class="form-input ref-note" placeholder="메모 (선택)" value="${note||''}" style="flex:1;min-width:120px;font-size:.8rem;">
+    <button type="button" onclick="this.parentElement.remove()" style="background:none;border:1px solid var(--border);color:var(--text-muted);width:28px;height:34px;border-radius:6px;cursor:pointer;font-size:14px;flex-shrink:0;">×</button>
+  `;
+  document.getElementById('refList').appendChild(div);
+}
+
+function collectRefs() {
+  const rows = document.querySelectorAll('#refList > div');
+  const refs = [];
+  rows.forEach(row => {
+    const url = row.querySelector('.ref-url').value.trim();
+    if (!url) return;
+    refs.push({
+      url: url,
+      purpose: row.querySelector('.ref-purpose').value,
+      note: row.querySelector('.ref-note').value.trim(),
+    });
+  });
+  return refs;
+}
+
+// 초기 1행 추가
+addRefRow();
+function getRadio(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '';
+}
+
+function buildReview() {
+  const rows = [
+    ['프로젝트명', document.getElementById('projectName').value],
+    ['한 줄 요약', document.getElementById('projectSummary').value],
+    ['프로젝트 배경', document.getElementById('projectDesc').value || '-'],
+    ['서비스 범위', getChecked('scope').join(', ') || '-'],
+    ['핵심 기능', document.getElementById('coreFeatures').value || '-'],
+    ['현행 프로세스(AS-IS)', document.getElementById('currentProcess').value || '-'],
+    ['레퍼런스', collectRefs().map(r => `${r.url} (${r.purpose}${r.note ? ', '+r.note : ''})`).join('\n') || '-'],
+    ['차별화 포인트', document.getElementById('competitors').value || '-'],
+    ['활용 사례', document.getElementById('useCases').value || '-'],
+    ['기대 KPI', document.getElementById('expectedKpi').value || '-'],
+    ['서비스 대상', document.getElementById('targetUsers').value || '-'],
+    ['배포 환경', getChecked('deployType').join(', ') || '-'],
+    ['데이터 보유', document.getElementById('dataReadiness').value || '-'],
+    ['데이터 규모', document.getElementById('dataVolume').value || '-'],
+    ['데이터 유형', getChecked('dataTypes').join(', ') || '-'],
+    ['보안 요건', getChecked('securityReqs').join(', ') || '-'],
+    ['ML 프레임워크', getChecked('mlFrameworks').join(', ') || '-'],
+    ['MLOps 도구', getChecked('mlopsTools').join(', ') || '-'],
+    ['데이터 도구', getChecked('dataTools').join(', ') || '-'],
+    ['인프라 환경', getChecked('infraEnv').join(', ') || '-'],
+    ['연동 시스템', getChecked('integrations').join(', ') || '-'],
+    ['개발 예산', getRadio('budget') || '-'],
+    ['유지보수 예산', getRadio('maintenanceBudget') || '-'],
+    ['시작일', [document.getElementById('startYear').value, document.getElementById('startMonth').value ? document.getElementById('startMonth').value+'월' : '', document.getElementById('startPeriod').value].filter(Boolean).join(' ') || '-'],
+    ['완료 목표', [document.getElementById('endYear').value, document.getElementById('endMonth').value ? document.getElementById('endMonth').value+'월' : ''].filter(Boolean).join(' ') || '-'],
+    ['우선순위', document.getElementById('priority').value],
+    ['일정 유연성', getRadio('flexSchedule') || '-'],
+    ['담당자', document.getElementById('contactName').value + ' / ' + document.getElementById('contactTitle').value],
+    ['회사 / 산업', document.getElementById('contactCompany').value + ' / ' + document.getElementById('contactIndustry').value],
+    ['이메일', document.getElementById('contactEmail').value],
+    ['연락처', document.getElementById('contactPhone').value || '-'],
+    ['추가 전달사항', document.getElementById('additionalDesc').value || '-'],
+  ];
+  const tbl = document.getElementById('reviewTable');
+  tbl.innerHTML = rows.map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+}
+
+function nextStep() {
+  if (!validate()) return;
+  if (currentStep === TOTAL) { doSubmit(); return; }
+  if (currentStep === TOTAL - 1) buildReview();
+  currentStep++;
+  showPanel(currentStep);
+  updateIndicator();
+  window.scrollTo(0, 0);
+}
+
+function prevStep() {
+  if (currentStep <= 1) return;
+  currentStep--;
+  showPanel(currentStep);
+  updateIndicator();
+  window.scrollTo(0, 0);
+}
+
+function toggleSub(id, show) {
+  const el = document.getElementById(id);
+  if (show) el.classList.add('visible');
+  else el.classList.remove('visible');
+}
+
+async function doSubmit() {
+  const btn = document.getElementById('nextBtn');
+  btn.disabled = true; btn.textContent = '제출 중...';
+  document.getElementById('submit-error').textContent = '';
+
+  const payload = {
+    project_name: document.getElementById('projectName').value.trim(),
+    project_summary: document.getElementById('projectSummary').value.trim(),
+    project_desc: document.getElementById('projectDesc').value.trim(),
+    scope: getChecked('scope'),
+    project_types: {
+      ai_model: document.getElementById('type-ai').checked,
+      mlops: document.getElementById('type-mlops').checked,
+      llm: document.getElementById('type-llm').checked,
+      vision: document.getElementById('type-vision').checked,
+      prediction: document.getElementById('type-pred').checked,
+    },
+    type_ai_sub: getChecked('type_ai_sub'),
+    type_mlops_sub: getChecked('type_mlops_sub'),
+    type_llm_sub: getChecked('type_llm_sub'),
+    type_vision_sub: getChecked('type_vision_sub'),
+    type_pred_sub: getChecked('type_pred_sub'),
+    core_features: document.getElementById('coreFeatures').value.trim(),
+    current_process: document.getElementById('currentProcess').value.trim(),
+    reference_urls: collectRefs(),
+    competitors: document.getElementById('competitors').value.trim(),
+    use_cases: document.getElementById('useCases').value.trim(),
+    expected_kpi: document.getElementById('expectedKpi').value.trim(),
+    target_users: document.getElementById('targetUsers').value.trim(),
+    deploy_type: getChecked('deployType'),
+    data_readiness: document.getElementById('dataReadiness').value,
+    data_volume: document.getElementById('dataVolume').value,
+    data_types: getChecked('dataTypes'),
+    security_reqs: getChecked('securityReqs'),
+    ml_frameworks: getChecked('mlFrameworks'),
+    mlops_tools: getChecked('mlopsTools'),
+    data_tools: getChecked('dataTools'),
+    infra_env: getChecked('infraEnv'),
+    integrations: getChecked('integrations'),
+    tech_notes: document.getElementById('techNotes').value.trim(),
+    budget: getRadio('budget'),
+    maintenance_budget: getRadio('maintenanceBudget'),
+    start_year: document.getElementById('startYear').value,
+    start_month: document.getElementById('startMonth').value,
+    start_period: document.getElementById('startPeriod').value,
+    end_year: document.getElementById('endYear').value,
+    end_month: document.getElementById('endMonth').value,
+    flex_schedule: getRadio('flexSchedule'),
+    priority: parseInt(document.getElementById('priority').value) || 3,
+    contact_name: document.getElementById('contactName').value.trim(),
+    contact_title: document.getElementById('contactTitle').value.trim(),
+    contact_company: document.getElementById('contactCompany').value.trim(),
+    contact_industry: document.getElementById('contactIndustry').value,
+    contact_email: document.getElementById('contactEmail').value.trim(),
+    contact_phone: document.getElementById('contactPhone').value.trim(),
+    additional_desc: document.getElementById('additionalDesc').value.trim(),
+    source: 'internal',
+  };
+
+  try {
+    const token = localStorage.getItem('ai_si_token');
+    const resp = await fetch('/api/v1/intake/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(()=>({}));
+      throw new Error(e.detail || '제출 실패');
+    }
+    const data = await resp.json();
+    alert('접수가 완료되었습니다. 접수 ID: ' + (data.submission_id || data.id || ''));
+    location.href = '/intake/submissions';
+  } catch(e) {
+    document.getElementById('submit-error').textContent = '오류: ' + e.message;
+    btn.disabled = false; btn.textContent = '제출하기';
+  }
+}
+
+// Init
+updateIndicator();
+document.getElementById('stepCount').textContent = `1 / ${TOTAL}`;
+</script>
+{% endblock %}

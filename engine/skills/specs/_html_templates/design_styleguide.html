@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} — 디자인 스타일가이드</title>
+<style>/* __INJECT_BASE_CSS__ */
+.design-tone{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r);padding:32px 24px;text-align:center;margin:12px 0}
+.design-tone h3{color:var(--text);margin:0 0 8px;font-size:18px}
+.design-tone p{color:var(--text-2);margin:0}
+.showcase{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin:12px 0}
+.swatch-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin:12px 0}
+.swatch{border-radius:var(--r-sm);overflow:hidden;border:1px solid var(--border)}
+.swatch-color{height:52px}
+.swatch-label{padding:8px;font-size:11px;background:var(--bg-card)}
+.swatch-label strong{display:block;margin-bottom:2px}
+.type-specimen{padding:14px 0;border-bottom:1px solid var(--border)}
+.type-specimen:last-child{border-bottom:none}
+.type-row{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+.type-meta{font-size:11px;color:var(--text-3)}
+.spacing-bar{display:flex;align-items:center;gap:12px;padding:6px 0}
+.spacing-bar .bar{background:var(--accent);border-radius:3px;height:12px;opacity:.7}
+.spacing-bar .label{font-size:12px;color:var(--text-3);min-width:60px}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a class="back" href="javascript:history.back()">← 돌아가기</a>
+  <span style="flex:1"></span>
+  <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+</div>
+
+<h1>{{PROJECT_NAME}} — 디자인 스타일가이드</h1>
+<div class="meta">
+  <span>작성일: {{DATE}}</span>
+  <span>프로젝트 ID: {{PROJECT_ID}}</span>
+</div>
+
+<div class="summary">
+  <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">컬러</div></div>
+  <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">서체</div></div>
+  <div class="summary-item"><div class="summary-num amber">0</div><div class="summary-label">아이콘</div></div>
+</div>
+
+<div class="section">
+  <h2>1. 디자인 톤 &amp; 무드</h2>
+  <!-- CONTENT: 디자인 톤. 그라데이션과 키워드로 표현 -->
+  <div class="design-tone">
+    <h3>Modern &amp; Trustworthy</h3>
+    <p>클린한 레이아웃, 충분한 여백, 블루 계열</p>
+  </div>
+</div>
+
+<div class="section">
+  <h2>2. 컬러 시스템</h2>
+  <div class="swatch-row">
+    <!-- CONTENT: 컬러 스와치. 아래 패턴 반복 -->
+    <div class="swatch">
+      <div class="swatch-color" style="background:#1B2A4A"></div>
+      <div class="swatch-label"><strong>Primary</strong>#1B2A4A</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>3. 타이포그래피</h2>
+  <div class="showcase">
+    <!-- CONTENT: 서체 스펙. 아래 패턴 반복 -->
+    <div class="type-specimen">
+      <div class="type-row">
+        <span style="font-size:24px;font-weight:700;">Heading 1 — 가나다라</span>
+        <span class="type-meta">24px / Bold / 1.4</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>4. 간격 체계</h2>
+  <!-- CONTENT: 간격 스케일. 아래 패턴 반복 -->
+  <div class="spacing-bar"><span class="label">4px</span><div class="bar" style="width:16px"></div></div>
+  <div class="spacing-bar"><span class="label">8px</span><div class="bar" style="width:32px"></div></div>
+  <div class="spacing-bar"><span class="label">16px</span><div class="bar" style="width:64px"></div></div>
+</div>
+
+<div class="section">
+  <h2>5. 아이콘</h2>
+  <!-- CONTENT: 아이콘 라이브러리 및 사용 규칙 -->
+</div>
+
+<div class="section">
+  <h2>6. 모션 / 애니메이션</h2>
+  <!-- CONTENT: 트랜지션 규칙, 이징, 지속시간 가이드 -->
+</div>
+
+</body>
+</html>

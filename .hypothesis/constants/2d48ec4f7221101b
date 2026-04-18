@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/visual/renderer.py
+# hypothesis_version: 6.141.1
+
+[150, 375, 667, 768, 800, 1024, 1280, '0', '1', '15000', 'V8_VISUAL_REGRESSION', 'V8_VISUAL_TIMEOUT_MS', 'count', 'desktop', 'height', 'issues', 'mobile', 'networkidle', 'playwright_used', 'rendered_issues', 'screenshots_captured', 'source_issues', 'tablet', 'width']

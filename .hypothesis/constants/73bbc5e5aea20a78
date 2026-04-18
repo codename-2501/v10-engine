@@ -1,0 +1,4 @@
+# file: /Users/codename/Downloads/v8/engine/skills/registry.py
+# hypothesis_version: 6.141.1
+
+['*.yaml', '/', '\\s*\\(.*?\\)\\s*', '\\s+', '^\\[QA\\]\\s*', '_', '_+', '_common', '_common.yaml', 'name', 'path', 'phase', 'r', 'specs', 'utf-8', 'w', '·']

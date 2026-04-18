@@ -1,0 +1,53 @@
+name: "LLM 성능 평가"
+phase: DEVELOPMENT
+type: document
+model_preference: opus
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **RAGAS 메트릭** — RAGAS 프레임워크 메트릭(Context Precision/Recall, Faithfulness, Answer Relevancy) 정의 및 결과를 테이블(메트릭/정의/점수/기준/판정)로 정리.
+  2. **답변 품질** — 답변 정확성, 완전성, 일관성, 유용성 평가. 인간 평가(Human Evaluation) 결과, 자동 평가 결과 비교를 테이블(평가항목/자동평가/인간평가/상관계수)로 정리.
+  3. **환각율** — 환각(Hallucination) 유형 분류, 탐지 방법, 환각률 측정 결과, 환각 발생 패턴 분석, 완화 전략 서술.
+  4. **지연시간** — TTFT(Time to First Token), 토큰 생성 속도, 전체 응답 시간, P50/P95/P99 지연시간을 테이블(메트릭/P50/P95/P99/목표)로 정리.
+  5. **비용** — 토큰 사용량, API 호출 비용, 월간 예상 비용, 비용 최적화 방안을 테이블(항목/단가/사용량/월비용)로 정리.
+
+  ### 품질 기준
+  - RAGAS 메트릭 전체 항목 평가 완료
+  - 환각율에 구체적 발생 패턴 분석 포함
+  - 비용 분석에 최적화 방안 포함
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 5개 필수 섹션 모두 작성 완료
+  □ 테이블 4개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ RAGAS 메트릭 점수 존재
+  □ 비용 최적화 방안 명시
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":5,"tables":4,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "RAGAS 메트릭"
+      - "답변 품질"
+      - "환각율"
+      - "지연시간"
+      - "비용"
+    required_tables: 4
+    min_chars: 2500
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "RAGAS 메트릭 전체 항목이 평가 완료되었는지 검증"
+    - "환각율에 구체적 발생 패턴 분석이 포함되어 있는지 검증"
+    - "비용 분석에 최적화 방안이 포함되어 있는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

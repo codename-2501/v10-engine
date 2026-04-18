@@ -1,0 +1,75 @@
+name: "InstantDB 데이터 모델 설계"
+phase: DESIGN
+type: document
+model_preference: opus
+backend_requirement: "instantdb"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  InstantDB의 Triple Store(EAV) 기반 위에서 relational 인터페이스를 제공하는
+  특성을 이해하고, 앱에 필요한 엔티티/속성/관계를 선언형으로 설계하세요.
+
+  ### InstantDB 특성 반영 (MANDATORY)
+  - 스키마 변경이 lock-free (ALTER TABLE 없음) — 점진적 진화 가능
+  - Triple Store 위에 entity/attribute/link 3계층
+  - 속성(attribute)은 앱 전역에서 고유 — 엔티티 간 중복 불가
+  - many-to-many는 link 양방향 선언
+  - soft-delete 기본 (컬럼 삭제 후 복구 가능)
+
+  ### 필수 섹션 (순서 준수)
+  1. **엔티티 카탈로그** — 각 엔티티명(복수형 권장), 목적, 핵심 속성 요약표
+  2. **속성 스펙표** — name, type(string/number/boolean/date/json), unique 여부,
+     indexed 여부, 설명 (모든 엔티티 × 모든 속성)
+  3. **관계(Links) 정의** — forward/reverse 양방향 선언, cardinality
+     (one/many), cascade 규칙
+  4. **스키마 선언 코드** — `i.schema({ entities: {...}, links: {...} })`
+     형태의 완성된 TypeScript 코드 블록 (schema.ts)
+  5. **네이밍 컨벤션** — 엔티티는 복수형 camelCase, 속성은 camelCase,
+     link 이름은 의미론적 단수/복수 구분 명시
+  6. **마이그레이션 전략** — 신규 속성 추가, 이름 변경, soft-delete
+     시나리오별 단계
+
+  ### 품질 기준
+  - 모든 엔티티에 `createdAt`, `updatedAt` (timestamp) 포함
+  - 고유성 제약은 `unique: true` 명시 (partial index 자동 생성됨)
+  - 검색/필터 대상 속성은 `indexed: true`
+  - 민감 정보(비밀번호, 토큰)는 DB 저장 금지 — 외부 인증 서비스 경유
+  - link 정의 시 forward/reverse 이름이 직관적
+  - 스키마 선언 코드는 즉시 `npx instant-cli push schema`로 적용 가능해야 함
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 6개 필수 섹션 모두 작성 완료
+  □ 스키마 선언 코드 블록 1개 이상 (TypeScript, i.schema 형태)
+  □ 모든 엔티티가 createdAt/updatedAt 포함
+  □ unique/indexed 결정이 명시적 (기본값 의존 금지)
+  □ TODO/TBD/미정 키워드 없음
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":6,"schema_blocks":N,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "엔티티 카탈로그"
+      - "속성 스펙표"
+      - "관계"
+      - "스키마 선언"
+      - "네이밍 컨벤션"
+      - "마이그레이션 전략"
+    has_code_blocks: true
+    min_chars: 4500
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "모든 엔티티에 createdAt/updatedAt timestamp 속성이 포함되는지 검증"
+    - "unique 제약이 필요한 속성(이메일 등)에 unique:true가 명시되는지 검증"
+    - "link 정의가 양방향(forward/reverse) 모두 선언되는지 검증"
+    - "i.schema() 호출이 실제 컴파일 가능한 TypeScript 형태인지 검증"
+    - "비밀번호/토큰 등 민감 정보가 DB 스키마에 포함되지 않는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

@@ -1,0 +1,177 @@
+name: "디자인 토큰"
+phase: DESIGN
+type: json
+model_preference: sonnet
+composition_role: tokens
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙 (엄수):
+  1. 순수 JSON만 출력. 마크다운 코드 블록(```)으로 감싸지 마세요.
+  2. 도구 호출(function_calls, invoke 등) 절대 금지.
+  3. JSON 문자열 값 안에 따옴표 중첩("") 금지.
+  4. 자가검증 체크리스트를 출력에 포함시키지 마세요 (내부 확인만).
+
+  이 프로젝트의 **디자인 토큰**을 JSON으로 정의하세요.
+  디자인 토큰은 프로젝트 전체 산출물의 시각적 일관성을 보장하는 원자 단위입니다.
+  토큰을 변경하면 모든 페이지가 자동으로 리스타일링됩니다.
+
+  ### 프로젝트 맥락 분석 (필수)
+  프로젝트 이름, 클라이언트, 업종을 분석하여 적합한 톤을 결정하세요:
+  - 실버케어/복지 → 따뜻한 톤 (앰버, 테라코타)
+  - SaaS/테크 → 모던 미니멀 (시안, 블루)
+  - 교육/학습 → 친근한 톤 (그린, 틸)
+  - 커머스/리테일 → 활동적 (오렌지, 코랄)
+  - 금융/법률 → 신뢰감 (네이비, 슬레이트)
+  - 의료/헬스 → 청결감 (민트, 스카이블루)
+
+  ### 출력 JSON 스키마
+  ```
+  {
+    "colors": {
+      "primary": "#hex",           // 메인 브랜드 색상 (10% 강조 영역에만)
+      "primary_dim": "#hex",       // primary의 어두운 변형 (호버/링)
+      "primary_subtle": "rgba",    // primary의 미세 배경 (알림/배지)
+      "secondary": "#hex",         // 보조 색상 (필요 시만, 없으면 primary 변형으로)
+      "bg": "#hex",                // 배경 (oklch 8~12%, 예: #111318)
+      "surface_1": "#hex",         // 카드/패널 (oklch 12~15%, 예: #1a1d24)
+      "surface_2": "#hex",         // 모달/드롭다운 (oklch 16~20%)
+      "surface_3": "#hex",         // 호버/하이라이트 (oklch 20~25%)
+      "text": "#hex",              // 주 텍스트 (다크: oklch 92~96%)
+      "text_muted": "#hex",        // 보조 텍스트 (oklch 65~75%)
+      "text_dim": "#hex",          // 비활성/캡션 (oklch 40~50%)
+      "border": "rgba(...)",       // 보더 (rgba white .06~.08)
+      "border_strong": "rgba(...)",// 강조 보더 (rgba white .12~.15)
+      "success": "#hex",
+      "success_dim": "rgba",
+      "warning": "#hex",
+      "warning_dim": "rgba",
+      "error": "#hex",
+      "error_dim": "rgba",
+      "info": "#hex",
+      "info_dim": "rgba"
+    },
+    "typography": {
+      "font_family": "Pretendard Variable",
+      "font_family_mono": "JetBrains Mono, SF Mono, monospace",
+      "scale_ratio": 1.333,
+      "scale": {
+        "xs": "0.75rem",
+        "sm": "0.875rem",
+        "base": "1rem",
+        "lg": "1.333rem",
+        "xl": "1.777rem",
+        "2xl": "2.369rem",
+        "3xl": "3.157rem"
+      },
+      "line_height": {
+        "tight": 1.2,
+        "normal": 1.5,
+        "relaxed": 1.7
+      },
+      "letter_spacing": {
+        "heading": "-0.03em",
+        "body": "0",
+        "caption": "0.04em",
+        "uppercase": "0.06em"
+      },
+      "weights": {
+        "light": 300,
+        "regular": 400,
+        "regular_dark": 350,
+        "medium": 550,
+        "semibold": 650,
+        "bold": 700,
+        "extrabold": 800
+      },
+      "measure": "65ch"
+    },
+    "spacing": {
+      "2xs": "4px",
+      "xs": "8px",
+      "sm": "12px",
+      "md": "16px",
+      "lg": "24px",
+      "xl": "32px",
+      "2xl": "48px",
+      "3xl": "64px",
+      "4xl": "96px"
+    },
+    "breakpoints": {
+      "mobile": "480px",
+      "tablet": "768px",
+      "desktop": "1024px",
+      "wide": "1280px"
+    },
+    "motion": {
+      "instant": "100ms",
+      "fast": "150ms",
+      "normal": "250ms",
+      "slow": "400ms",
+      "enter": "500ms",
+      "ease_out": "cubic-bezier(0.16, 1, 0.3, 1)",
+      "ease_in": "cubic-bezier(0.7, 0, 0.84, 0)",
+      "ease_in_out": "cubic-bezier(0.45, 0, 0.55, 1)"
+    },
+    "effects": {
+      "shadow_sm": "0 1px 2px rgba(0,0,0,0.15)",
+      "shadow_md": "0 4px 12px rgba(0,0,0,0.2)",
+      "shadow_lg": "0 12px 32px rgba(0,0,0,0.3)",
+      "radius_sm": "4px",
+      "radius_md": "8px",
+      "radius_lg": "14px",
+      "radius_pill": "99px",
+      "focus_ring": "0 0 0 2px var(--color-primary)"
+    },
+    "meta": {
+      "tone": "프로젝트에 맞는 톤 설명",
+      "direction": "bold aesthetic direction (brutalist/minimalist/organic/editorial 등)",
+      "industry": "업종",
+      "theme": "dark",
+      "neutral_tint": "브랜드 색조의 미세 틴트 (chroma 0.005~0.01)",
+      "lang": "ko"
+    }
+  }
+  ```
+
+  ### 디자인 규칙 (엄격 준수)
+  - 반드시 다크 테마. bg는 oklch 8~12%. 라이트 테마 금지
+  - pure black(#000) 금지 — 모든 중성색에 브랜드 색조 미세 틴트
+  - 보라색 그라디언트 금지, cyan-on-dark/neon-on-dark 팔레트 금지
+  - accent/primary는 다크 배경 위에서 잘 보이는 밝은 톤. 60-30-10 비율 준수
+  - 4pt 기반 간격 스케일 (4, 8, 12, 16, 24, 32, 48, 64, 96)
+  - surface 계층: bg < surface_1 < surface_2 < surface_3 (밝을수록 높은 레이어)
+  - 다크 모드에서 그림자 대신 밝은 서피스 레이어로 깊이 표현
+  - WCAG 2.1 AA 대비(본문 4.5:1, 큰 텍스트 3:1) 필수
+  - 모션은 transform + opacity만. ease 프리셋 금지, cubic-bezier 커스텀 사용
+  - semantic 색상 4종 필수, 각각 기본 + dim 변형 포함
+
+  ### 출력 전 자가검증
+  □ 모든 필드가 빠짐없이 채워져 있는가
+  □ colors에 최소 14개 키가 있는가
+  □ 다크 테마인가 (bg가 #111318 범위)
+  □ primary 색상이 프로젝트 맥락에 맞는가
+  □ JSON 문법이 유효한가
+
+validation:
+  structural:
+    min_chars: 1500
+    forbidden: ["TODO", "TBD", "미정", "작성 예정"]
+  semantic:
+    - "JSON 파싱이 가능한 유효한 형식인지 검증"
+    - "colors, typography, spacing, breakpoints, effects, meta 6개 섹션 모두 존재하는지 검증"
+    - "다크 테마인지 (bg 색상이 #10~#20 범위) 검증"
+    - "프로젝트 맥락에 맞는 primary 색상인지 검증"
+
+qa_prompt: |
+  위 디자인 토큰 JSON을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  추가 검증:
+  - JSON이 유효한가?
+  - 모든 필수 키가 존재하는가?
+  - 색상 대비가 WCAG AA를 충족하는가?
+  - 프로젝트 맥락에 적합한 톤인가?
+  판정: PASS 또는 FAIL + 구체적 사유

@@ -1,0 +1,73 @@
+name: "InstantDB 인증 구현"
+phase: BUILD
+type: code
+model_preference: opus
+backend_requirement: "instantdb"
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  InstantDB가 제공하는 인증 방식을 프로젝트에 맞게 선택/구현하세요.
+  Magic Code(이메일 6자리), OAuth(Google/GitHub/Apple), Clerk 통합 중
+  하나 이상을 완전히 작동 가능한 형태로.
+
+  ### 인증 특성 반영 (MANDATORY)
+  - `db.auth.sendMagicCode(email)` + `db.auth.signInWithMagicCode(email, code)`
+  - OAuth 는 InstantDB 대시보드에서 provider 등록 후 `db.auth.signInWithIdToken` 사용
+  - `db.useAuth()` 훅으로 현재 user 상태 구독 (실시간)
+  - 로그아웃은 `db.auth.signOut()` — 로컬 IndexedDB 캐시도 비워짐
+  - `$users` 엔티티에 추가 속성 link 가능 (profile, preferences 등)
+
+  ### 필수 섹션 (순서 준수)
+  1. **인증 방식 선택 근거** — Magic Code/OAuth/Clerk 중 선택 + 이유
+     (타깃 사용자, 가입 UX, 보안 요구사항)
+  2. **인증 UI 컴포넌트** — Login/Signup/EmailVerify 페이지 완성 코드
+     (React/Next.js), 에러 처리, 로딩 상태
+  3. **세션 관리** — useAuth 훅 활용, ProtectedRoute, 토큰 자동 갱신
+  4. **사용자 프로필 확장** — $users 에 profile link (name, avatar, role)
+     생성/업데이트 로직
+  5. **로그아웃 및 계정 삭제** — signOut, 계정 삭제(cascade) 흐름
+  6. **보안 체크리스트** — rate limit, 이메일 검증, 의심스러운 로그인 알림
+
+  ### 품질 기준
+  - Magic Code 입력 시 rate limit 경고 UI
+  - OAuth 콜백 URL 환경별 분리
+  - 로그인 실패 시 이메일/코드 구분된 에러 메시지 (보안상 "not found" 노출 금지)
+  - 로그인 후 원래 가려던 페이지로 리다이렉트
+  - 세션 만료 시 자동 재인증 유도
+  - $users 엔티티 자체 수정 대신 linked profile 엔티티 사용 (InstantDB 권장)
+
+  ### 출력 전 자가검증 (MANDATORY)
+  □ 6개 필수 섹션 모두 작성 완료
+  □ 코드 블록 6개 이상 (최소 Login + Signup + useAuth 래퍼)
+  □ sendMagicCode / signInWithMagicCode 둘 다 사용
+  □ ProtectedRoute 구현 포함
+  □ 에러 메시지가 사용자 존재 여부를 누설하지 않음
+
+  <!-- SELF_CHECK: {"sections":6,"components":N,"auth_methods":M,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "인증 방식 선택"
+      - "인증 UI 컴포넌트"
+      - "세션 관리"
+      - "사용자 프로필"
+      - "로그아웃"
+      - "보안 체크리스트"
+    has_code_blocks: true
+    min_chars: 5500
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "sendMagicCode 와 signInWithMagicCode 가 함께 구현되는지 검증"
+    - "ProtectedRoute 또는 동등 메커니즘으로 비인증 접근이 차단되는지 검증"
+    - "로그인 실패 메시지가 '이메일 없음' vs '코드 틀림'을 구분해서 노출하지 않는지 검증"
+    - "$users 대신 연결된 profile 엔티티로 사용자 확장이 이루어지는지 검증"
+    - "OAuth 콜백 URL이 환경변수로 관리되어 환경별 분리가 가능한지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유

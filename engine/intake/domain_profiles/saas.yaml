@@ -1,0 +1,91 @@
+name: SaaS / B2B 도구
+keywords:
+  - SaaS
+  - 협업
+  - workspace
+  - dashboard
+  - admin
+  - tenant
+  - 멀티테넌트
+  - subscription
+  - 구독
+  - api
+
+terminology:
+  - 워크스페이스: tenant/팀 단위 격리 공간
+  - 시트: 사용자 라이선스 수
+  - 역할: owner/admin/member/viewer
+  - 통합: 외부 서비스 연동(Slack/Google 등)
+  - 청구: subscription billing
+
+regulations:
+  - 개인정보보호법(PIPA)
+  - GDPR(해외 사용자)
+  - SOC 2(엔터프라이즈 영업)
+  - 데이터 위치/주권
+
+screen_estimate:
+  small: 35
+  medium: 60
+  large: 100
+
+spec_overrides:
+  보안_설계서:
+    extra_required:
+      - 멀티테넌시 데이터 격리
+      - SSO/SAML
+      - API key 발급/회수
+      - 감사 로그
+  api_설계서:
+    extra_required:
+      - rate limiting per tenant
+      - webhook 서명
+  화면_목록_정의서:
+    group_prefix_examples:
+      - "SC-AU: 인증/SSO"
+      - "SC-WS: 워크스페이스 설정"
+      - "SC-DB: 대시보드"
+      - "SC-AD: 관리자"
+      - "SC-BL: 청구/구독"
+
+design_tone:
+  palette: "모던 미니멀 — 중성 회색 + 단일 액센트"
+  density: "정보 밀도 높음"
+  forbidden:
+    - "장식 요소 과다"
+    - "빈 공간 낭비"
+
+# S13
+component_categories:
+  - name: "layout"
+    chunk_items:
+      - workspace_header
+      - side_nav
+      - breadcrumb
+      - page_container
+  - name: "dashboard"  # SaaS 전용
+    chunk_items:
+      - metric_card
+      - trend_chart
+      - kpi_tile
+      - activity_feed
+      - filter_toolbar
+  - name: "data"
+    chunk_items:
+      - data_table
+      - bulk_action_bar
+      - pagination
+      - column_picker
+  - name: "form"
+    chunk_items:
+      - form_field
+      - multi_select
+      - date_range_picker
+      - button
+  - name: "collaboration"  # 협업 기능
+    chunk_items:
+      - comment_thread
+      - mention_popup
+      - notification_bell
+      - user_avatar
+      - member_list

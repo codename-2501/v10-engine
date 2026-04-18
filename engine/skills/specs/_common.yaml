@@ -1,0 +1,53 @@
+name: _common
+rules:
+  # ── 문서 기본 ──
+  - 모든 산출물은 마크다운 형식으로 작성
+  - '"TODO, TBD, 미정, 작성 예정, 추후 작성, 추후 결정" 단어 사용 절대 금지. 하나라도 포함 시 검증 실패'
+  - 확정되지 않은 부분은 합리적인 기본값을 넣을 것 (빈칸/미정 금지)
+  - 미완성 섹션 금지 — 모든 섹션 완전 작성
+  - 테이블은 마크다운 파이프(|) 형식
+  - 코드 블록은 언어 명시 (```python, ```sql 등)
+  - 한국어 작성 기본 (기술 용어는 영문 병기 가능)
+
+  # ── HTML 산출물: 테마 & 색상 ──
+  - "HTML 산출물(type: html)은 실제 서비스 수준의 시각적 완성도 필수"
+  - "반드시 다크 테마. 배경 oklch(8% ~ 12%), 카드/서피스는 배경보다 밝게 (oklch 12~18%). pure black(#000) 금지. 라이트 테마(흰 배경) 절대 금지."
+  - "중성색(neutral)에 브랜드 색조를 미세하게 틴트 (chroma 0.005~0.01). 완전한 무채색 회색 금지 — 자연에 순수 회색은 없음."
+  - "accent/primary는 프로젝트 맥락에 맞게 1색 선택. 60-30-10 비율: 60% 중성 배경, 30% 보조/텍스트, 10% 강조색. 강조색은 희소할수록 강력."
+  - "semantic 색상 4종 필수 (success, warning, error, info). 각 2~3 음영 (기본 + dim + subtle)."
+  - "색상만으로 정보 전달 금지 — 아이콘·텍스트 라벨 병행. 색맹 8% 남성 대응."
+  - "WCAG 2.1 AA 대비 필수: 본문 4.5:1, 큰 텍스트 3:1, UI 컴포넌트 3:1. 플레이스홀더 텍스트도 4.5:1."
+
+  # ── HTML 산출물: 타이포그래피 ──
+  - "폰트는 Pretendard Variable 사용 (CDN import 허용). 보조 폰트 필요 시 contrast pairing (예: serif + sans)."
+  - "AI 기본 폰트 금지: Inter, Roboto, Arial, Open Sans, Segoe UI, system-ui 금지."
+  - "본문 16px 최소. 5단계 타이포 스케일 (비율 1.25~1.5). heading은 letter-spacing: -0.02em~-0.04em."
+  - "vertical rhythm: line-height 기반 (본문 1.5~1.6 = 24px). 모든 수직 간격을 24px 배수로."
+  - "읽기 최적 너비 max-width: 65ch. 다크 모드 본문은 font-weight 한 단계 낮춤 (400→350)."
+
+  # ── HTML 산출물: 간격 & 레이아웃 ──
+  - "4pt 기반 간격 스케일: 4, 8, 12, 16, 24, 32, 48, 64, 96px. semantic 네이밍 (--space-xs ~ --space-3xl)."
+  - "sibling 간격은 gap 사용 (margin collapse 방지). 섹션 간 48px 이상, 카드 padding 24px 이상."
+  - "self-adjusting 그리드: repeat(auto-fit, minmax(280px, 1fr)). 미디어 쿼리 최소화."
+  - "카드 중첩 금지 — 카드 안에 카드 넣지 마세요. 간격·타이포·구분선으로 계층 표현."
+  - "squint test: 디자인을 흐릿하게 봤을 때 주/보조 요소가 구분되고 그룹핑이 명확해야 함."
+
+  # ── HTML 산출물: 모션 & 인터랙션 ──
+  - "모션 지속시간: 즉시 응답 100~150ms, 상태 전환 200~300ms, 구조 변경 300~500ms, 진입 시퀀스 500~800ms. 퇴장은 진입의 75%."
+  - "이징: ease 프리셋 금지. ease-out (등장), ease-in (사라짐), ease-in-out (토글). cubic-bezier 커스텀 권장."
+  - "transform + opacity만 애니메이트. height 애니메이션은 grid-template-rows: 0fr→1fr 사용."
+  - "prefers-reduced-motion 반드시 대응. bounce/elastic 이징 금지 (2015년 트렌드, 현재는 촌스러움)."
+
+  # ── HTML 산출물: 안티패턴 (AI 슬롭 방지) ──
+  - "보라색 그라디언트 금지. cyan-on-dark, neon-on-dark 팔레트 금지."
+  - "모든 것을 카드로 감싸지 마세요. 동일한 카드 그리드 반복 금지."
+  - "glassmorphism (backdrop-filter: blur + 반투명 배경) 남용 금지 — 1~2곳 포인트로만."
+  - "모든 것을 가운데 정렬하지 마세요. 좌측 정렬이 가독성 기본."
+  - "그림자를 깊이 표현에만 사용. 다크 테마에서는 밝은 서피스 레이어가 그림자를 대체."
+  - "AI 슬롭 테스트: 누군가가 즉시 'AI가 만들었구나'라고 판단할 디자인이면 더 대담한 선택 필요."
+  - "프로젝트 맥락에 맞는 독창적 디자인. 쿠키커터 템플릿 느낌 금지."
+
+  # ── HTML 산출물: 접근성 ──
+  - "zoom 비활성화 금지. rem/em 단위로 사용자 설정 존중."
+  - "터치 타겟 최소 44px. 시각적 크기가 작아도 padding/pseudo-element로 터치 영역 확보."
+  - ":focus-visible 포커스 링 필수. outline: 2px solid accent + offset 2px."

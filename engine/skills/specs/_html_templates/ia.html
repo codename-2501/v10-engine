@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} — IA (정보 구조도)</title>
+<style>/* __INJECT_BASE_CSS__ */
+.tree { margin: 16px 0; }
+.tree ul { list-style: none; padding-left: 24px; position: relative; }
+.tree > ul { padding-left: 0; }
+.tree li { position: relative; padding: 6px 0 6px 20px; }
+.tree li::before { content: ''; position: absolute; left: 0; top: 0; width: 1px; height: 100%; background: var(--border); }
+.tree li::after { content: ''; position: absolute; left: 0; top: 18px; width: 14px; height: 1px; background: var(--border); }
+.tree li:last-child::before { height: 18px; }
+.tree > ul > li::before, .tree > ul > li::after { display: none; }
+.tree > ul > li { padding-left: 0; }
+.tree .node { display: inline-block; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 4px 12px; font-size: 13px; transition: all .15s ease-out; }
+.tree .node-root { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+.tree .node-section { border-color: var(--accent); color: var(--accent); }
+.access-matrix td, .access-matrix th { text-align: center; font-size: 12px; }
+.access-matrix td:first-child { text-align: left; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a class="back" href="javascript:history.back()">← 돌아가기</a>
+  <span style="flex:1"></span>
+  <button class="dl-btn" onclick="window.print()">PDF 저장</button>
+</div>
+
+<h1>{{PROJECT_NAME}} — IA (정보 구조도)</h1>
+<div class="meta">
+  <span>작성일: {{DATE}}</span>
+  <span>프로젝트 ID: {{PROJECT_ID}}</span>
+</div>
+
+<div class="summary">
+  <div class="summary-item"><div class="summary-num blue">0</div><div class="summary-label">페이지</div></div>
+  <div class="summary-item"><div class="summary-num green">0</div><div class="summary-label">Depth 1</div></div>
+  <div class="summary-item"><div class="summary-num amber">0</div><div class="summary-label">역할</div></div>
+</div>
+
+<div class="section">
+  <h2>1. 서비스 구조</h2>
+  <!-- CONTENT: 트리 구조. 아래 패턴으로 중첩하여 작성 -->
+  <div class="tree">
+    <ul>
+      <li><span class="node node-root">홈</span>
+        <ul>
+          <li><span class="node node-section">대시보드</span>
+            <ul>
+              <li><span class="node">요약</span></li>
+              <li><span class="node">통계</span></li>
+            </ul>
+          </li>
+          <li><span class="node node-section">설정</span></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <h2>2. 네비게이션 맵</h2>
+  <!-- CONTENT: GNB/LNB 구조 및 네비게이션 규칙 -->
+</div>
+
+<div class="section">
+  <h2>3. URL 구조</h2>
+  <!-- CONTENT: URL 패턴. 아래 테이블 패턴 사용 -->
+  <table>
+    <thead><tr><th>화면</th><th>URL</th><th>인증</th></tr></thead>
+    <tbody>
+      <tr><td>홈</td><td><code>/</code></td><td>불필요</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>4. 역할별 접근 권한</h2>
+  <!-- CONTENT: 접근 권한 매트릭스. 아래 패턴 사용 -->
+  <table class="access-matrix">
+    <thead><tr><th>페이지</th><th>비회원</th><th>회원</th><th>관리자</th></tr></thead>
+    <tbody>
+      <tr><td>홈</td><td>O</td><td>O</td><td>O</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

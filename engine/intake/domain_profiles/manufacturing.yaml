@@ -1,0 +1,88 @@
+name: 제조 / 스마트팩토리
+keywords:
+  - 제조
+  - 공장
+  - 스마트팩토리
+  - MES
+  - ERP
+  - 생산
+  - 설비
+  - 품질
+  - QC
+  - manufacturing
+  - factory
+  - production
+
+terminology:
+  - MES: 생산 실행 시스템
+  - ERP: 전사 자원 관리
+  - PLC: 설비 제어기
+  - WO: 작업 지시(Work Order)
+  - QC: 품질 검사
+  - LOT: 생산 단위
+
+regulations:
+  - 산업안전보건법
+  - ISO 9001(품질)
+  - ISO 14001(환경)
+  - GMP/GLP(식품·의약품 시)
+
+screen_estimate:
+  small: 30
+  medium: 55
+  large: 90
+
+spec_overrides:
+  api_설계서:
+    extra_required:
+      - 설비 데이터 polling/streaming
+      - 시계열 DB 연동
+      - 알람 임계 정의
+  화면_목록_정의서:
+    group_prefix_examples:
+      - "SC-PR: 생산 계획/실적"
+      - "SC-EQ: 설비 모니터링"
+      - "SC-QC: 품질 검사"
+      - "SC-WH: 자재/창고"
+      - "SC-RP: 보고서"
+
+design_tone:
+  palette: "산업용 — 고대비 + 안전색(빨강/노랑/녹색)"
+  density: "정보 밀도 높음 (KPI 집약)"
+  display: "현장 대형 모니터 가독성 고려"
+  forbidden:
+    - "저대비 색상"
+    - "장식 위주 레이아웃"
+
+# S13
+component_categories:
+  - name: "layout"
+    chunk_items:
+      - factory_dashboard_header
+      - zone_selector
+      - plant_map_panel
+  - name: "monitoring"  # 제조 전용 — 실시간 모니터링
+    chunk_items:
+      - kpi_card
+      - equipment_status
+      - alarm_panel
+      - chart_realtime
+      - oee_gauge
+      - downtime_tracker
+  - name: "production"  # 생산 계획·실적
+    chunk_items:
+      - work_order_card
+      - production_schedule
+      - quality_checklist
+      - material_tracker
+  - name: "feedback"
+    chunk_items:
+      - alarm_modal
+      - shift_notification
+      - toast
+      - emergency_banner
+  - name: "form"
+    chunk_items:
+      - work_order_form
+      - inspection_form
+      - button

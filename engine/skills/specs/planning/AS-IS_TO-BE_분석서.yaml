@@ -1,0 +1,53 @@
+name: "AS-IS TO-BE 분석서"
+phase: PLANNING
+type: document
+model_preference: opus
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ### 필수 섹션 (순서 준수)
+  1. **현행 시스템(AS-IS) 분석** — 현재 시스템 구성, 주요 기능, 기술 스택, 운영 현황을 테이블 포함하여 상세 기술. 문제점·한계를 구체적으로 서술.
+  2. **목표 시스템(TO-BE) 설계** — 개선 목표, 목표 아키텍처, 신규 기능, 기술 스택 변경 사항을 테이블로 정리.
+  3. **Gap 분석** — AS-IS vs TO-BE 비교 테이블(영역/AS-IS/TO-BE/Gap/우선순위) 작성. 정량적 지표 포함.
+  4. **개선 방안** — Gap별 구체적 개선 전략, 구현 방안, 필요 리소스를 테이블로 정리.
+  5. **기대 효과** — 정량적·정성적 기대 효과를 구분하여 서술. KPI 지표 포함.
+
+  ### 품질 기준
+  - AS-IS와 TO-BE가 동일 기준으로 대비 가능해야 함
+  - Gap 분석에 우선순위(High/Medium/Low) 명시
+  - 기대 효과에 측정 가능한 KPI 최소 3개 포함
+
+  ### 출력 전 자가검증 (MANDATORY)
+  아래 전부 충족될 때까지 수정 후 출력:
+  □ 5개 필수 섹션 모두 작성 완료
+  □ 테이블 4개 이상 포함
+  □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
+  □ Gap 분석에 우선순위 컬럼 존재
+  □ 기대 효과에 KPI 3개 이상
+
+  자가검증 결과를 산출물 말미에 첨부:
+  <!-- SELF_CHECK: {"sections":5,"tables":4,"pass":true/false} -->
+
+validation:
+  structural:
+    required_headings:
+      - "현행 시스템(AS-IS) 분석"
+      - "목표 시스템(TO-BE) 설계"
+      - "Gap 분석"
+      - "개선 방안"
+      - "기대 효과"
+    required_tables: 4
+    min_chars: 3000
+    forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
+  semantic:
+    - "AS-IS 항목과 TO-BE 항목이 동일한 기준으로 대비되는지 검증"
+    - "Gap 분석이 AS-IS/TO-BE 차이를 누락 없이 반영하는지 검증"
+    - "개선 방안이 모든 Gap 항목에 대해 구체적 대책을 제시하는지 검증"
+
+qa_prompt: |
+  위 산출물을 검토하세요.
+  검증 기준:
+  {{semantic_criteria}}
+  판정: PASS 또는 FAIL + 구체적 사유
