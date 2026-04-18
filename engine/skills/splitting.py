@@ -748,6 +748,17 @@ async def split_component_library_by_category(
     # 다운스트림 (registry/recipe/assembly) 이 SKIPPED umbrella 에 의존하면
     # 영구 미충족 dep 로 BLOCKED 상태 영원히 유지됨.
     # 새 sub-task 들이 이미 다운스트림 edge 를 추가했으므로 umbrella edge 는 안전하게 비활성화.
+    #
+    # Invariant 검증: umbrella outgoing edge 의 to_node 들이 새 sub-QA 들로부터도
+    # 활성 edge 를 가지는지 확인 → 그렇지 않으면 의존성이 끊김. 이때는 sub-QA →
+    # 해당 to_node edge 를 자동 추가하여 의존 관계 보존.
+    umbrella_outgoing = await db.fetchall(
+        """SELECT DISTINCT to_node_id FROM edges
+           WHERE from_node_id IN (?, COALESCE(?, '')) AND dag_id=? AND is_active=1""",
+        (node_id, original_qa_id or "", dag_id),
+    )
+    umbrella_to_nodes = [r["to_node_id"] for r in umbrella_outgoing]
+
     await db.execute(
         "UPDATE edges SET is_active=0 WHERE from_node_id=? AND dag_id=?",
         (node_id, dag_id),
@@ -756,6 +767,41 @@ async def split_component_library_by_category(
         await db.execute(
             "UPDATE edges SET is_active=0 WHERE from_node_id=? AND dag_id=?",
             (original_qa_id, dag_id),
+        )
+
+    # Invariant: 새 sub-QA 들이 to_node 와 활성 edge 를 가지는지 확인.
+    # 누락이면 자동 보충 (의존 관계 단절 방지).
+    sub_qa_ids = await db.fetchall(
+        """SELECT id FROM nodes
+           WHERE dag_id=? AND name LIKE '[QA] 컴포넌트 라이브러리 (%'
+             AND node_type='QA' AND state != 'SKIPPED'""",
+        (dag_id,),
+    )
+    sub_qa_id_list = [r["id"] for r in sub_qa_ids]
+
+    for to_node in umbrella_to_nodes:
+        # GATE 노드는 이미 step 7 에서 처리됨 → 일반 다운스트림 (registry 등) 만 확인
+        existing = await db.fetchall(
+            """SELECT from_node_id FROM edges
+               WHERE to_node_id=? AND dag_id=? AND is_active=1
+                 AND from_node_id IN ({})""".format(
+                ",".join("?" * len(sub_qa_id_list)) if sub_qa_id_list else "''"
+            ),
+            (to_node, dag_id, *sub_qa_id_list) if sub_qa_id_list else (to_node, dag_id),
+        )
+        if existing:
+            continue  # 이미 sub-QA 로부터 edge 있음 — OK
+        # 누락 — 모든 sub-QA 에서 to_node 로 edge 추가 (다운스트림이 모든 카테고리 wait)
+        for sub_qa in sub_qa_id_list:
+            await db.execute(
+                """INSERT OR IGNORE INTO edges
+                   (id, dag_id, from_node_id, to_node_id, edge_type, created_at, is_active)
+                   VALUES (?, ?, ?, ?, 'DEPENDS_ON', ?, 1)""",
+                (str(_uuid.uuid4()), dag_id, sub_qa, to_node, now),
+            )
+        logger.info(
+            "split_library_invariant_repair to_node=%s sub_qa_count=%d",
+            to_node[:8] if len(to_node) >= 8 else to_node, len(sub_qa_id_list),
         )
 
     # 7. 카테고리별 서브노드 생성

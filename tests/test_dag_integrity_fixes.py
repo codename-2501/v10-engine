@@ -253,3 +253,67 @@ async def test_verify_no_issues_clean_dag():
     assert await _check_broken_pairs(db, "test-dag") == []
     assert await _check_skipped_outgoing_edges(db, "test-dag") == []
     assert await _check_orphan_edges(db, "test-dag") == []
+
+
+# ---------------------------------------------------------------------------
+# 통합: run_integrity_check + 자동 복구 flow
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_run_integrity_check_detects_and_fixes():
+    """검출 + 자동 복구 E2E 흐름."""
+    from engine.tools.verify_dag_integrity import run_integrity_check
+
+    db = create_adapter("sqlite:///:memory:")
+    await db.execute("""
+        CREATE TABLE nodes (
+            id TEXT PRIMARY KEY, dag_id TEXT, name TEXT, node_type TEXT,
+            state TEXT, qa_pair_node_id TEXT, task_pair_node_id TEXT
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE edges (
+            id TEXT PRIMARY KEY, dag_id TEXT, from_node_id TEXT,
+            to_node_id TEXT, is_active INTEGER DEFAULT 1
+        )
+    """)
+    dag_id = "test-dag"
+    skipped_id = str(uuid.uuid4())
+    downstream_id = str(uuid.uuid4())
+    edge_id = str(uuid.uuid4())
+    orphan_edge_id = str(uuid.uuid4())
+
+    await db.execute(
+        "INSERT INTO nodes (id, dag_id, name, node_type, state) VALUES (?, ?, ?, 'TASK', 'SKIPPED')",
+        (skipped_id, dag_id, "umbrella"),
+    )
+    await db.execute(
+        "INSERT INTO nodes (id, dag_id, name, node_type, state) VALUES (?, ?, ?, 'TASK', 'BLOCKED')",
+        (downstream_id, dag_id, "registry"),
+    )
+    # SKIPPED active edge (자동 복구 대상)
+    await db.execute(
+        "INSERT INTO edges VALUES (?, ?, ?, ?, 1)",
+        (edge_id, dag_id, skipped_id, downstream_id),
+    )
+    # 고아 edge (자동 복구 대상)
+    await db.execute(
+        "INSERT INTO edges VALUES (?, ?, ?, ?, 1)",
+        (orphan_edge_id, dag_id, "ghost-from-id", downstream_id),
+    )
+
+    # dry-run
+    result = await run_integrity_check(db, dag_id=dag_id, apply=False)
+    assert result["counts"]["skipped_active_outgoing_edge"] == 1
+    assert result["counts"]["orphan_edge"] == 1
+    assert result["fixed"] is None
+
+    # apply
+    result2 = await run_integrity_check(db, dag_id=dag_id, apply=True)
+    assert result2["fixed"]["skipped_outgoing"] == 1
+    assert result2["fixed"]["orphan_edges"] == 1
+
+    # 재실행 → 0건 (복구 완료)
+    result3 = await run_integrity_check(db, dag_id=dag_id, apply=False)
+    assert result3["counts"].get("skipped_active_outgoing_edge", 0) == 0
+    assert result3["counts"].get("orphan_edge", 0) == 0

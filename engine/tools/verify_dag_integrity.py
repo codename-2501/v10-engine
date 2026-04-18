@@ -176,7 +176,53 @@ async def _apply_fixes(db: Any, issues: list[dict]) -> dict:
                 "UPDATE edges SET is_active=0 WHERE id=?", (it["edge_id"],),
             )
             fixed["orphan_edges"] += 1
+    # Prometheus counter
+    try:
+        from engine.observability.metrics import V10_DAG_INTEGRITY_AUTOFIXED_TOTAL
+        for issue_type, count in fixed.items():
+            if count > 0:
+                V10_DAG_INTEGRITY_AUTOFIXED_TOTAL.labels(issue_type=issue_type).inc(count)
+    except Exception:
+        pass
     return fixed
+
+
+async def run_integrity_check(
+    db: Any,
+    dag_id: str | None = None,
+    apply: bool = False,
+) -> dict:
+    """프로그래매틱 검증 — startup hook, cron, API 에서 호출.
+
+    Returns:
+        {"issues": [...], "counts": {...}, "fixed": {...} | None}
+    """
+    all_issues: list[dict] = []
+    counts: dict[str, int] = {}
+    for checker in (
+        _check_broken_pairs,
+        _check_skipped_outgoing_edges,
+        _check_orphan_edges,
+        _check_pair_consistency,
+        _check_cycles,
+    ):
+        issues = await checker(db, dag_id)
+        for it in issues:
+            counts[it["type"]] = counts.get(it["type"], 0) + 1
+        all_issues.extend(issues)
+
+    # Prometheus gauge
+    try:
+        from engine.observability.metrics import V10_DAG_INTEGRITY_ISSUES
+        for issue_type, count in counts.items():
+            V10_DAG_INTEGRITY_ISSUES.labels(issue_type=issue_type).set(count)
+    except Exception:
+        pass
+
+    result: dict = {"issues": all_issues, "counts": counts, "fixed": None}
+    if apply and all_issues:
+        result["fixed"] = await _apply_fixes(db, all_issues)
+    return result
 
 
 async def main() -> int:
