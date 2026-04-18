@@ -8,11 +8,32 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import re
+import uuid
 from typing import Any
 
 from engine.skills.utils import _now
 
 logger = logging.getLogger(__name__)
+
+
+# 거시 진단 도입 모드: dry-run | keyword-only | full
+# - dry-run: 로그/audit 만 기록, INVALID 전환 안 함 (안전 점진 도입용)
+# - keyword-only: 키워드 매칭만, AI fallback 비활성 (안전 default)
+# - full: 키워드 + AI fallback 모두 활성 (운영 안정화 후 권장)
+#
+# Default 가 'keyword-only' 인 이유: 키워드는 strict 매칭으로 false positive 거의 없고
+# 비용 0. AI fallback 은 응답 형식/지연 변동 위험이 있어 명시 opt-in.
+def _rework_mode() -> str:
+    return (os.environ.get("V10_UPSTREAM_REWORK_MODE", "keyword-only") or "keyword-only").strip().lower()
+
+
+# 킬 스위치: V10_UPSTREAM_REWORK_KILL=1 이면 거시 진단 즉시 비활성
+# 운영 중 문제 발생 시 환경변수 변경만으로 즉시 차단 가능 (서버 재시작 불필요는
+# 프로세스 환경변수 갱신 가능 시. 일반적으로 재시작 1회 필요).
+def _is_killed() -> bool:
+    return (os.environ.get("V10_UPSTREAM_REWORK_KILL", "") or "").strip() in ("1", "true", "yes")
 
 
 async def _cascade_for_node(
@@ -345,26 +366,66 @@ async def _invalidate_early_completed_downstreams(
 
 
 # upstream artifact 키워드 (downstream QA verdict 텍스트에서 검출).
+# 7개 카테고리로 확장 (범용성 확보). 키워드 매칭은 strict (word boundary 적용).
 _UPSTREAM_KEYWORDS: dict[str, list[str]] = {
     "DESIGN": [
         "디자인 시안", "디자인 토큰", "ui 디자인", "디자인 컴포넌트",
         "design token", "design system", "스타일 가이드",
+        "디자인 시스템", "tokens",
     ],
     "API": [
         "api 설계", "api 명세", "엔드포인트", "endpoint",
         "request schema", "response schema",
+        "rest api", "graphql", "rpc", "webhook",
     ],
     "DB": [
         "db 설계", "스키마", "테이블 정의", "schema definition",
         "정규화", "외래키", "foreign key",
+        "마이그레이션", "migration", "엔티티",
     ],
     "REQ": [
         "요구사항", "기능 백로그", "유스케이스",
         "requirement", "user story",
+        "기능 명세", "스펙", "spec",
+    ],
+    "INFRA": [
+        "배포", "deployment", "ci/cd", "쿠버네티스", "docker",
+        "kubernetes", "infra",
+    ],
+    "MOBILE": [
+        "네이티브", "ios", "android", "react native", "expo",
+    ],
+    "DATA": [
+        "피처", "feature", "모델", "dataset", "파이프라인",
+        "pipeline", "ml model",
     ],
 }
 
 UPSTREAM_REWORK_LIMIT_PER_PHASE = 2
+
+# AI fallback confidence 임계 — 미만이면 폐기 (false positive 방지)
+AI_CONFIDENCE_THRESHOLD = 0.7
+
+# AI fallback 분류 가능 카테고리 화이트리스트
+_VALID_CATEGORIES: set[str] = {"DESIGN", "API", "DB", "REQ", "INFRA", "MOBILE", "DATA"}
+
+
+def _kw_match(text: str, kw: str) -> bool:
+    """Strict 키워드 매칭.
+    - 영어/숫자/공백/심볼만으로 구성된 키워드: word boundary (\\b) 사용
+    - 한국어 포함: 키워드 뒤에 한글/공백/문장부호/문장끝만 허용 (조사 무관 매칭)
+    """
+    if not kw or not text:
+        return False
+    kw_lower = kw.lower()
+    text_lower = text.lower()
+    is_ascii = all(ord(c) < 128 for c in kw_lower)
+    if is_ascii:
+        return bool(re.search(rf"\b{re.escape(kw_lower)}\b", text_lower))
+    # 한국어/혼용: 키워드 뒤가 한글이면 별도 단어 (false positive 차단)
+    return bool(
+        re.search(rf"{re.escape(kw_lower)}(?![a-z0-9_])", text_lower)
+    )
 
 
 async def _ensure_rework_count_column(db: Any) -> None:
@@ -379,16 +440,152 @@ async def _ensure_rework_count_column(db: Any) -> None:
 
 
 def _classify_upstream_categories(verdict_text: str) -> set[str]:
-    """QA verdict 텍스트에서 어느 upstream 카테고리(DESIGN/API/DB/REQ) 가
-    원인으로 지목됐는지 분류."""
-    text = (verdict_text or "").lower()
+    """QA verdict 텍스트에서 어느 upstream 카테고리가 원인인지 키워드 분류.
+    Strict 매칭 (word boundary / 한글 경계) 으로 false positive 차단."""
+    if not verdict_text:
+        return set()
     hit: set[str] = set()
     for cat, kws in _UPSTREAM_KEYWORDS.items():
         for kw in kws:
-            if kw in text:
+            if _kw_match(verdict_text, kw):
                 hit.add(cat)
                 break
     return hit
+
+
+async def _classify_upstream_categories_ai(
+    verdict_text: str,
+    model_adapter: Any,
+    *,
+    cur_phase: str | None = None,
+    task_name: str | None = None,
+    upstream_task_names: list[str] | None = None,
+) -> set[str]:
+    """키워드 매칭 0건일 때 fallback. haiku 로 카테고리 분류.
+
+    출력 스키마:
+      {"categories": ["DESIGN"], "confidence": 0.85, "reasoning": "..."}
+    confidence < AI_CONFIDENCE_THRESHOLD 이면 폐기.
+
+    노드 컨텍스트(phase/task_name/upstream_task_names) 를 함께 전달하여 정확도 ↑.
+    """
+    if model_adapter is None or not verdict_text:
+        return set()
+
+    ctx_lines: list[str] = []
+    if cur_phase:
+        ctx_lines.append(f"- 현재 phase: {cur_phase}")
+    if task_name:
+        ctx_lines.append(f"- 실패한 작업: {task_name}")
+    if upstream_task_names:
+        ctx_lines.append(
+            "- 같은 engagement 의 상위 TASK 후보: "
+            + ", ".join(upstream_task_names[:5])
+        )
+    ctx_block = "\n".join(ctx_lines) if ctx_lines else "(컨텍스트 없음)"
+
+    prompt = (
+        "당신은 QA 실패 사유를 보고 어느 상위 단계 결함이 root cause 인지 분류하는 분류기입니다.\n"
+        "가능한 카테고리: DESIGN, API, DB, REQ, INFRA, MOBILE, DATA\n"
+        "직접적 증거가 없으면 빈 배열 반환. 추측 금지.\n\n"
+        "## 노드 컨텍스트\n"
+        f"{ctx_block}\n\n"
+        "## QA 실패 사유\n"
+        f"{verdict_text[:1500]}\n\n"
+        "## 출력 형식 (JSON 만, 다른 텍스트 금지)\n"
+        '{"categories": ["DESIGN"], "confidence": 0.85, "reasoning": "한 줄 사유"}'
+    )
+    try:
+        resp = await model_adapter.call(
+            model="claude-haiku-4-5-20251001",
+            system="You are a precise root-cause classifier. Output JSON only.",
+            prompt=prompt,
+            max_tokens=300,
+        )
+        content = (resp.content or "").strip()
+        # JSON 추출 (```json fence 제거)
+        if content.startswith("```"):
+            content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content, flags=re.M).strip()
+        parsed = json.loads(content)
+        if not isinstance(parsed, dict):
+            return set()
+        confidence = float(parsed.get("confidence", 0.0))
+        if confidence < AI_CONFIDENCE_THRESHOLD:
+            logger.info(
+                "ai_classify_low_confidence conf=%.2f threshold=%.2f — discarded",
+                confidence, AI_CONFIDENCE_THRESHOLD,
+            )
+            return set()
+        cats = parsed.get("categories", [])
+        if not isinstance(cats, list):
+            return set()
+        return {c for c in cats if isinstance(c, str) and c in _VALID_CATEGORIES}
+    except Exception as exc:
+        logger.debug("ai_classify_failed err=%s", exc)
+        return set()
+
+
+_AUDIT_TABLE_ENSURED = False
+
+
+async def _ensure_audit_table(db: Any) -> None:
+    """upstream_rework_audit 테이블 idempotent 생성. 첫 호출 1회만.
+
+    Migration 039 가 적용되지 않은 DB 에서도 안전하게 작동하도록 보호망.
+    프로세스 라이프사이클 동안 한 번만 ALTER 시도.
+    """
+    global _AUDIT_TABLE_ENSURED
+    if _AUDIT_TABLE_ENSURED:
+        return
+    try:
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS upstream_rework_audit (
+              id                    TEXT PRIMARY KEY,
+              qa_node_id            TEXT NOT NULL,
+              detected_categories   TEXT NOT NULL,
+              invalidated_node_ids  TEXT NOT NULL,
+              outcome               TEXT NOT NULL DEFAULT 'pending',
+              method                TEXT NOT NULL,
+              notes                 TEXT,
+              created_at            TEXT NOT NULL,
+              resolved_at           TEXT
+            )"""
+        )
+        _AUDIT_TABLE_ENSURED = True
+    except Exception as exc:
+        logger.debug("audit_table_ensure_skipped err=%s", exc)
+
+
+async def _record_audit(
+    db: Any,
+    qa_node_id: str,
+    detected_categories: set[str],
+    invalidated_node_ids: list[str],
+    method: str,  # 'keyword' | 'ai' | 'dry-run'
+) -> None:
+    """upstream_rework_audit 테이블에 결과 기록.
+
+    Migration 039 누락 보호: 첫 호출 시 테이블 idempotent CREATE.
+    """
+    if db is None:
+        return
+    await _ensure_audit_table(db)
+    try:
+        await db.execute(
+            """INSERT INTO upstream_rework_audit
+               (id, qa_node_id, detected_categories, invalidated_node_ids,
+                outcome, method, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                str(uuid.uuid4()), qa_node_id,
+                json.dumps(sorted(detected_categories), ensure_ascii=False),
+                json.dumps(invalidated_node_ids, ensure_ascii=False),
+                "pending",  # 후속 audit 도구가 success/false_positive 로 갱신
+                method, _now(),
+            ),
+        )
+    except Exception as exc:
+        logger.debug("audit_record_skipped err=%s", exc)
 
 
 async def trigger_upstream_rework_if_needed(
@@ -396,16 +593,66 @@ async def trigger_upstream_rework_if_needed(
     failed_qa_node_id: str,
     failed_task_node_id: str,
     qa_verdict_text: str,
+    model_adapter: Any = None,
 ) -> int:
     """downstream QA FAIL 시 호출. 사유에 upstream 키워드가 있으면 해당 upstream
     TASK 노드(같은 engagement 의 카테고리 매칭) 를 INVALID 로 전환.
 
-    Returns: 영향받은 upstream 노드 수.
+    거시 진단 흐름:
+      1. 키워드 strict 매칭 (비용 0)
+      2. 0건이면 AI fallback (haiku, confidence threshold 적용) — model_adapter 필요
+      3. 모드 가드: dry-run 이면 audit 만 기록, INVALID 안 함
+
+    Returns: 영향받은 upstream 노드 수 (dry-run 모드에선 0).
     """
     if db is None or not qa_verdict_text:
         return 0
 
+    # 킬 스위치 — 운영 즉시 차단
+    if _is_killed():
+        logger.info("upstream_rework_killed env=V10_UPSTREAM_REWORK_KILL — skip")
+        return 0
+
+    mode = _rework_mode()
+
+    # ── 1단계: 키워드 매칭 (strict) ──
     categories = _classify_upstream_categories(qa_verdict_text)
+    classify_method = "keyword"
+
+    # ── 2단계: AI fallback (full 모드 + model_adapter 있을 때만) ──
+    if not categories and mode == "full" and model_adapter is not None:
+        # 노드 컨텍스트 수집 (정확도 향상)
+        cur_phase = None
+        task_name = None
+        upstream_names: list[str] = []
+        try:
+            ctx_row = await db.fetchone(
+                "SELECT n.phase, n.engagement_id, t.name AS task_name "
+                "FROM nodes n LEFT JOIN nodes t ON t.id=? "
+                "WHERE n.id=?",
+                (failed_task_node_id, failed_qa_node_id),
+            )
+            if ctx_row:
+                cur_phase = ctx_row.get("phase")
+                task_name = ctx_row.get("task_name")
+                eng_id = ctx_row.get("engagement_id")
+                if eng_id:
+                    up_rows = await db.fetchall(
+                        "SELECT name FROM nodes WHERE engagement_id=? "
+                        "AND state='COMPLETED' AND node_type='TASK' LIMIT 5",
+                        (eng_id,),
+                    )
+                    upstream_names = [r["name"] for r in up_rows if r.get("name")]
+        except Exception:
+            pass
+
+        categories = await _classify_upstream_categories_ai(
+            qa_verdict_text, model_adapter,
+            cur_phase=cur_phase, task_name=task_name,
+            upstream_task_names=upstream_names,
+        )
+        classify_method = "ai" if categories else "ai_empty"
+
     if not categories:
         return 0
 
@@ -422,12 +669,15 @@ async def trigger_upstream_rework_if_needed(
     cur_phase = row["phase"]
 
     # 같은 engagement 의 COMPLETED upstream TASK 중 카테고리 매칭
-    # 카테고리 → task_name 키워드 매핑
+    # 카테고리 → task_name 키워드 매핑 (7개 카테고리 모두 커버)
     cat_to_namekw = {
         "DESIGN": ["디자인", "design"],
         "API": ["api"],
         "DB": ["db", "데이터베이스", "스키마"],
         "REQ": ["요구사항", "백로그", "유스케이스"],
+        "INFRA": ["배포", "deployment", "infra", "ci/cd"],
+        "MOBILE": ["네이티브", "ios", "android", "mobile"],
+        "DATA": ["피처", "모델", "파이프라인", "dataset"],
     }
     name_clauses: list[str] = []
     params: list = [engagement_id]
@@ -449,6 +699,7 @@ async def trigger_upstream_rework_if_needed(
         return 0
 
     affected = 0
+    invalidated_ids: list[str] = []
     now = _now()
     for c in candidates:
         prev_count = int(c.get("upstream_rework_count") or 0)
@@ -466,27 +717,58 @@ async def trigger_upstream_rework_if_needed(
             "triggered_by_qa": failed_qa_node_id,
             "triggered_by_task": failed_task_node_id,
             "categories": sorted(categories),
+            "method": classify_method,
             "reason_excerpt": qa_verdict_text[:300],
         }
+
+        if mode == "dry-run":
+            # 시뮬레이션 — INVALID 안 함, 로그만
+            logger.warning(
+                "upstream_rework_DRYRUN node=%s name=%s cats=%s method=%s",
+                c["id"][:8], c["task_name"][:30], sorted(categories), classify_method,
+            )
+            affected += 1
+            invalidated_ids.append(c["id"])
+            continue
+
         try:
+            # Atomic 동시성 가드: WHERE 절에 한도 재확인 — race condition 시
+            # 두 hook 이 동시에 increment 하더라도 최종 한도 초과 노드는 UPDATE 0 rows.
             await db.execute(
                 """UPDATE nodes
                 SET state='INVALID',
                     description=?,
                     upstream_rework_count = COALESCE(upstream_rework_count,0)+1,
                     updated_at=?
-                WHERE id=? AND state='COMPLETED'""",
-                (json.dumps(verdict_meta, ensure_ascii=False), now, c["id"]),
+                WHERE id=? AND state='COMPLETED'
+                  AND COALESCE(upstream_rework_count,0) < ?""",
+                (json.dumps(verdict_meta, ensure_ascii=False), now, c["id"],
+                 UPSTREAM_REWORK_LIMIT_PER_PHASE),
             )
             affected += 1
+            invalidated_ids.append(c["id"])
             logger.info(
-                "upstream_rework_invalidated node=%s name=%s cats=%s",
-                c["id"][:8], c["task_name"][:30], sorted(categories),
+                "upstream_rework_invalidated node=%s name=%s cats=%s method=%s",
+                c["id"][:8], c["task_name"][:30], sorted(categories), classify_method,
             )
+            # Prometheus counter (per-category)
+            try:
+                from engine.observability.metrics import V10_UPSTREAM_REWORK_TOTAL
+                for _cat in categories:
+                    V10_UPSTREAM_REWORK_TOTAL.labels(category=_cat).inc()
+            except Exception:
+                pass
         except Exception as e:
             logger.warning(
                 "upstream_rework_failed node=%s err=%s", c["id"][:8], e,
             )
+
+    # Audit 기록 (idempotent — 테이블 없으면 스킵)
+    if affected > 0 or mode == "dry-run":
+        await _record_audit(
+            db, failed_qa_node_id, categories, invalidated_ids,
+            method=("dry-run" if mode == "dry-run" else classify_method),
+        )
 
     if affected > 0:
         # observability 에 이벤트 기록
@@ -496,9 +778,64 @@ async def trigger_upstream_rework_if_needed(
                 db, "upstream_rework_triggered",
                 project_id=engagement_id,
                 payload={"affected": affected, "categories": sorted(categories),
-                         "phase": cur_phase},
+                         "phase": cur_phase, "method": classify_method,
+                         "mode": mode},
             )
         except Exception:
             pass
+        # root cause detection counter
+        try:
+            from engine.observability.metrics import V10_QA_ROOT_CAUSE_DETECTED
+            V10_QA_ROOT_CAUSE_DETECTED.labels(
+                phase=cur_phase or "unknown", method=classify_method,
+            ).inc()
+        except Exception:
+            pass
 
-    return affected
+    # dry-run 모드는 호출자가 INVALID 처리 안 하도록 0 반환
+    return 0 if mode == "dry-run" else affected
+
+
+# ────────────────────────────────────────────────────────────────────────
+# 단일 헬퍼: executor.py 의 4개 호출 지점 (QA verdict, TASK 예외, SUSPENDED,
+# BLOCKED) 이 동일한 try/except + 길이 가드 + 호출 패턴을 가지므로 중복 제거.
+# ────────────────────────────────────────────────────────────────────────
+
+MIN_DIAGNOSTIC_TEXT_LEN = 30
+
+
+async def macro_diagnose_safe(
+    db: Any,
+    qa_node_id: str,
+    task_node_id: str,
+    fail_text: str,
+    model_adapter: Any = None,
+    *,
+    source: str = "unknown",
+) -> int:
+    """안전한 거시 진단 호출 헬퍼 — executor.py 모든 호출 지점에서 사용.
+
+    - 길이 가드: 30자 미만이면 즉시 0 반환 (추상 메시지 자동 skip)
+    - try/except 격리: hook 실패가 호출자 흐름 차단 안 함
+    - source 라벨: 호출 지점 식별 (qa_verdict | task_exception | suspended | blocked_dep)
+
+    Returns: 영향받은 상위 노드 수.
+    """
+    if not fail_text or len(fail_text) < MIN_DIAGNOSTIC_TEXT_LEN:
+        return 0
+    try:
+        affected = await trigger_upstream_rework_if_needed(
+            db, qa_node_id, task_node_id, fail_text, model_adapter=model_adapter,
+        )
+        if affected > 0:
+            logger.warning(
+                "macro_diagnose_hit source=%s node=%s upstream=%d",
+                source, qa_node_id[:8] if qa_node_id else "n/a", affected,
+            )
+        return affected
+    except Exception as exc:
+        logger.debug(
+            "macro_diagnose_failed source=%s node=%s err=%s",
+            source, qa_node_id[:8] if qa_node_id else "n/a", exc,
+        )
+        return 0
