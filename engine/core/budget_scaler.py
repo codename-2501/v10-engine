@@ -101,6 +101,16 @@ def scale_engagement_budget(profile: SizeProfile) -> dict[str, int]:
         profile.project_type, sf,
         {p: f"{v/1000:.0f}K" for p, v in result.items()},
     )
+    # Prometheus gauge 방출 (noop fallback 안전)
+    try:
+        from engine.observability.metrics import V10_BUDGET_MULTIPLIER
+        for phase, limit in result.items():
+            multiplier = limit / max(1, BASE_BUDGET.get(phase, 1))
+            V10_BUDGET_MULTIPLIER.labels(
+                phase=phase, project_type=profile.project_type,
+            ).set(round(multiplier, 3))
+    except Exception:
+        pass
     return result
 
 
@@ -227,4 +237,12 @@ async def try_budget_realloc(
         engagement_id[:8], donor, need_phase, transfer,
         already + 1, MAX_REALLOC_PER_ENGAGEMENT,
     )
+    # Prometheus counter
+    try:
+        from engine.observability.metrics import V10_BUDGET_REALLOC_TOTAL
+        V10_BUDGET_REALLOC_TOTAL.labels(
+            from_phase=donor, to_phase=need_phase,
+        ).inc()
+    except Exception:
+        pass
     return True

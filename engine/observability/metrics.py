@@ -222,3 +222,35 @@ SCHEMA_FAIL = _make_counter(
     "output_schema strict 검증 실패",
     labels=["spec_id"],
 )
+
+# ---------------------------------------------------------------------------
+# V10: Phase 예산 동적 스케일링 메트릭
+# ---------------------------------------------------------------------------
+
+# Intake pre-scale 시 적용된 phase 별 배수 (Base 대비)
+V10_BUDGET_MULTIPLIER = _make_gauge(
+    "v10_phase_budget_multiplier",
+    "V10 intake pre-scale 로 산정된 Phase 예산 배수 (Base 대비)",
+    labels=["phase", "project_type"],
+)
+
+# Runtime Level 2 Realloc 발생 누적
+V10_BUDGET_REALLOC_TOTAL = _make_counter(
+    "v10_budget_realloc_total",
+    "V10 Level 2 Runtime cross-phase realloc 발생",
+    labels=["from_phase", "to_phase"],
+)
+
+# 재할당 실패 (donor 없음 또는 max 도달)
+V10_REALLOC_FAILED_TOTAL = _make_counter(
+    "v10_budget_realloc_failed_total",
+    "V10 realloc 시도 실패 (donor 없음 또는 max 소진)",
+    labels=["reason"],
+)
+
+# Phase 한도 초과로 BLOCKED 된 노드 수
+V10_PHASE_BUDGET_EXCEEDED = _make_counter(
+    "v10_phase_budget_exceeded_total",
+    "Phase budget 초과로 BLOCKED 전이된 노드",
+    labels=["phase"],
+)
