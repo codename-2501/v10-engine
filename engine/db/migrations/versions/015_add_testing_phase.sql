@@ -1,6 +1,7 @@
 -- 015_add_testing_phase.sql
 -- TESTING phase 추가: nodes, dags, phase_transitions, node_snapshots 테이블
 -- SQLite는 CHECK 제약 ALTER 불가 → 재생성 방식
+-- UP:
 
 PRAGMA foreign_keys=OFF;
 
