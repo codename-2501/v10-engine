@@ -3173,12 +3173,42 @@ async def create_skill_executor(
                         f"Budget QA FAIL (harness 미통과): {_budget_err}"
                     )
             else:
-                # TASK 노드 예산 초과 → BLOCKED 전환 (retry_count 미소비)
+                # V10: Level 2 Runtime Realloc 시도 — 다른 Phase 여유 차용
+                _realloc_ok = False
+                if engagement_id:
+                    try:
+                        from engine.core.budget_scaler import try_budget_realloc
+                        _shortage = max(
+                            100_000,
+                            int(str(_budget_err).split()[-2].replace(",", "").split("/")[0])
+                            if "/" in str(_budget_err) else 200_000,
+                        )
+                        _realloc_ok = await try_budget_realloc(
+                            db, engagement_id, node.phase, _shortage,
+                        )
+                    except Exception as _rr_err:
+                        logger.debug(
+                            "v10_realloc_attempt_failed node=%s error=%s",
+                            node.id[:8], _rr_err,
+                        )
+
+                if _realloc_ok:
+                    # 재할당 성공 → READY 로 되돌려 재시도 트리거
+                    await db.execute(
+                        "UPDATE nodes SET state='NOT_STARTED', updated_at=? WHERE id=?",
+                        (_now(), node.id),
+                    )
+                    logger.info(
+                        "v10_budget_realloc_applied node=%s phase=%s → NOT_STARTED",
+                        node.id[:8], node.phase,
+                    )
+                    return
+
+                # Realloc 실패 시 기존 경로: BLOCKED + gotcha + 에피소드
                 try:
                     await _record_gotcha(db, node.project_id, node.id, node.name, str(_budget_err))
                 except Exception:
                     pass
-                # Phase F: 에피소드 벡터 메모리에도 백그라운드 저장
                 if episode_store:
                     try:
                         asyncio.create_task(episode_store.save_episode(
@@ -3199,8 +3229,8 @@ async def create_skill_executor(
                     (_now(), node.id),
                 )
                 logger.warning(
-                    "budget_exceeded_blocked node=%s phase=%s error=%s",
-                    node.id[:8], node.phase, _budget_err,
+                    "budget_exceeded_blocked node=%s phase=%s error=%s (realloc_tried=%s)",
+                    node.id[:8], node.phase, _budget_err, _realloc_ok,
                 )
                 return
 

@@ -525,6 +525,26 @@ class IntakeProcessor:
             ),
         )
 
+        # V10: Phase 예산 동적 스케일링 (Level 1 Intake Pre-scale)
+        # SizeProfile 추출 → phase별 예산 override 계산 → engagements 업데이트
+        try:
+            from engine.intake.size_estimator import estimate_size
+            from engine.core.budget_scaler import scale_engagement_budget, save_override
+            _profile = estimate_size(raw)
+            _override = scale_engagement_budget(_profile)
+            await save_override(self._db, engagement_id, _override)
+            logger.info(
+                "v10_budget_override_applied engagement=%s type=%s override=%s",
+                engagement_id[:8], _profile.project_type,
+                {p: f"{v//1000}K" for p, v in _override.items()},
+            )
+        except Exception as _bs_err:
+            # 스케일러 실패해도 engagement 생성은 계속 (기본값으로 fallback)
+            logger.warning(
+                "v10_budget_scaler_skipped engagement=%s error=%s",
+                engagement_id[:8], _bs_err,
+            )
+
         # ── 컴포넌트 결정 → 프로젝트/DAG/노드 생성 ──────────────────────
         components = self._determine_components(raw)
 
