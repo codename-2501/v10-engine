@@ -562,6 +562,64 @@ async def split_design_task_by_group(
 # DESIGN 단계 분할 — "컴포넌트 라이브러리" 카테고리별 독립 노드 생성
 # ---------------------------------------------------------------------------
 
+# project_type 별 부적합 카테고리 (split 시점에 SKIPPED 처리)
+# size_estimator 의 ProjectType (mlops/data/app/si/mixed) 와 1:1 매칭.
+# - app (모바일/웹/소비자 앱): 운영시스템/관제 카테고리 부적합
+# - SI/MLOps/Data: 모든 카테고리 적합 (보수적 default)
+# - mixed: 알 수 없으면 보수적으로 모두 진행
+_INAPPROPRIATE_CATEGORIES_BY_TYPE: dict[str, set[str]] = {
+    "app":    {"monitoring", "production", "mlops", "ml", "ops"},
+    "mixed":  set(),
+    "si":     set(),
+    "mlops":  set(),
+    "data":   set(),
+}
+
+
+async def _filter_categories_by_project_type(
+    db: Any, project_id: str, categories: list[dict],
+) -> list[dict]:
+    """SizeProfile.project_type 기준으로 부적합 카테고리 필터링.
+
+    raw_json 에서 project_type 추출 → _INAPPROPRIATE_CATEGORIES_BY_TYPE 매칭.
+    실패 시 원본 그대로 반환 (fail-safe).
+    """
+    try:
+        from engine.intake.size_estimator import estimate_size
+        import json as _json_pf
+        eng_row = await db.fetchone(
+            """SELECT e.global_context FROM engagements e
+               JOIN projects p ON p.engagement_id=e.id WHERE p.id=?""",
+            (project_id,),
+        )
+        if not eng_row or not eng_row.get("global_context"):
+            return categories
+        gctx = _json_pf.loads(eng_row["global_context"])
+        if not isinstance(gctx, dict):
+            return categories
+        profile = estimate_size(gctx)
+        ptype = (profile.project_type or "mixed").lower()
+        bad = _INAPPROPRIATE_CATEGORIES_BY_TYPE.get(ptype, set())
+        if not bad:
+            return categories
+        filtered = [
+            c for c in categories
+            if str(c.get("name", "")).lower() not in bad
+        ]
+        if len(filtered) < len(categories):
+            removed = sorted(
+                str(c.get("name", "")).lower() for c in categories
+                if str(c.get("name", "")).lower() in bad
+            )
+            logger.info(
+                "split_library_filter_inappropriate project=%s ptype=%s removed=%s kept=%d/%d",
+                project_id, ptype, removed, len(filtered), len(categories),
+            )
+        return filtered
+    except Exception:
+        return categories
+
+
 async def split_component_library_by_category(
     db: Any, project_id: str, node_id: str, dag_id: str,
 ) -> int:
@@ -610,6 +668,19 @@ async def split_component_library_by_category(
     # Fallback: spec.split_categories
     if not categories:
         categories = spec.get("split_categories", [])
+
+    # ── 부적합 카테고리 필터링 (project_type 기반) ──
+    # domain_profile 미정의 프로젝트 (모바일/웹/소비자 앱) 에서 monitoring/production
+    # 같은 운영시스템 카테고리가 균등 분할되어 LLM이 부적합 컴포넌트 생성 → 영구 FAILED.
+    # SizeProfile.project_type 기준으로 부적합 카테고리 사전 제거.
+    if categories:
+        try:
+            categories = await _filter_categories_by_project_type(
+                db, project_id, categories,
+            )
+        except Exception as _fe:
+            logger.warning("split_library_category_filter_failed: %s", _fe)
+
     if not categories:
         logger.info("split_library_no_categories project=%s", project_id)
         return 0
@@ -671,6 +742,66 @@ async def split_component_library_by_category(
         await db.execute(
             "UPDATE nodes SET state='SKIPPED', updated_at=? WHERE id=?",
             (now, original_qa_id),
+        )
+
+    # 6-1. (NEW) umbrella 노드의 outgoing edges 비활성화
+    # 다운스트림 (registry/recipe/assembly) 이 SKIPPED umbrella 에 의존하면
+    # 영구 미충족 dep 로 BLOCKED 상태 영원히 유지됨.
+    # 새 sub-task 들이 이미 다운스트림 edge 를 추가했으므로 umbrella edge 는 안전하게 비활성화.
+    #
+    # Invariant 검증: umbrella outgoing edge 의 to_node 들이 새 sub-QA 들로부터도
+    # 활성 edge 를 가지는지 확인 → 그렇지 않으면 의존성이 끊김. 이때는 sub-QA →
+    # 해당 to_node edge 를 자동 추가하여 의존 관계 보존.
+    umbrella_outgoing = await db.fetchall(
+        """SELECT DISTINCT to_node_id FROM edges
+           WHERE from_node_id IN (?, COALESCE(?, '')) AND dag_id=? AND is_active=1""",
+        (node_id, original_qa_id or "", dag_id),
+    )
+    umbrella_to_nodes = [r["to_node_id"] for r in umbrella_outgoing]
+
+    await db.execute(
+        "UPDATE edges SET is_active=0 WHERE from_node_id=? AND dag_id=?",
+        (node_id, dag_id),
+    )
+    if original_qa_id:
+        await db.execute(
+            "UPDATE edges SET is_active=0 WHERE from_node_id=? AND dag_id=?",
+            (original_qa_id, dag_id),
+        )
+
+    # Invariant: 새 sub-QA 들이 to_node 와 활성 edge 를 가지는지 확인.
+    # 누락이면 자동 보충 (의존 관계 단절 방지).
+    sub_qa_ids = await db.fetchall(
+        """SELECT id FROM nodes
+           WHERE dag_id=? AND name LIKE '[QA] 컴포넌트 라이브러리 (%'
+             AND node_type='QA' AND state != 'SKIPPED'""",
+        (dag_id,),
+    )
+    sub_qa_id_list = [r["id"] for r in sub_qa_ids]
+
+    for to_node in umbrella_to_nodes:
+        # GATE 노드는 이미 step 7 에서 처리됨 → 일반 다운스트림 (registry 등) 만 확인
+        existing = await db.fetchall(
+            """SELECT from_node_id FROM edges
+               WHERE to_node_id=? AND dag_id=? AND is_active=1
+                 AND from_node_id IN ({})""".format(
+                ",".join("?" * len(sub_qa_id_list)) if sub_qa_id_list else "''"
+            ),
+            (to_node, dag_id, *sub_qa_id_list) if sub_qa_id_list else (to_node, dag_id),
+        )
+        if existing:
+            continue  # 이미 sub-QA 로부터 edge 있음 — OK
+        # 누락 — 모든 sub-QA 에서 to_node 로 edge 추가 (다운스트림이 모든 카테고리 wait)
+        for sub_qa in sub_qa_id_list:
+            await db.execute(
+                """INSERT OR IGNORE INTO edges
+                   (id, dag_id, from_node_id, to_node_id, edge_type, created_at, is_active)
+                   VALUES (?, ?, ?, ?, 'DEPENDS_ON', ?, 1)""",
+                (str(_uuid.uuid4()), dag_id, sub_qa, to_node, now),
+            )
+        logger.info(
+            "split_library_invariant_repair to_node=%s sub_qa_count=%d",
+            to_node[:8] if len(to_node) >= 8 else to_node, len(sub_qa_id_list),
         )
 
     # 7. 카테고리별 서브노드 생성

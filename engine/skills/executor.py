@@ -3169,10 +3169,13 @@ async def create_skill_executor(
             # 8-2. Category-constraint self-check (library split TASK)
             # spec 에 _library_split_category 제약이 있으면 결과 JSON 의 category
             # 필드를 대조 → 미스매치 시 1회 교정 재호출.
+            # stop_reason 무관하게 적용 — max_tokens 절단 후 자동 확장된 케이스도
+            # category 검증 필요 (절단 케이스에서 LLM 이 잘못된 카테고리 라벨링 빈발).
+            # _enforce_category_constraint 내부에서 JSON 파싱 가능 여부를 체크하므로
+            # 절단 응답이면 조용히 0 영향 후 fallthrough.
             if (
                 art_type == "json"
                 and node.node_type == "TASK"
-                and response.stop_reason == "end_turn"
             ):
                 response = await _enforce_category_constraint(
                     db, model_adapter, model, response, node, assembly, max_tokens,

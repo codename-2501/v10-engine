@@ -275,3 +275,16 @@ V10_UPSTREAM_REWORK_TOTAL = _make_counter(
     "상위 phase TASK INVALID 전환 누적 (root cause 자동 수정)",
     labels=["category"],
 )
+
+# DAG 정합성 검증 결과 (startup hook + 정기 실행)
+V10_DAG_INTEGRITY_ISSUES = _make_gauge(
+    "v10_dag_integrity_issues",
+    "verify_dag_integrity 가 검출한 현재 정합성 이슈 수",
+    labels=["issue_type"],  # broken_qa_pair / broken_task_pair / skipped_active_outgoing_edge / orphan_edge / pair_inconsistency / cycle
+)
+
+V10_DAG_INTEGRITY_AUTOFIXED_TOTAL = _make_counter(
+    "v10_dag_integrity_autofixed_total",
+    "verify_dag_integrity --apply 가 자동 복구한 누적 건수",
+    labels=["issue_type"],
+)

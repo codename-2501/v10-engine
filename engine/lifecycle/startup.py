@@ -99,6 +99,23 @@ class StartupRecovery:
         # 통과하면 자동 복원. 직접 DB 조작 대신 엔진이 자체 처리하는 범용 경로.
         result["harness_regressions_recovered"] = await self._recover_harness_regression_suspended()
 
+        # DAG 정합성 검증 + 자동 복구 (startup hook)
+        # 158+80건 같은 누적 방지 — 매 startup 마다 정기 검증.
+        # 위험 항목 (cycle/pair_inconsistency) 은 로그만, 안전 항목 (SKIPPED edge /
+        # orphan edge) 은 자동 복구.
+        try:
+            from engine.tools.verify_dag_integrity import run_integrity_check
+            integrity = await run_integrity_check(self._db, apply=True)
+            result["integrity_issues"] = integrity.get("counts", {})
+            result["integrity_fixed"] = integrity.get("fixed") or {}
+            if result["integrity_issues"]:
+                logger.info(
+                    "startup_dag_integrity issues=%s fixed=%s",
+                    result["integrity_issues"], result["integrity_fixed"],
+                )
+        except Exception as _ie:
+            logger.warning("startup_dag_integrity_failed err=%s", _ie)
+
         logger.info(
             "startup_recovery_complete garbage_deleted=%s pair_links_healed=%s "
             "zombies_suspended=%s shutdown_drain_resumed=%s transient_resumed=%s "
