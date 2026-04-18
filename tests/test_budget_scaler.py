@@ -107,3 +107,36 @@ def test_estimate_size_from_habit_tracker_like_raw():
     assert profile.project_type == "app"
     assert profile.features >= 9
     assert profile.screens_est >= 10
+
+
+# ---------------------------------------------------------------------------
+# V10-04: factors_override 경로 및 DB 조회 동작
+# ---------------------------------------------------------------------------
+
+def test_scale_with_factors_override():
+    """factors_override 직접 전달 시 그 값이 우선 적용."""
+    profile = SizeProfile(project_type="app", screens_est=10, features=5)
+    custom = {"DEFINE": 0.5, "DESIGN": 3.0, "BUILD": 2.0, "VERIFY": 1.0, "DELIVER": 0.3}
+    result = scale_engagement_budget(profile, factors_override=custom)
+    # DESIGN: 900K × 3.0 × size_factor(≈1.0) = ~2.7M
+    assert result["DESIGN"] >= int(BASE_BUDGET["DESIGN"] * 2.5)
+    # DEFINE: 600K × 0.5 = ~300K
+    assert result["DEFINE"] < int(BASE_BUDGET["DEFINE"] * 0.7)
+
+
+def test_outlier_iqr_removal():
+    """IQR 이상치 제거 로직 독립 검증."""
+    from engine.tools.recalibrate_type_factor import _remove_outliers_iqr
+    # 정상 분포 + 극단치 1개
+    values = [100, 110, 95, 105, 100, 115, 10000]  # 10000이 outlier
+    cleaned = _remove_outliers_iqr(values)
+    assert 10000 not in cleaned
+    assert len(cleaned) >= 4
+
+
+def test_outlier_small_sample_passthrough():
+    """샘플 4개 미만이면 원본 그대로 통과 (통계 의미 없음)."""
+    from engine.tools.recalibrate_type_factor import _remove_outliers_iqr
+    values = [100, 10000]
+    cleaned = _remove_outliers_iqr(values)
+    assert cleaned == values  # 변경 없음

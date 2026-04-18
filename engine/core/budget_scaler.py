@@ -82,13 +82,23 @@ def _size_factor(profile: SizeProfile) -> float:
     return max(MIN_SIZE_FACTOR, min(MAX_SIZE_FACTOR, raw))
 
 
-def scale_engagement_budget(profile: SizeProfile) -> dict[str, int]:
+def scale_engagement_budget(
+    profile: SizeProfile,
+    factors_override: dict[str, float] | None = None,
+) -> dict[str, int]:
     """
     SizeProfile → phase 예산 override dict (저장용).
 
+    우선순위:
+      1. factors_override (호출자가 DB 조회 결과 전달)
+      2. TYPE_FACTOR 하드코딩 seed (fallback)
+
     저장 예: {"DEFINE": 658000, "DESIGN": 2220000, ...}
     """
-    factors = TYPE_FACTOR.get(profile.project_type, TYPE_FACTOR["mixed"])
+    if factors_override is not None:
+        factors = factors_override
+    else:
+        factors = TYPE_FACTOR.get(profile.project_type, TYPE_FACTOR["mixed"])
     sf = _size_factor(profile)
 
     result: dict[str, int] = {}
@@ -112,6 +122,35 @@ def scale_engagement_budget(profile: SizeProfile) -> dict[str, int]:
     except Exception:
         pass
     return result
+
+
+# ---------------------------------------------------------------------------
+# DB 조회: budget_type_factors 테이블 (V10 마이그레이션 038)
+# ---------------------------------------------------------------------------
+
+async def load_type_factors(db: Any, project_type: str) -> dict[str, float]:
+    """
+    budget_type_factors 테이블에서 project_type 에 맞는 factor dict 조회.
+    테이블 없거나 항목 없으면 TYPE_FACTOR hardcoded 복귀.
+    """
+    try:
+        rows = await db.fetchall(
+            "SELECT phase, factor FROM budget_type_factors WHERE project_type=?",
+            (project_type,),
+        )
+        if rows:
+            return {r["phase"]: r["factor"] for r in rows}
+    except Exception as exc:
+        logger.debug("load_type_factors_fallback type=%s: %s", project_type, exc)
+    return dict(TYPE_FACTOR.get(project_type, TYPE_FACTOR["mixed"]))
+
+
+async def scale_engagement_budget_db(
+    db: Any, profile: SizeProfile,
+) -> dict[str, int]:
+    """DB 조회 우선 + fallback. intake processor 에서 직접 사용."""
+    factors = await load_type_factors(db, profile.project_type)
+    return scale_engagement_budget(profile, factors_override=factors)
 
 
 # ---------------------------------------------------------------------------

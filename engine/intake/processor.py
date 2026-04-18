@@ -526,12 +526,12 @@ class IntakeProcessor:
         )
 
         # V10: Phase 예산 동적 스케일링 (Level 1 Intake Pre-scale)
-        # SizeProfile 추출 → phase별 예산 override 계산 → engagements 업데이트
+        # SizeProfile 추출 → budget_type_factors DB 조회 → phase별 override 저장
         try:
             from engine.intake.size_estimator import estimate_size
-            from engine.core.budget_scaler import scale_engagement_budget, save_override
+            from engine.core.budget_scaler import scale_engagement_budget_db, save_override
             _profile = estimate_size(raw)
-            _override = scale_engagement_budget(_profile)
+            _override = await scale_engagement_budget_db(self._db, _profile)
             await save_override(self._db, engagement_id, _override)
             logger.info(
                 "v10_budget_override_applied engagement=%s type=%s override=%s",
