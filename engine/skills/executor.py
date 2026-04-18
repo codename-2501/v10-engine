@@ -2133,6 +2133,29 @@ async def create_skill_executor(
                         ],
                         "stall_count": _stall["stall_count"],
                     }, ensure_ascii=False)
+
+                # ── 갭 보강 2: SUSPENDED 직전 마지막 QA 사유로 거시 진단 시도 ──
+                # stall 누적은 root cause 가 상위에 있다는 강한 신호.
+                _stall_fail_text = ""
+                try:
+                    _rj = json.loads(_reason_json) if _reason_json else {}
+                    if isinstance(_rj, dict):
+                        _failures = _rj.get("failures") or []
+                        if isinstance(_failures, list) and _failures:
+                            _stall_fail_text = " ".join(str(f) for f in _failures)
+                        elif _rj.get("reason"):
+                            _stall_fail_text = str(_rj["reason"])
+                except Exception:
+                    pass
+                if _stall_fail_text:
+                    from engine.skills.executor_cascade import macro_diagnose_safe
+                    await macro_diagnose_safe(
+                        db, node.id,
+                        node.task_pair_node_id or node.id,
+                        _stall_fail_text,
+                        model_adapter=model_adapter, source="suspended_stall",
+                    )
+
                 await db.execute(
                     "UPDATE nodes SET state='SUSPENDED', description=?, updated_at=? WHERE id=?",
                     (_reason_json, _now(), node.id),
@@ -2232,11 +2255,39 @@ async def create_skill_executor(
                 r["id"][:8] for r in _dep_check
                 if r["state"] not in ("COMPLETED", "SKIPPED")
             ]
+            _failed_blockers = [
+                r["id"] for r in _dep_check
+                if r["state"] in ("FAILED", "SUSPENDED", "INVALID")
+            ]
             if _incomplete:
                 logger.warning(
                     "executor_dep_guard node=%s incomplete_deps=%s → BLOCKED",
                     node.id[:8], _incomplete,
                 )
+                # ── 갭 보강 3: BLOCKED dependency → blocker 사유로 거시 진단 ──
+                # 단순 "still running" 이 아닌 FAILED/SUSPENDED/INVALID 인 경우만
+                # blocker 의 failure_reasons 를 추출하여 root cause 더 위 단계 추적.
+                if _failed_blockers:
+                    _blk_text = ""
+                    try:
+                        _blk_row = await db.fetchone(
+                            "SELECT failure_reasons FROM nodes WHERE id=?",
+                            (_failed_blockers[0],),
+                        )
+                        if _blk_row and _blk_row.get("failure_reasons"):
+                            _frs_arr = json.loads(_blk_row["failure_reasons"])
+                            if _frs_arr and isinstance(_frs_arr, list):
+                                _last = _frs_arr[-1]
+                                if isinstance(_last, dict):
+                                    _blk_text = str(_last.get("reason", ""))
+                    except Exception:
+                        pass
+                    if _blk_text:
+                        from engine.skills.executor_cascade import macro_diagnose_safe
+                        await macro_diagnose_safe(
+                            db, node.id, _failed_blockers[0], _blk_text,
+                            model_adapter=model_adapter, source="blocked_dep",
+                        )
                 # BLOCKED 전환 + return (retry_count 미소비 — ValueError raise 시 dag_advancer가 retry_count 증가)
                 await db.execute(
                     "UPDATE nodes SET state='BLOCKED', updated_at=? WHERE id=?",
@@ -3115,6 +3166,18 @@ async def create_skill_executor(
                     model_adapter, model, response, max_tokens,
                 )
 
+            # 8-2. Category-constraint self-check (library split TASK)
+            # spec 에 _library_split_category 제약이 있으면 결과 JSON 의 category
+            # 필드를 대조 → 미스매치 시 1회 교정 재호출.
+            if (
+                art_type == "json"
+                and node.node_type == "TASK"
+                and response.stop_reason == "end_turn"
+            ):
+                response = await _enforce_category_constraint(
+                    db, model_adapter, model, response, node, assembly, max_tokens,
+                )
+
             # 9-11. Post-AI-call processing (save, validate, repair, complete)
             await _handle_post_ai_call(
                 db, node, response, spec, project,
@@ -3256,6 +3319,17 @@ async def create_skill_executor(
                         "episode_save_skip node=%s error=%s",
                         node.id[:8], _ep_err,
                     )
+            # ── 갭 보강 1: TASK 직접 예외 → 거시 진단 시도 ──
+            # 메시지 길이 가드 + try/except 격리 모두 헬퍼 내부에서 처리.
+            if (
+                node.node_type == "TASK"
+                and not isinstance(_any_exc, (InputBudgetExceededError, PhaseBudgetExceededError))
+            ):
+                from engine.skills.executor_cascade import macro_diagnose_safe
+                await macro_diagnose_safe(
+                    db, node.id, node.id, str(_any_exc),
+                    model_adapter=model_adapter, source="task_exception",
+                )
             raise
 
     # ── Heartbeat Wrapper ──
@@ -4811,6 +4885,36 @@ async def _handle_post_ai_call(
                         f"QA 부분 패치 (score={_qa_score}): {'; '.join(_affected[:3])}"
                     )
 
+            # ── 거시 우선 진단 (root cause 가 상위 단계에 있는지 자동 분석) ──
+            # 키워드 strict 매칭 + 0건 시 AI fallback (V10_UPSTREAM_REWORK_MODE 환경변수로 제어)
+            # 0건이면 기존 미시 retry 흐름으로 자동 fallback (회귀 0)
+            from engine.skills.executor_cascade import macro_diagnose_safe
+            _upstream_affected = await macro_diagnose_safe(
+                db, node.id, node.task_pair_node_id or "",
+                fail_text, model_adapter=model_adapter, source="qa_verdict",
+            )
+
+            if _upstream_affected > 0:
+                # 거시 진단 성공 → 직속 paired TASK 도 함께 INVALID (정합성)
+                if node.task_pair_node_id:
+                    try:
+                        await db.execute(
+                            "UPDATE nodes SET state='INVALID', "
+                            "stall_count=COALESCE(stall_count,0)+1, "
+                            "updated_at=? WHERE id=?",
+                            (_now(), node.task_pair_node_id),
+                        )
+                    except Exception:
+                        pass
+                logger.warning(
+                    "qa_root_cause_detected qa=%s upstream=%d → paired TASK INVALID",
+                    node.id[:8], _upstream_affected,
+                )
+                raise ValueError(
+                    f"QA 판정 FAIL (score={verdict.get('score', '?')}) — "
+                    f"상위 결함 {_upstream_affected}건 감지, root cause 재생성 대기"
+                )
+
             # Score < 30: 전체 재생성 (구조적 문제)
             # 조건 1: 키워드 매칭 — 기존 재시도 트리거 유지
             # 조건 2: 반복 동일실패 — QA가 retry>=1 이면서 직전 실패 사유와 같으면 강제 재생성
@@ -4969,4 +5073,116 @@ async def _handle_post_ai_call(
                 "upstream_cascade_failed node=%s error=%s — continuing",
                 node.id[:8], _casc_err,
             )
+
+
+async def _enforce_category_constraint(
+    db: Any,
+    model_adapter: ModelAdapter,
+    model: str,
+    response: Any,
+    node: NodeSnapshot,
+    assembly: Any,
+    max_tokens: int,
+) -> Any:
+    """
+    _library_split_category 제약이 있는 TASK 의 JSON 배열 결과에서
+    모든 item 의 category 필드가 지정된 카테고리와 일치하는지 검증.
+
+    미스매치 시 1회 교정 재호출. 여전히 미스매치면 원본 반환 (QA 가 적발).
+
+    Returns:
+        response (통과 시 원본, 재호출 성공 시 새 응답)
+    """
+    try:
+        row = await db.fetchone(
+            "SELECT description FROM nodes WHERE id=?", (node.id,),
+        )
+        if not row or not row["description"]:
+            return response
+        desc = json.loads(row["description"])
+    except (json.JSONDecodeError, TypeError):
+        return response
+
+    if not isinstance(desc, dict):
+        return response
+    target_cat = desc.get("_library_split_category")
+    if not target_cat:
+        return response
+
+    try:
+        parsed = json.loads(response.content)
+    except (json.JSONDecodeError, AttributeError):
+        return response
+    if not isinstance(parsed, list):
+        return response
+
+    mismatched = [
+        (i, str(item.get("category", "<missing>")))
+        for i, item in enumerate(parsed)
+        if isinstance(item, dict) and item.get("category") != target_cat
+    ]
+    if not mismatched:
+        return response
+
+    logger.warning(
+        "category_constraint_violation node=%s target=%s violations=%d/%d",
+        node.id[:8], target_cat, len(mismatched), len(parsed),
+    )
+
+    corrective = (
+        f"\n\n## 🚨 CRITICAL 재생성 요청\n"
+        f"이전 응답의 {len(mismatched)}/{len(parsed)}개 컴포넌트가 "
+        f"category='{target_cat}' 이 아닙니다.\n"
+        f"발견된 잘못된 category 값: {', '.join({c for _, c in mismatched[:5]})}\n\n"
+        f"**모든 컴포넌트의 category 필드를 반드시 '{target_cat}' 으로 설정**해야 합니다.\n"
+        f"'{target_cat}' 카테고리에 속하지 않는 컴포넌트는 모두 삭제하고 재생성하세요.\n"
+        f"순수 JSON 배열로만 출력. category 필드 하드코딩 필수."
+    )
+    corrected_prompt = assembly.prompt + corrective
+
+    try:
+        retry_resp = await model_adapter.call(
+            model=model,
+            system=assembly.system,
+            prompt=corrected_prompt,
+            max_tokens=max_tokens,
+        )
+    except Exception as exc:
+        logger.warning(
+            "category_retry_call_failed node=%s error=%s", node.id[:8], exc,
+        )
+        return response
+
+    try:
+        reparsed = json.loads(retry_resp.content)
+    except (json.JSONDecodeError, AttributeError):
+        logger.warning(
+            "category_retry_unparseable node=%s — keeping original", node.id[:8],
+        )
+        return response
+
+    if not isinstance(reparsed, list):
+        return response
+    still_wrong = [
+        item for item in reparsed
+        if isinstance(item, dict) and item.get("category") != target_cat
+    ]
+    if still_wrong:
+        logger.warning(
+            "category_retry_still_wrong node=%s still=%d/%d — keeping original",
+            node.id[:8], len(still_wrong), len(reparsed),
+        )
+        return response
+
+    logger.info(
+        "category_retry_success node=%s target=%s items=%d",
+        node.id[:8], target_cat, len(reparsed),
+    )
+    # Prometheus counter
+    try:
+        from engine.observability.metrics import V10_CATEGORY_RETRY_SUCCESS
+        V10_CATEGORY_RETRY_SUCCESS.labels(category=target_cat).inc()
+    except Exception:
+        pass
+    return retry_resp
 

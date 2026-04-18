@@ -254,3 +254,24 @@ V10_PHASE_BUDGET_EXCEEDED = _make_counter(
     "Phase budget 초과로 BLOCKED 전이된 노드",
     labels=["phase"],
 )
+
+# TASK 단계 category 제약 위반 감지 후 1회 교정 재호출이 성공한 횟수
+V10_CATEGORY_RETRY_SUCCESS = _make_counter(
+    "v10_category_constraint_retry_success_total",
+    "Library split TASK 에서 category 미스매치 교정 재호출 성공",
+    labels=["category"],
+)
+
+# QA FAIL 시 거시 진단으로 root cause(상위 단계 결함) 감지된 횟수
+V10_QA_ROOT_CAUSE_DETECTED = _make_counter(
+    "v10_qa_root_cause_detected_total",
+    "QA FAIL 거시 분석으로 상위 결함 감지",
+    labels=["phase", "method"],  # method: keyword | ai
+)
+
+# 거시 진단 결과 상위 phase TASK 가 INVALID 로 전환된 누적
+V10_UPSTREAM_REWORK_TOTAL = _make_counter(
+    "v10_upstream_rework_total",
+    "상위 phase TASK INVALID 전환 누적 (root cause 자동 수정)",
+    labels=["category"],
+)
