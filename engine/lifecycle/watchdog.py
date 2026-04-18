@@ -48,8 +48,15 @@ _PERMANENT_SUSPENSION_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 # 엔진 내부 상태로 쓰이는 특수 사유 — watchdog이 건드리지 않음 (startup 등 다른 경로가 처리)
+# 수동 개입 / 영구 보류 사유도 포함하여 watchdog 자동 재개로 인한 무한 루프 방지.
 _RESERVED_SUSPENSION_REASONS = frozenset({
     "SHUTDOWN_DRAIN",
+    # 수동 개입 — 운영자/사용자가 명시적으로 보류
+    "MANUAL_HOLD",
+    "SHOULD_SKIP",
+    "PROJECT_CONTEXT_NOT_APPLICABLE",  # 프로젝트 도메인에 부적합한 노드
+    "DEPENDENCY_NOT_MET",              # 의존 그래프 미충족 (구조적 문제)
+    "DEPENDENCY_GRAPH_BROKEN",         # 의존 그래프 자체 손상
 })
 
 SUSPENDED_MIN_COOLDOWN_MINUTES = 3  # suspend 직후 바로 풀면 또 같은 오류 → 쿨다운
