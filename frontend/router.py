@@ -76,7 +76,12 @@ async def _load_engagement_projects_data(db, engagement_id: str) -> dict:
                FROM agent_token_usage GROUP BY node_id
            ) tu ON tu.node_id = n.id
            WHERE p.engagement_id = ?
-           ORDER BY p.id, n.phase, n.node_type DESC, n.priority, n.created_at""",
+           ORDER BY p.id,
+                    CASE n.phase
+                        WHEN 'DEFINE' THEN 1 WHEN 'DESIGN' THEN 2
+                        WHEN 'BUILD' THEN 3 WHEN 'VERIFY' THEN 4
+                        WHEN 'DELIVER' THEN 5 ELSE 99 END,
+                    n.node_type DESC, n.priority, n.created_at""",
         (engagement_id,),
     )
 
@@ -715,7 +720,12 @@ def register_dashboard_routes(app, get_db_func, get_current_user_func) -> None:
                 dag_id = dag["id"]
                 node_rows = await db.fetchall(
                     """SELECT id, name, state, phase, node_type, priority
-                       FROM nodes WHERE dag_id=? ORDER BY phase, priority""",
+                       FROM nodes WHERE dag_id=?
+                       ORDER BY CASE phase
+                                    WHEN 'DEFINE' THEN 1 WHEN 'DESIGN' THEN 2
+                                    WHEN 'BUILD' THEN 3 WHEN 'VERIFY' THEN 4
+                                    WHEN 'DELIVER' THEN 5 ELSE 99 END,
+                                priority""",
                     (dag_id,),
                 )
                 nodes = [dict(r) for r in node_rows]
@@ -1035,7 +1045,12 @@ def register_dashboard_routes(app, get_db_func, get_current_user_func) -> None:
                               retry_count, stall_count,
                               invalidation_pending, invalidation_source_id,
                               task_pair_node_id, qa_pair_node_id
-                       FROM nodes WHERE dag_id=? ORDER BY phase, priority""",
+                       FROM nodes WHERE dag_id=?
+                       ORDER BY CASE phase
+                                    WHEN 'DEFINE' THEN 1 WHEN 'DESIGN' THEN 2
+                                    WHEN 'BUILD' THEN 3 WHEN 'VERIFY' THEN 4
+                                    WHEN 'DELIVER' THEN 5 ELSE 99 END,
+                                priority""",
                     (dag_id,),
                 )
                 nodes = [dict(r) for r in node_rows]

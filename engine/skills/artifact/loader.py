@@ -672,7 +672,11 @@ async def _load_upstream_artifacts(db, node) -> str:
            WHERE d.project_id = ? AND n.phase IN ('BUILD', 'DESIGN')
              AND n.node_type = 'TASK' AND n.state = 'COMPLETED'
              AND av.version_num = a.current_version
-           ORDER BY n.phase, n.name""",
+           ORDER BY CASE n.phase
+                        WHEN 'DEFINE' THEN 1 WHEN 'DESIGN' THEN 2
+                        WHEN 'BUILD' THEN 3 WHEN 'VERIFY' THEN 4
+                        WHEN 'DELIVER' THEN 5 ELSE 99 END,
+                    n.name""",
         (node.project_id,),
     )
 
@@ -747,7 +751,11 @@ async def _load_defect_targets_only(db, node) -> str:
              AND n.node_type = 'TASK' AND n.state = 'COMPLETED'
              AND a.current_version > 1
              AND av.version_num = a.current_version
-           ORDER BY n.phase, n.name""",
+           ORDER BY CASE n.phase
+                        WHEN 'DEFINE' THEN 1 WHEN 'DESIGN' THEN 2
+                        WHEN 'BUILD' THEN 3 WHEN 'VERIFY' THEN 4
+                        WHEN 'DELIVER' THEN 5 ELSE 99 END,
+                    n.name""",
         (node.project_id,),
     )
 
