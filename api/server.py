@@ -592,7 +592,13 @@ async def list_nodes(
     if phase_filter:
         query += " AND phase=?"
         params.append(phase_filter)
-    query += " ORDER BY phase, priority"
+    query += (
+        " ORDER BY CASE phase"
+        " WHEN 'DEFINE' THEN 1 WHEN 'DESIGN' THEN 2"
+        " WHEN 'BUILD' THEN 3 WHEN 'VERIFY' THEN 4"
+        " WHEN 'DELIVER' THEN 5 ELSE 99 END,"
+        " priority"
+    )
     rows = await db.fetchall(query, tuple(params))
     return {"nodes": [dict(r) for r in rows]}
 

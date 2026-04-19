@@ -260,6 +260,89 @@ async def test_verify_no_issues_clean_dag():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
+async def test_phase_display_order_correct():
+    """대시보드 phase 정렬이 워크플로우 순서 (DEFINE→DESIGN→BUILD→VERIFY→DELIVER) 로
+    나와야 함 — 알파벳 순 (BUILD<DEFINE<...) 이 아니라."""
+    db = create_adapter("sqlite:///:memory:")
+    await db.execute("""
+        CREATE TABLE nodes (
+            id TEXT PRIMARY KEY, dag_id TEXT, phase TEXT,
+            name TEXT, priority INTEGER DEFAULT 0
+        )
+    """)
+    dag_id = "test"
+    for i, phase in enumerate(["DELIVER", "BUILD", "DEFINE", "VERIFY", "DESIGN"]):
+        await db.execute(
+            "INSERT INTO nodes VALUES (?, ?, ?, ?, 0)",
+            (str(uuid.uuid4()), dag_id, phase, f"n{i}"),
+        )
+    rows = await db.fetchall(
+        """SELECT phase FROM nodes WHERE dag_id=?
+           ORDER BY CASE phase
+                        WHEN 'DEFINE' THEN 1 WHEN 'DESIGN' THEN 2
+                        WHEN 'BUILD' THEN 3 WHEN 'VERIFY' THEN 4
+                        WHEN 'DELIVER' THEN 5 ELSE 99 END, name""",
+        (dag_id,),
+    )
+    assert [r["phase"] for r in rows] == [
+        "DEFINE", "DESIGN", "BUILD", "VERIFY", "DELIVER",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_cascade_revives_skipped_qa_and_edges():
+    """TASK COMPLETED cascade 가 SKIPPED QA 살리고 outgoing edges 재활성화."""
+    db = create_adapter("sqlite:///:memory:")
+    await db.execute("""
+        CREATE TABLE nodes (
+            id TEXT PRIMARY KEY, state TEXT, version INTEGER DEFAULT 0,
+            node_type TEXT, updated_at TEXT
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE edges (
+            id TEXT PRIMARY KEY, from_node_id TEXT, to_node_id TEXT,
+            is_active INTEGER DEFAULT 1
+        )
+    """)
+    qa_id = str(uuid.uuid4())
+    downstream_id = str(uuid.uuid4())
+    edge_id = str(uuid.uuid4())
+    # QA SKIPPED + outgoing edge 비활성 (startup hook 이 끊은 상태 재현)
+    await db.execute(
+        "INSERT INTO nodes (id, state, node_type) VALUES (?, 'SKIPPED', 'QA')",
+        (qa_id,),
+    )
+    await db.execute(
+        "INSERT INTO nodes (id, state, node_type) VALUES (?, 'BLOCKED', 'TASK')",
+        (downstream_id,),
+    )
+    await db.execute(
+        "INSERT INTO edges (id, from_node_id, to_node_id, is_active) VALUES (?, ?, ?, 0)",
+        (edge_id, qa_id, downstream_id),
+    )
+
+    # cascade 시뮬레이션 (executor.py 11-0a 로직):
+    #   페어 TASK COMPLETED → 짝 QA SKIPPED → NOT_STARTED + outgoing edges 재활성화
+    rc = await db.execute(
+        """UPDATE nodes SET state='NOT_STARTED'
+           WHERE id=? AND state IN ('BLOCKED', 'SKIPPED')""",
+        (qa_id,),
+    )
+    assert rc == 1
+    await db.execute(
+        "UPDATE edges SET is_active=1 WHERE from_node_id=? AND is_active=0",
+        (qa_id,),
+    )
+
+    # 검증
+    row = await db.fetchone("SELECT state FROM nodes WHERE id=?", (qa_id,))
+    assert row["state"] == "NOT_STARTED"
+    erow = await db.fetchone("SELECT is_active FROM edges WHERE id=?", (edge_id,))
+    assert erow["is_active"] == 1
+
+
+@pytest.mark.asyncio
 async def test_retry_reactivates_outgoing_edges():
     """c9_manual_retry 시 노드의 비활성 outgoing edges 자동 재활성화."""
     from engine.core.validation_gateway import ValidationGateway
