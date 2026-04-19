@@ -4992,16 +4992,48 @@ async def _handle_post_ai_call(
         (_now(), _now(), node.id),
     )
 
-    # 11-0a. TASK 완료 시 짝 QA 노드가 pair guard로 BLOCKED 또는 SKIPPED 상태라면
-    #         NOT_STARTED 로 해제하여 QA가 다시 돌 수 있도록 한다.
-    #         SKIPPED 포함 이유: 이전에 cascade/split 로 SKIPPED 됐던 QA 가 TASK
-    #         재실행 (retry) 으로 다시 살아나야 하는 경우. 없으면 다운스트림 영구 BLOCKED.
-    #         또한 해당 QA 의 outgoing edges 가 Migration 040/Fix #2 등으로 비활성화됐다면
-    #         재활성화 (PR #3 의 c9_manual_retry 보강을 cascade 경로로 확장).
+    # 11-0a. TASK 완료 시 짝 QA 노드를 자동 복구:
+    #         (a) pair link 누락 시 이름 매칭으로 양방향 link 자동 세팅 (중복 QA 있어도
+    #             실제 실행된 (state != SKIPPED) 것 또는 최근 created 것 우선)
+    #         (b) QA state 가 BLOCKED/SKIPPED 이면 NOT_STARTED 로 전환
+    #         (c) QA 의 outgoing edges 중 is_active=0 인 것 재활성화 → 다운스트림 의존성 복구
+    #
+    #         기존 startup._heal_pair_links 는 서버 재시작 시에만 실행되어 runtime 중
+    #         깨진 pair link 를 복구 못 했음. 여기서 cascade 경로로 확장하여 범용 복구.
     if node.node_type == "TASK":
         try:
             _qa_pair_id = getattr(node, "qa_pair_node_id", None)
-            _revived_qa_ids: list[str] = []
+
+            # (a) pair link 누락 시 이름 매칭으로 복구
+            if not _qa_pair_id:
+                _qa_candidate = await db.fetchone(
+                    """SELECT n.id FROM nodes n
+                       WHERE n.dag_id=? AND n.project_id=? AND n.node_type='QA'
+                         AND n.name=?
+                       ORDER BY
+                         CASE WHEN n.state != 'SKIPPED' THEN 0 ELSE 1 END,
+                         (SELECT COUNT(*) FROM artifacts WHERE node_id=n.id) DESC,
+                         n.created_at DESC
+                       LIMIT 1""",
+                    (node.dag_id, node.project_id, f"[QA] {node.name}"),
+                )
+                if _qa_candidate:
+                    _qa_pair_id = _qa_candidate["id"]
+                    # 양방향 pair link 세팅 (둘 다 NULL 일 때만 — 기존 link 덮어쓰기 방지)
+                    await db.execute(
+                        "UPDATE nodes SET qa_pair_node_id=?, updated_at=? WHERE id=? AND qa_pair_node_id IS NULL",
+                        (_qa_pair_id, _now(), node.id),
+                    )
+                    await db.execute(
+                        "UPDATE nodes SET task_pair_node_id=?, updated_at=? WHERE id=? AND task_pair_node_id IS NULL",
+                        (node.id, _now(), _qa_pair_id),
+                    )
+                    logger.info(
+                        "cascade_pair_link_healed task=%s qa=%s",
+                        node.id[:8], _qa_pair_id[:8],
+                    )
+
+            # (b) QA state 전환 + (c) outgoing edges 재활성화
             if _qa_pair_id:
                 _rowcount = await db.execute(
                     """UPDATE nodes SET state='NOT_STARTED', updated_at=?, version=version+1
@@ -5009,28 +5041,10 @@ async def _handle_post_ai_call(
                     (_now(), _qa_pair_id),
                 )
                 if _rowcount:
-                    _revived_qa_ids.append(_qa_pair_id)
-            else:
-                # pair link 누락 시 이름 매칭 fallback
-                _name_matched = await db.fetchall(
-                    """SELECT id FROM nodes
-                       WHERE dag_id=? AND project_id=? AND node_type='QA'
-                         AND name=? AND state IN ('BLOCKED', 'SKIPPED')""",
-                    (node.dag_id, node.project_id, f"[QA] {node.name}"),
-                )
-                for _mr in _name_matched:
-                    _revived_qa_ids.append(_mr["id"])
                     await db.execute(
-                        "UPDATE nodes SET state='NOT_STARTED', updated_at=?, version=version+1 WHERE id=?",
-                        (_now(), _mr["id"]),
+                        "UPDATE edges SET is_active=1 WHERE from_node_id=? AND is_active=0",
+                        (_qa_pair_id,),
                     )
-
-            # 살아난 QA 노드들의 outgoing edges 재활성화 — 다운스트림 의존성 복구
-            for _rid in _revived_qa_ids:
-                await db.execute(
-                    "UPDATE edges SET is_active=1 WHERE from_node_id=? AND is_active=0",
-                    (_rid,),
-                )
             # DAG enqueue 는 TASK COMPLETED 다음 단계의 cascade 훅(아래 11-1)이
             # 처리하므로 여기서 별도로 하지 않는다. unblock 상태 업데이트만으로 충분.
         except Exception as _qa_unblock_err:

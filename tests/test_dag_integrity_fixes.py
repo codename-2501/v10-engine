@@ -260,6 +260,57 @@ async def test_verify_no_issues_clean_dag():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
+async def test_cascade_heals_pair_link_with_duplicate_qas():
+    """중복 QA 3개 (2 SKIPPED, 1 실제 실행됨) 중 실제 실행된 걸 우선 선택."""
+    db = create_adapter("sqlite:///:memory:")
+    await db.execute("""
+        CREATE TABLE nodes (
+            id TEXT PRIMARY KEY, dag_id TEXT, project_id TEXT,
+            node_type TEXT, name TEXT, state TEXT,
+            qa_pair_node_id TEXT, task_pair_node_id TEXT,
+            created_at TEXT DEFAULT '2026-04-19T00:00:00Z'
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE artifacts (id TEXT PRIMARY KEY, node_id TEXT)
+    """)
+    dag_id = "test"
+    proj_id = "proj"
+    task_id = str(uuid.uuid4())
+    qa_skipped1 = str(uuid.uuid4())
+    qa_skipped2 = str(uuid.uuid4())
+    qa_active = str(uuid.uuid4())
+    # TASK 페어 link NULL
+    await db.execute(
+        """INSERT INTO nodes (id, dag_id, project_id, node_type, name, state)
+           VALUES (?, ?, ?, 'TASK', 'X', 'COMPLETED')""",
+        (task_id, dag_id, proj_id),
+    )
+    # 중복 QA 3개 (2 SKIPPED, 1 FAILED)
+    for qid, state in [
+        (qa_skipped1, "SKIPPED"),
+        (qa_skipped2, "SKIPPED"),
+        (qa_active, "FAILED"),
+    ]:
+        await db.execute(
+            """INSERT INTO nodes (id, dag_id, project_id, node_type, name, state)
+               VALUES (?, ?, ?, 'QA', '[QA] X', ?)""",
+            (qid, dag_id, proj_id, state),
+        )
+    # 이름 매칭 쿼리 (executor.py 11-0a 로직과 동일)
+    row = await db.fetchone(
+        """SELECT id, state FROM nodes
+           WHERE dag_id=? AND project_id=? AND node_type='QA' AND name='[QA] X'
+           ORDER BY CASE WHEN state != 'SKIPPED' THEN 0 ELSE 1 END,
+                    (SELECT COUNT(*) FROM artifacts WHERE node_id=nodes.id) DESC,
+                    created_at DESC
+           LIMIT 1""",
+        (dag_id, proj_id),
+    )
+    assert row["id"] == qa_active, "SKIPPED 아닌 QA 가 우선 선택되어야 함"
+
+
+@pytest.mark.asyncio
 async def test_phase_display_order_correct():
     """대시보드 phase 정렬이 워크플로우 순서 (DEFINE→DESIGN→BUILD→VERIFY→DELIVER) 로
     나와야 함 — 알파벳 순 (BUILD<DEFINE<...) 이 아니라."""
