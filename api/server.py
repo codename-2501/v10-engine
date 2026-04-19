@@ -281,7 +281,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AI SI 매뉴팩처링 플랫폼 v9",
+    title="AI SI 매뉴팩처링 플랫폼 v10",
     version="9.0.0",
     lifespan=lifespan,
 )

@@ -260,6 +260,63 @@ async def test_verify_no_issues_clean_dag():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
+async def test_retry_reactivates_outgoing_edges():
+    """c9_manual_retry 시 노드의 비활성 outgoing edges 자동 재활성화."""
+    from engine.core.validation_gateway import ValidationGateway
+
+    db = create_adapter("sqlite:///:memory:")
+    # 최소 schema (validation_gateway 가 참조하는 컬럼)
+    await db.execute("""
+        CREATE TABLE nodes (
+            id TEXT PRIMARY KEY, state TEXT, version INTEGER DEFAULT 0,
+            retry_count INTEGER DEFAULT 0, stall_count INTEGER DEFAULT 0,
+            failure_reasons TEXT, description TEXT, updated_at TEXT
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE edges (
+            id TEXT PRIMARY KEY, from_node_id TEXT, to_node_id TEXT,
+            is_active INTEGER DEFAULT 1
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE agent_token_usage (node_id TEXT, tokens INTEGER)
+    """)
+
+    node_id = str(uuid.uuid4())
+    downstream_id = str(uuid.uuid4())
+    edge_id = str(uuid.uuid4())
+
+    await db.execute(
+        "INSERT INTO nodes (id, state) VALUES (?, 'FAILED')", (node_id,),
+    )
+    await db.execute(
+        "INSERT INTO nodes (id, state) VALUES (?, 'BLOCKED')", (downstream_id,),
+    )
+    # 비활성 outgoing edge (Migration 040 이나 splitting.py 에서 비활성화됐던 케이스)
+    await db.execute(
+        "INSERT INTO edges (id, from_node_id, to_node_id, is_active) VALUES (?, ?, ?, 0)",
+        (edge_id, node_id, downstream_id),
+    )
+
+    gw = ValidationGateway(db)
+    success = await gw.c9_manual_retry(node_id, "ADMIN")
+    assert success is True
+
+    # outgoing edge 재활성화 확인
+    row = await db.fetchone(
+        "SELECT is_active FROM edges WHERE id=?", (edge_id,),
+    )
+    assert row["is_active"] == 1, "retry 후 outgoing edge 가 재활성화되어야 함"
+
+    # 노드 상태 READY 확인
+    node_row = await db.fetchone(
+        "SELECT state FROM nodes WHERE id=?", (node_id,),
+    )
+    assert node_row["state"] == "READY"
+
+
+@pytest.mark.asyncio
 async def test_run_integrity_check_detects_and_fixes():
     """검출 + 자동 복구 E2E 흐름."""
     from engine.tools.verify_dag_integrity import run_integrity_check
