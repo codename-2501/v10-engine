@@ -1,14 +1,14 @@
 """
 run.py
-AI SI 매뉴팩처링 플랫폼 v9 — 실행 진입점.
+AI SI 매뉴팩처링 플랫폼 v10 — 실행 진입점.
 
 사용법:
-  python run.py --port 8004       # V9 기본 실행 (0.0.0.0:8004)
-  python run.py --host 127.0.0.1 --port 8004  # 로컬만 허용
+  python run.py --port 8007       # V10 기본 실행 (0.0.0.0:8007)
+  python run.py --host 127.0.0.1 --port 8007  # 로컬만 허용
   python run.py --port 8000 --dev             # 개발 모드 (hot-reload + 콘솔 로그)
 
   또는 uvicorn 직접:
-  uvicorn api.server:app --host 0.0.0.0 --port 8004 --workers 1
+  uvicorn api.server:app --host 0.0.0.0 --port 8007 --workers 1
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import sys
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="AI SI 매뉴팩처링 플랫폼 v9")
+    parser = argparse.ArgumentParser(description="AI SI 매뉴팩처링 플랫폼 v10")
     parser.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     parser.add_argument("--workers", type=int, default=int(os.environ.get("WORKERS", "1")),

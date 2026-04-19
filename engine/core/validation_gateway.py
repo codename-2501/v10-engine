@@ -377,6 +377,17 @@ class ValidationGateway:
                WHERE id=? AND version=?""",
             (node_id, node["version"]),
         )
+        # Re-activate outgoing edges that may have been deactivated while
+        # the node was SKIPPED (e.g. by splitting.py or migration 040).
+        # Without this, downstream nodes remain BLOCKED forever due to
+        # missing dependency edge even after retry succeeds.
+        try:
+            await self._db.execute(
+                "UPDATE edges SET is_active=1 WHERE from_node_id=? AND is_active=0",
+                (node_id,),
+            )
+        except Exception:
+            pass
         if affected:
             logger.info("c9_manual_retry node_id=%s actor_role=%s", node_id, actor_role)
         return affected > 0
