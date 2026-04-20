@@ -672,7 +672,7 @@ def register_dashboard_routes(app, get_db_func, get_current_user_func) -> None:
             import logging
             logging.getLogger("frontend.router").warning("preview_url_detect_error: %s", _exc)
 
-        return templates.TemplateResponse(
+        _resp = templates.TemplateResponse(
             "engagement_detail_live.html",
             {
                 "request": request,
@@ -684,6 +684,12 @@ def register_dashboard_routes(app, get_db_func, get_current_user_func) -> None:
                 "preview_url": preview_url,
             },
         )
+        # live 페이지는 DAG 실시간 상태 + 최신 JS 함수 정의 포함 → 캐시 금지.
+        # 이전 세션에서 브라우저가 오래된 JS 캐시해서 viewArtifact/showFailureReason
+        # 등 함수 누락된 버전 사용하던 문제 방지.
+        _resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        _resp.headers["Pragma"] = "no-cache"
+        return _resp
 
     # ── DAG 시각화 ────────────────────────────────────────────────────────
 
