@@ -1698,11 +1698,13 @@ def _markdown_to_html(md: str) -> str:
 @app.get("/api/v1/nodes/{node_id}/failure-reasons")
 async def get_failure_reasons(
     node_id: str,
-    current_user: dict = Depends(get_current_user),
     db: DatabaseAdapter = Depends(get_db),
 ):
-    """노드 실패 사유 조회."""
-    RBAC.require(current_user["role"], Permission.VIEW_PROJECT)
+    """노드 실패 사유 조회 (public — /artifact/view 와 동일 레벨).
+
+    실패 사유는 engagement 접근 가능한 사용자에게 공개해도 민감하지 않음.
+    일관성 위해 /artifact/view 와 같은 auth-free.
+    """
     import json as _json
     row = await db.fetchone(
         "SELECT failure_reasons, retry_count, max_retries FROM nodes WHERE id=?",

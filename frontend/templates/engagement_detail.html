@@ -868,19 +868,23 @@ async function deleteEnvVar(key) {
 }
 
 async function showFailureReason(nodeId, nodeName) {
+  // public endpoint — 토큰 선택
   const token = localStorage.getItem('ai_si_token') || '';
+  const headers = token ? {'Authorization': 'Bearer ' + token} : {};
   try {
-    const r = await fetch(`/api/v1/nodes/${nodeId}/failure-reasons`, {
-      headers: {'Authorization': 'Bearer ' + token}
-    });
-    if (!r.ok) { alert('조회 실패'); return; }
+    const r = await fetch(`/api/v1/nodes/${nodeId}/failure-reasons`, { headers });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      alert(`조회 실패 (HTTP ${r.status})\n\n${nodeName}\n\n${body.slice(0, 300)}`);
+      return;
+    }
     const d = await r.json();
     const reasons = d.reasons || [];
     if (!reasons.length) {
-      alert(`${nodeName}\n\n실패 사유가 기록되지 않았습니다.`);
+      alert(`${nodeName}\n\n실패 사유가 기록되지 않았습니다.\n(retry ${d.retry_count||0}/${d.max_retries||0})`);
       return;
     }
-    let msg = `${nodeName} — 실패 이력\n${'─'.repeat(40)}\n\n`;
+    let msg = `${nodeName} — 실패 이력 (${reasons.length}건)\n${'─'.repeat(40)}\n\n`;
     reasons.forEach(r => {
       msg += `시도 ${r.attempt}: ${r.reason || '(사유 없음)'}\n시간: ${(r.at||'').slice(0,19)}\n\n`;
     });
