@@ -2491,6 +2491,24 @@ async def create_skill_executor(
             }
             rendered_prompt = render(spec["prompt"], variables)
 
+            # ── 엔진 전역 규칙: HTML 산출물은 풀 반응형 의무 ──
+            # CLAUDE.md 정책 + engine/skills/specs/_common/responsive_rules.md 자동 주입.
+            # 모든 HTML skill 에 공통 적용되어 개별 spec 수정 없이 범용 커버.
+            if spec.get("type") == "html":
+                try:
+                    from pathlib import Path as _Path
+                    _rules_path = _Path(__file__).parent / "specs" / "_common" / "responsive_rules.md"
+                    if _rules_path.exists():
+                        _rules = _rules_path.read_text(encoding="utf-8")
+                        rendered_prompt = (
+                            "## ⚠️ 풀 반응형 의무 (엔진 전역 규칙)\n\n"
+                            + _rules + "\n\n"
+                            + "──── 위 규칙 위반 시 산출물 거부 ────\n\n"
+                            + rendered_prompt
+                        )
+                except Exception as _rr_err:
+                    logger.debug("responsive_rules_inject_skip: %s", _rr_err)
+
             # 분할 노드: description이 JSON 메타데이터면 카테고리 지시로 변환
             if node.node_type == "TASK" and "(" in node.name:
                 try:

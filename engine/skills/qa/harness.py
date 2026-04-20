@@ -1638,6 +1638,37 @@ def _harness_validate_html(
         if not c_pass:
             failures.append(f"분량 부족: {len(content)} < {min_chars}자")
 
+    # 7-R. 풀 반응형 safeguard CSS 포함 여부 (엔진 전역 규칙)
+    # engine/skills/specs/_common/responsive_rules.md 의 필수 CSS 패턴 체크.
+    # 구체적으로 다음 핵심 2가지 존재하면 PASS:
+    #   (a) `min-width: 0` 을 * 또는 전역 선택자에 적용
+    #   (b) `overflow-wrap: anywhere` 또는 `word-break: keep-all` 적용
+    # 없으면 카드/그리드가 모바일에서 깨지므로 경고 (FAIL 아닌 warn).
+    _has_min_width_zero = bool(re.search(
+        r'\*\s*[^{]*\{[^}]*min-width\s*:\s*0',
+        content, re.IGNORECASE,
+    ))
+    _has_overflow_wrap = bool(re.search(
+        r'overflow-wrap\s*:\s*(?:anywhere|break-word)',
+        content, re.IGNORECASE,
+    )) or bool(re.search(
+        r'word-break\s*:\s*(?:keep-all|break-all|break-word)',
+        content, re.IGNORECASE,
+    ))
+    _responsive_ok = _has_min_width_zero and _has_overflow_wrap
+    checks.append({
+        "name": "responsive_safeguard",
+        "pass": _responsive_ok,
+        "min_width_zero": _has_min_width_zero,
+        "overflow_wrap": _has_overflow_wrap,
+    })
+    if not _responsive_ok:
+        failures.append(
+            "풀 반응형 safeguard CSS 누락 — "
+            "* { min-width: 0 } + overflow-wrap/word-break 필수 "
+            "(_common/responsive_rules.md 참조)"
+        )
+
     # 8. forbidden 키워드 (HTML 주석 영역 제외)
     forbidden_list = structural.get("forbidden", [])
     if forbidden_list:
