@@ -469,23 +469,29 @@ function closeAddProject() {
 }
 
 async function viewArtifact(nodeId, projectId, nodeName) {
+  // /artifact/preview 는 public endpoint — 로그인/토큰 불필요. 먼저 창 열기.
+  const previewUrl = `/api/v1/projects/${projectId}/nodes/${nodeId}/artifact/preview`;
+  window.open(previewUrl, '_blank');
+
+  // 백그라운드로 수정 모드용 메타데이터 로드 (실패해도 보기 창은 열림).
   const token = localStorage.getItem('ai_si_token') || '';
+  if (!token) return;
   try {
     const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/artifact`, {
       headers: {'Authorization': 'Bearer ' + token}
     });
-    if (!r.ok) { alert('산출물을 찾을 수 없습니다.'); return; }
+    if (!r.ok) return;
     const d = await r.json();
     _editNodeId = nodeId;
     _editProjectId = projectId;
     _editRawContent = d.content || '';
     _editArtifactType = d.artifact_type || '';
-    document.getElementById('artifactTitle').textContent = nodeName + ' (v' + d.version + ')';
-    const contentEl = document.getElementById('artifactContent');
-    const raw = d.content || '';
-    // 새 탭에서 전체화면 보기 (플로팅 수정 버튼 포함)
-    window.open(`/api/v1/projects/${projectId}/nodes/${nodeId}/artifact/preview`, '_blank');
-  } catch(e) { alert('오류: ' + e.message); }
+    const titleEl = document.getElementById('artifactTitle');
+    if (titleEl) titleEl.textContent = nodeName + ' (v' + d.version + ')';
+  } catch (e) {
+    // silent — 보기 창은 이미 열렸음
+    console.warn('viewArtifact metadata load failed:', e);
+  }
 }
 
 function renderMarkdown(md) {
