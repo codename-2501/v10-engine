@@ -57,4 +57,28 @@ h1, h2, h3, h4, h5, h6, p, a, span, button, label { overflow-wrap: anywhere; }
 - 각 `<section>` (화면) 은 **독립 풀반응형 컴포넌트**
 - 섹션 간 **세로 배치** (가로 grid 금지) — 모바일에서도 정상 폭 유지
 - 각 섹션 최대폭 `max-width: 1280px; margin: 0 auto;`
-- 섹션 헤더 (SC-XX-NNN 라벨) 는 `position: sticky` 권장
+- **섹션 헤더 라벨 (SC-XX-NNN 형식) position 규칙**:
+  - ❌ 절대 `position: absolute` 금지 — 내부 콘텐츠와 겹침
+  - ✅ 권장: `position: static` 또는 `position: sticky; top: 0;` (스크롤 시 상단 고정 + 반투명 배경)
+  - 콘텐츠 시작 전 **자연스러운 블록 요소** 로 배치 (flex/float 회피)
+
+### 올바른 섹션 라벨 예시
+```html
+<section id="SC-AU-005" class="screen">
+  <header class="screen-label" style="position: sticky; top: 0; z-index: 10;
+          background: rgba(22,28,24,0.94); backdrop-filter: blur(8px);
+          padding: 10px 16px; margin: 0 0 16px;
+          font-size: 11px; letter-spacing: 0.08em;">
+    SC-AU-005 | 비밀번호 재설정
+  </header>
+  <!-- 화면 실제 콘텐츠 -->
+</section>
+```
+
+### 금지 예시 (겹침 유발)
+```html
+<!-- ❌ 이 방식은 내부 콘텐츠 위에 라벨이 덮어쓰기 -->
+<header class="screen-label" style="position: absolute; top: 12px; left: 16px;">
+  SC-XX-NNN | ...
+</header>
+```

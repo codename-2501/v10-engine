@@ -1503,6 +1503,19 @@ async def view_artifact_html(
             "pre, code { white-space: pre-wrap; word-break: break-all; overflow-x: auto; }\n"
             # 긴 연속 문자열 강제 줄바꿈 — 타이틀/링크
             "h1, h2, h3, h4, h5, h6, p, a, span, button, label { overflow-wrap: anywhere; }\n"
+            # 시안 카탈로그 화면 라벨: position:absolute 금지 (콘텐츠 겹침 방지)
+            # screen-label / section-label / screen-id 등 관용 클래스 모두 커버
+            ".screen-label, .section-label, .screen-id,"
+            " [class*='screen-label'], [class*='section-header'] {"
+            " position: static !important;"
+            " margin-bottom: 12px !important;"
+            " display: block !important;"
+            " }\n"
+            # section 내부 content 가 label 과 겹치지 않도록 여유 padding
+            "section.screen, section[id^='SC-'], section[id^='SCR-'] {"
+            " padding-top: 0 !important;"
+            " position: relative;"
+            " }\n"
             "</style>"
         )
         # <head> 끝 직전 삽입. <head> 없으면 <html> 다음 직후 삽입.
