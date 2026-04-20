@@ -224,7 +224,7 @@
       </div>
       <div class="art-actions">
         {% if item.artifact_id and item.state == 'COMPLETED' %}
-          <a class="art-btn-primary art-btn" href="/api/v1/projects/{{ pd.project_id }}/nodes/{{ item.id }}/artifact/view" target="_blank">
+          <a class="art-btn-primary art-btn" href="/api/v1/projects/{{ pd.project_id }}/nodes/{{ item.id }}/artifact/preview" target="_blank">
             보기
           </a>
           <button class="art-btn" onclick="openReviseModal('{{ pd.project_id }}','{{ item.id }}','{{ item.name }}')">

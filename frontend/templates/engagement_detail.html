@@ -484,7 +484,7 @@ async function viewArtifact(nodeId, projectId, nodeName) {
     const contentEl = document.getElementById('artifactContent');
     const raw = d.content || '';
     // 새 탭에서 전체화면 보기 (플로팅 수정 버튼 포함)
-    window.open(`/api/v1/projects/${projectId}/nodes/${nodeId}/artifact/view`, '_blank');
+    window.open(`/api/v1/projects/${projectId}/nodes/${nodeId}/artifact/preview`, '_blank');
   } catch(e) { alert('오류: ' + e.message); }
 }
 

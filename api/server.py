@@ -1316,6 +1316,128 @@ async def revise_artifact(
     return result
 
 
+@app.get("/api/v1/projects/{project_id}/nodes/{node_id}/artifact/preview")
+async def preview_artifact_responsive(
+    project_id: str,
+    node_id: str,
+    db: DatabaseAdapter = Depends(get_db),
+):
+    """반응형 뷰포트 미리보기 — Mobile/Tablet/Desktop 탭.
+
+    iframe 으로 기존 /artifact/view 감싸 viewport 크기 동적 조정.
+    """
+    from fastapi.responses import HTMLResponse
+
+    node = await db.fetchone("SELECT name FROM nodes WHERE id=?", (node_id,))
+    node_name = (node["name"] if node else "산출물")
+
+    view_url = f"/api/v1/projects/{project_id}/nodes/{node_id}/artifact/view"
+    html = f"""<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="UTF-8">
+<title>{node_name} — 반응형 미리보기</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; padding: 0; background: #0f1210;
+    min-height: 100vh; overflow: hidden;
+  }}
+  .stage {{
+    height: 100vh; overflow: auto; padding: 20px 16px;
+    display: flex; justify-content: center; align-items: flex-start;
+    background: repeating-linear-gradient(45deg, #12161320, #12161320 8px, transparent 8px, transparent 16px);
+  }}
+  .frame-wrap {{
+    background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    transition: width .25s cubic-bezier(.16,1,.3,1);
+    width: 100%; max-width: none; height: calc(100vh - 40px);
+  }}
+  iframe {{ width: 100%; height: 100%; border: 0; display: block; background: #fff; }}
+
+  /* Floating button */
+  .fab {{
+    position: fixed; right: 24px; bottom: 24px; z-index: 1000;
+    display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 10px;
+    font-family: -apple-system, "Pretendard Variable", sans-serif;
+  }}
+  .fab-main {{
+    width: 56px; height: 56px; border-radius: 28px; border: none;
+    background: #5CC987; color: #0f1210;
+    font-size: 22px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(92,201,135,0.45);
+    transition: transform .15s;
+  }}
+  .fab-main:hover {{ transform: scale(1.08); }}
+  .fab-menu {{
+    display: none; flex-direction: column; gap: 8px;
+    background: #161c18; padding: 10px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+  }}
+  .fab.open .fab-menu {{ display: flex; }}
+  .fab-btn {{
+    padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    background: #25302a; color: #edf2ee; border: 1px solid transparent;
+    cursor: pointer; white-space: nowrap; text-align: left;
+    min-width: 160px; display: flex; justify-content: space-between; gap: 12px;
+  }}
+  .fab-btn:hover {{ background: #2d3a33; }}
+  .fab-btn.active {{ background: #5CC987; color: #0f1210; border-color: #3EAD6A; }}
+  .fab-btn span.size {{ opacity: .7; font-family: monospace; font-size: 11px; }}
+  .vp-badge {{
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 999;
+    background: rgba(22,28,24,0.9); color: #edf2ee;
+    padding: 6px 14px; border-radius: 20px; font-size: 12px;
+    font-family: monospace; backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+  }}
+</style></head><body>
+  <div class="vp-badge" id="vp-badge">Full viewport</div>
+  <div class="stage">
+    <div class="frame-wrap" id="frame-wrap">
+      <iframe src="{view_url}" title="artifact"></iframe>
+    </div>
+  </div>
+  <div class="fab" id="fab">
+    <button class="fab-main" id="fab-main" title="뷰포트 전환">⇄</button>
+    <div class="fab-menu">
+      <button class="fab-btn" data-w="375">📱 Mobile<span class="size">375px</span></button>
+      <button class="fab-btn" data-w="768">📲 Tablet<span class="size">768px</span></button>
+      <button class="fab-btn" data-w="1280">🖥 Desktop<span class="size">1280px</span></button>
+      <button class="fab-btn active" data-w="max">↔️ Full<span class="size">100%</span></button>
+      <button class="fab-btn" onclick="window.open('{view_url}','_blank')">🔗 Raw<span class="size">↗</span></button>
+    </div>
+  </div>
+<script>
+  const fab = document.getElementById('fab');
+  const main = document.getElementById('fab-main');
+  const wrap = document.getElementById('frame-wrap');
+  const badge = document.getElementById('vp-badge');
+  main.addEventListener('click', () => fab.classList.toggle('open'));
+  document.querySelectorAll('.fab-btn[data-w]').forEach(b => {{
+    b.addEventListener('click', () => {{
+      document.querySelectorAll('.fab-btn[data-w]').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      const w = b.dataset.w;
+      if (w === 'max') {{
+        wrap.style.width = '100%'; wrap.style.maxWidth = 'none';
+        badge.textContent = 'Full viewport';
+      }} else {{
+        wrap.style.width = w + 'px'; wrap.style.maxWidth = w + 'px';
+        badge.textContent = w + 'px · ' + b.textContent.replace(/[0-9px]+$/, '').trim();
+      }}
+      fab.classList.remove('open');
+    }});
+  }});
+  // ESC or outside click closes menu
+  document.addEventListener('keydown', e => {{ if (e.key === 'Escape') fab.classList.remove('open'); }});
+  document.addEventListener('click', e => {{ if (!fab.contains(e.target)) fab.classList.remove('open'); }});
+</script>
+</body></html>"""
+    return HTMLResponse(html)
+
+
 @app.get("/api/v1/projects/{project_id}/nodes/{node_id}/artifact/view")
 async def view_artifact_html(
     project_id: str,
