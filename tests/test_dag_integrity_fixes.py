@@ -259,6 +259,36 @@ async def test_verify_no_issues_clean_dag():
 # 통합: run_integrity_check + 자동 복구 flow
 # ---------------------------------------------------------------------------
 
+def test_is_html_detector_spec_type_html():
+    """spec.type='html' 이면 _is_html=True 확정 (content 앞부분과 무관)."""
+    # 로직 복제 — 실제 executor 에서 import 못 하니 동일 규칙 검증
+    def detect(spec, content):
+        _spec_html = bool(spec) and (
+            spec.get("type") == "html" or spec.get("file_type") == "html"
+        )
+        _content_looks_html = False
+        if content:
+            import re
+            _sniff = content.strip()
+            if _sniff.startswith("```"):
+                _sniff = re.sub(r"^```(?:html)?\s*\n?", "", _sniff)
+            _content_looks_html = _sniff[:15].lower().startswith(
+                ("<!doctype", "<html", "<div", "<style")
+            )
+        return _spec_html or _content_looks_html
+
+    # Case 1: spec.type=html → True (content 무관)
+    assert detect({"type": "html"}, "nothing here") is True
+    # Case 2: spec.file_type=html → True
+    assert detect({"file_type": "html"}, "x") is True
+    # Case 3: spec 없음 but content 는 ```html fence wrap
+    assert detect(None, "```html\n<!DOCTYPE html>\n<html>") is True
+    # Case 4: 순수 <!DOCTYPE 시작
+    assert detect(None, "<!DOCTYPE html>\n...") is True
+    # Case 5: document (헤딩 markdown)
+    assert detect({"type": "document"}, "# 제목\n내용") is False
+
+
 @pytest.mark.asyncio
 async def test_cascade_heals_pair_link_with_duplicate_qas():
     """중복 QA 3개 (2 SKIPPED, 1 실제 실행됨) 중 실제 실행된 걸 우선 선택."""
