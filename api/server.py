@@ -1483,11 +1483,35 @@ async def view_artifact_html(
         '', content,
     )
 
-    # HTML 산출물 → 그대로 반환
+    # HTML 산출물 → safeguard CSS 주입 후 반환
     if art["artifact_type"] == "html" or "<!DOCTYPE" in content:
         match = _rev.search(r'(<!DOCTYPE[\s\S]*</html>)', content, _rev.IGNORECASE)
         if match:
             content = match.group(1)
+        # Universal responsive safeguard (과거 생성 산출물도 즉시 보호)
+        # - min-width:0: flex item 이 내부 콘텐츠에 의해 부모 넘어서는 것 방지
+        # - overflow-wrap: anywhere: 긴 URL/이메일/영문 단어 어디서든 끊김
+        # - word-break: keep-all: 한글은 어절 단위로 유지 (예쁜 줄바꿈)
+        # - img/video max-width: 반응형 미디어
+        _safeguard_css = (
+            "<style data-v10-safeguard='1'>\n"
+            "*, *::before, *::after { min-width: 0; box-sizing: border-box; }\n"
+            "html, body { overflow-wrap: anywhere; word-break: keep-all; }\n"
+            "img, video, iframe, svg { max-width: 100%; height: auto; }\n"
+            # 테이블: 넓은 컬럼은 자체 가로 스크롤로 우회
+            "table { max-width: 100%; display: block; overflow-x: auto; }\n"
+            "pre, code { white-space: pre-wrap; word-break: break-all; overflow-x: auto; }\n"
+            # 긴 연속 문자열 강제 줄바꿈 — 타이틀/링크
+            "h1, h2, h3, h4, h5, h6, p, a, span, button, label { overflow-wrap: anywhere; }\n"
+            "</style>"
+        )
+        # <head> 끝 직전 삽입. <head> 없으면 <html> 다음 직후 삽입.
+        if "</head>" in content:
+            content = content.replace("</head>", _safeguard_css + "\n</head>", 1)
+        elif "<html" in content:
+            content = _rev.sub(r'(<html[^>]*>)', r'\1<head>' + _safeguard_css + '</head>', content, count=1)
+        else:
+            content = _safeguard_css + content
         return HTMLResponse(content)
 
     # JSON 산출물 → 포맷팅 + 구문 강조

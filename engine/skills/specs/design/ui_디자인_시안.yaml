@@ -90,6 +90,24 @@ prompt: |
   - 호버/포커스 상태 스타일 포함
   - 컴포넌트 정의서의 컬러/타이포/간격 토큰 적용
 
+  ### ★★ 반응형 안전망 CSS (MANDATORY — <style> 최상단에 반드시 포함) ★★
+  다음 global safeguard CSS 를 `<style>` 블록 최상단에 반드시 넣으세요.
+  이 CSS 없이 생성된 시안은 모바일/태블릿 뷰포트에서 카드/그리드가 깨집니다:
+
+  ```css
+  /* Responsive safeguard — flex overflow, long-text break, media fit */
+  *, *::before, *::after { min-width: 0; box-sizing: border-box; }
+  html, body { overflow-wrap: anywhere; word-break: keep-all; }
+  img, video, iframe, svg { max-width: 100%; height: auto; }
+  table { max-width: 100%; }
+  pre, code { white-space: pre-wrap; word-break: break-all; overflow-x: auto; }
+  ```
+
+  **이유**: flex 아이템의 기본 `min-width: auto` 때문에 내부 긴 콘텐츠가
+  부모 컨테이너를 밀어냄 → 카드 레이아웃 붕괴. 위 CSS 로 예방.
+  `word-break: keep-all` 은 한글 어절 단위 줄바꿈 유지 (영문 단어 중간
+  잘림 방지). `overflow-wrap: anywhere` 는 한글 없는 긴 영문도 끊김.
+
   ### ★ 디자인 퀄리티 규칙 (엄격히 준수)
 
   **금지 사항:**
