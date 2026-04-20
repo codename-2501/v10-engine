@@ -339,3 +339,71 @@
   프로젝트가 없습니다. + 프로젝트 버튼으로 추가하세요.
 </div>
 {% endfor %}
+
+<script>
+// ── engagement_detail_live.html 독립 페이지 action 함수들 ──
+// /engagements/*/live 경로는 engagement_detail.html 을 거치지 않고 단독 렌더링되므로
+// viewArtifact / showFailureReason 등 함수가 정의되지 않아 onclick 이 동작 안 했음.
+// 여기에 단순화 버전으로 직접 정의.
+
+function viewArtifact(nodeId, projectId, nodeName) {
+  const url = `/api/v1/projects/${projectId}/nodes/${nodeId}/artifact/preview`;
+  window.open(url, '_blank');
+}
+
+async function showFailureReason(nodeId, nodeName) {
+  const token = localStorage.getItem('ai_si_token') || '';
+  const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+  try {
+    const r = await fetch(`/api/v1/nodes/${nodeId}/failure-reasons`, { headers });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      alert(`조회 실패 (HTTP ${r.status})\n\n${nodeName}\n\n${body.slice(0, 300)}`);
+      return;
+    }
+    const d = await r.json();
+    const reasons = d.reasons || [];
+    if (!reasons.length) {
+      alert(`${nodeName}\n\n실패 사유 기록 없음.\n(retry ${d.retry_count||0}/${d.max_retries||0})`);
+      return;
+    }
+    let msg = `${nodeName} — 실패 이력 (${reasons.length}건)\n${'─'.repeat(40)}\n\n`;
+    reasons.forEach(r => {
+      msg += `시도 ${r.attempt}: ${r.reason || '(사유 없음)'}\n시간: ${(r.at||'').slice(0,19)}\n\n`;
+    });
+    alert(msg);
+  } catch (e) { alert('오류: ' + e.message); }
+}
+
+async function retryNode(nodeId, projectId, nodeName) {
+  if (!confirm(`"${nodeName}" 재시도하시겠습니까?\nretry_count 초기화 + 재실행.`)) return;
+  const token = localStorage.getItem('ai_si_token') || '';
+  if (!token) { alert('로그인이 필요합니다 — 우측 상단에서 로그인 후 다시 시도'); return; }
+  try {
+    const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/retry`, {
+      method: 'POST', headers: {'Authorization': 'Bearer ' + token}
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      alert('재시도 실패: ' + (d.detail || r.status)); return;
+    }
+    location.reload();
+  } catch (e) { alert('오류: ' + e.message); }
+}
+
+async function skipNode(nodeId, projectId, nodeName) {
+  if (!confirm(`"${nodeName}" 을(를) 건너뛰시겠습니까?`)) return;
+  const token = localStorage.getItem('ai_si_token') || '';
+  if (!token) { alert('로그인이 필요합니다'); return; }
+  try {
+    const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/skip`, {
+      method: 'POST', headers: {'Authorization': 'Bearer ' + token}
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      alert('건너뛰기 실패: ' + (d.detail || r.status)); return;
+    }
+    location.reload();
+  } catch (e) { alert('오류: ' + e.message); }
+}
+</script>
