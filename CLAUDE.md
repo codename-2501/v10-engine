@@ -14,7 +14,13 @@
 - engine/core/cascade.py — 변경 전파
 
 ## 구축 규칙
-- 웹 서비스 구축은 무조건 반응형 웹 (모바일/태블릿/데스크톱)
+- 웹 서비스 구축은 **무조건 풀 반응형 (Full Responsive / Fluid)** — 모바일 375px ~ 데스크톱 1280px 이상까지 연속적 대응
+- **적응형 (Adaptive) 절대 금지** — 특정 breakpoint 에서만 작동하는 고정 레이아웃 금지
+- 풀 반응형 의무 요소:
+  - flex/grid 는 `min-width: 0` + `overflow-wrap: anywhere` 기본 적용
+  - 테이블은 좁은 뷰포트에서 `overflow-x: auto` 자체 스크롤 또는 카드 리스트 전환
+  - 카드/그리드 column 은 `minmax()` 또는 `auto-fit` 으로 뷰포트 맞춤 리플로우
+  - 시안 카탈로그도 화면별 카드가 세로 reflow (가로 정렬 강제 금지)
 - 네이티브 앱 요청이 아닌 이상 반응형 웹으로 제작
 
 ## 산출물 디자인 규칙

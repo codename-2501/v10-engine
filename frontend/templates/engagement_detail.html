@@ -469,23 +469,29 @@ function closeAddProject() {
 }
 
 async function viewArtifact(nodeId, projectId, nodeName) {
+  // /artifact/preview 는 public endpoint — 로그인/토큰 불필요. 먼저 창 열기.
+  const previewUrl = `/api/v1/projects/${projectId}/nodes/${nodeId}/artifact/preview`;
+  window.open(previewUrl, '_blank');
+
+  // 백그라운드로 수정 모드용 메타데이터 로드 (실패해도 보기 창은 열림).
   const token = localStorage.getItem('ai_si_token') || '';
+  if (!token) return;
   try {
     const r = await fetch(`/api/v1/projects/${projectId}/nodes/${nodeId}/artifact`, {
       headers: {'Authorization': 'Bearer ' + token}
     });
-    if (!r.ok) { alert('산출물을 찾을 수 없습니다.'); return; }
+    if (!r.ok) return;
     const d = await r.json();
     _editNodeId = nodeId;
     _editProjectId = projectId;
     _editRawContent = d.content || '';
     _editArtifactType = d.artifact_type || '';
-    document.getElementById('artifactTitle').textContent = nodeName + ' (v' + d.version + ')';
-    const contentEl = document.getElementById('artifactContent');
-    const raw = d.content || '';
-    // 새 탭에서 전체화면 보기 (플로팅 수정 버튼 포함)
-    window.open(`/api/v1/projects/${projectId}/nodes/${nodeId}/artifact/view`, '_blank');
-  } catch(e) { alert('오류: ' + e.message); }
+    const titleEl = document.getElementById('artifactTitle');
+    if (titleEl) titleEl.textContent = nodeName + ' (v' + d.version + ')';
+  } catch (e) {
+    // silent — 보기 창은 이미 열렸음
+    console.warn('viewArtifact metadata load failed:', e);
+  }
 }
 
 function renderMarkdown(md) {
@@ -862,19 +868,23 @@ async function deleteEnvVar(key) {
 }
 
 async function showFailureReason(nodeId, nodeName) {
+  // public endpoint — 토큰 선택
   const token = localStorage.getItem('ai_si_token') || '';
+  const headers = token ? {'Authorization': 'Bearer ' + token} : {};
   try {
-    const r = await fetch(`/api/v1/nodes/${nodeId}/failure-reasons`, {
-      headers: {'Authorization': 'Bearer ' + token}
-    });
-    if (!r.ok) { alert('조회 실패'); return; }
+    const r = await fetch(`/api/v1/nodes/${nodeId}/failure-reasons`, { headers });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      alert(`조회 실패 (HTTP ${r.status})\n\n${nodeName}\n\n${body.slice(0, 300)}`);
+      return;
+    }
     const d = await r.json();
     const reasons = d.reasons || [];
     if (!reasons.length) {
-      alert(`${nodeName}\n\n실패 사유가 기록되지 않았습니다.`);
+      alert(`${nodeName}\n\n실패 사유가 기록되지 않았습니다.\n(retry ${d.retry_count||0}/${d.max_retries||0})`);
       return;
     }
-    let msg = `${nodeName} — 실패 이력\n${'─'.repeat(40)}\n\n`;
+    let msg = `${nodeName} — 실패 이력 (${reasons.length}건)\n${'─'.repeat(40)}\n\n`;
     reasons.forEach(r => {
       msg += `시도 ${r.attempt}: ${r.reason || '(사유 없음)'}\n시간: ${(r.at||'').slice(0,19)}\n\n`;
     });
