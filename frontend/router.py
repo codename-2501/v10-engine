@@ -1290,6 +1290,14 @@ def register_dashboard_routes(app, get_db_func, get_current_user_func) -> None:
 
     # ── 시스템 상태 ──────────────────────────────────────────────────────────
 
+    @app.get("/engine-flow", response_class=HTMLResponse)
+    async def engine_flow_page(request: Request):
+        """V10 엔진 시스템 React Flow 시각화."""
+        return templates.TemplateResponse(
+            "engine_flow.html",
+            {"request": request, "active_page": "status"},
+        )
+
     @app.get("/status", response_class=HTMLResponse)
     async def system_status_page(
         request: Request,

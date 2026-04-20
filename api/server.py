@@ -1327,7 +1327,7 @@ async def view_artifact_html(
     import re as _rev
 
     art = await db.fetchone(
-        "SELECT id, artifact_type FROM artifacts WHERE node_id=? AND project_id=?",
+        "SELECT id, artifact_type, current_version FROM artifacts WHERE node_id=? AND project_id=?",
         (node_id, project_id),
     )
     if not art:
@@ -1336,10 +1336,20 @@ async def view_artifact_html(
     node = await db.fetchone("SELECT name FROM nodes WHERE id=?", (node_id,))
     node_name = node["name"] if node else "산출물"
 
-    ver = await db.fetchone(
-        "SELECT storage_path AS content, version_num FROM artifact_versions WHERE artifact_id=? ORDER BY version_num DESC LIMIT 1",
-        (art["id"],),
-    )
+    # current_version 우선 조회 (롤백/revise 반영). 없으면 최신 fallback.
+    ver = None
+    if art.get("current_version"):
+        ver = await db.fetchone(
+            "SELECT storage_path AS content, version_num FROM artifact_versions "
+            "WHERE artifact_id=? AND version_num=?",
+            (art["id"], art["current_version"]),
+        )
+    if not ver:
+        ver = await db.fetchone(
+            "SELECT storage_path AS content, version_num FROM artifact_versions "
+            "WHERE artifact_id=? ORDER BY version_num DESC LIMIT 1",
+            (art["id"],),
+        )
     if not ver or not ver["content"]:
         return HTMLResponse("<h1>산출물 버전 없음</h1>", status_code=404)
 
