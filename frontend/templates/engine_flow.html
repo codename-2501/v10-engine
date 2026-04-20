@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}엔진 플로우 — AX FACTORY{% endblock %}
+{% block page_title %}V10 엔진 시스템 플로우{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://unpkg.com/reactflow@11.11.4/dist/style.css">
+<style>
+  .flow-wrap {
+    width: 100%;
+    height: calc(100vh - 180px);
+    min-height: 600px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .flow-legend {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.78rem;
+  }
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+  .flow-react-node {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    text-align: center;
+    min-width: 140px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .flow-react-node.core      { background: #dc2626; border: 1px solid #ef4444; }
+  .flow-react-node.skills    { background: #2563eb; border: 1px solid #3b82f6; }
+  .flow-react-node.ai        { background: #7c3aed; border: 1px solid #8b5cf6; }
+  .flow-react-node.lifecycle { background: #0891b2; border: 1px solid #06b6d4; }
+  .flow-react-node.intake    { background: #16a34a; border: 1px solid #22c55e; }
+  .flow-react-node.observ    { background: #ea580c; border: 1px solid #f97316; }
+  .flow-react-node.db        { background: #4b5563; border: 1px solid #6b7280; }
+  .flow-react-node.frontend  { background: #db2777; border: 1px solid #ec4899; }
+  .flow-react-node small { display: block; font-weight: 400; opacity: 0.75; font-size: 10px; margin-top: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flow-legend">
+  <div class="legend-item"><span class="legend-dot" style="background:#dc2626"></span>Core (불변 5파일)</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#2563eb"></span>Skills (실행기 + spec)</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#7c3aed"></span>AI (LLM / 인증)</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#0891b2"></span>Lifecycle (startup / watchdog)</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#16a34a"></span>Intake (진입점)</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#ea580c"></span>Observability (메트릭/이벤트)</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#4b5563"></span>DB</div>
+  <div class="legend-item"><span class="legend-dot" style="background:#db2777"></span>Frontend/API</div>
+</div>
+
+<div id="flow-root" class="flow-wrap"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
+
+<script>
+(function () {
+  const { useNodesState, useEdgesState, default: ReactFlow, Background, Controls, MiniMap, MarkerType } = window.ReactFlow;
+  const h = React.createElement;
+
+  // 엔진 모듈 정의 (V10 아키텍처)
+  const initialNodes = [
+    // Intake
+    { id: 'intake_public',     position: { x:  40, y:  60 }, data: { label: h('div', {className:'flow-react-node intake'}, 'Intake Submit', h('small', null, 'POST /intake/public')) }, style:{border:'none'} },
+    { id: 'intake_processor',  position: { x: 260, y:  60 }, data: { label: h('div', {className:'flow-react-node intake'}, 'Intake Processor', h('small', null, 'intake/processor.py')) }, style:{border:'none'} },
+    { id: 'size_estimator',    position: { x: 260, y: 170 }, data: { label: h('div', {className:'flow-react-node intake'}, 'Size Estimator', h('small', null, 'SizeProfile + project_type')) }, style:{border:'none'} },
+    { id: 'budget_scaler',     position: { x: 480, y: 170 }, data: { label: h('div', {className:'flow-react-node intake'}, 'Budget Scaler', h('small', null, 'phase limits override')) }, style:{border:'none'} },
+
+    // Core 5 파일
+    { id: 'dag_advancer',      position: { x: 520, y:  60 }, data: { label: h('div', {className:'flow-react-node core'}, 'DAG Advancer', h('small', null, 'CORE — 실행 엔진')) }, style:{border:'none'} },
+    { id: 'state_machine',     position: { x: 740, y:  60 }, data: { label: h('div', {className:'flow-react-node core'}, 'State Machine', h('small', null, 'CORE — 상태 전이')) }, style:{border:'none'} },
+    { id: 'budget_enforcer',   position: { x: 740, y: 170 }, data: { label: h('div', {className:'flow-react-node core'}, 'Budget Enforcer', h('small', null, 'CORE — 토큰 예산')) }, style:{border:'none'} },
+    { id: 'context_assembler', position: { x: 740, y: 280 }, data: { label: h('div', {className:'flow-react-node core'}, 'Context Assembler', h('small', null, 'CORE — 5-Layer')) }, style:{border:'none'} },
+    { id: 'cascade',           position: { x: 960, y: 170 }, data: { label: h('div', {className:'flow-react-node core'}, 'Cascade', h('small', null, 'CORE — 전파')) }, style:{border:'none'} },
+
+    // Skills
+    { id: 'executor',          position: { x: 960, y:  60 }, data: { label: h('div', {className:'flow-react-node skills'}, 'Skill Executor', h('small', null, 'TASK/QA 실행')) }, style:{border:'none'} },
+    { id: 'executor_cascade',  position: { x:1180, y:  60 }, data: { label: h('div', {className:'flow-react-node skills'}, 'Exec Cascade', h('small', null, '거시 진단 hook')) }, style:{border:'none'} },
+    { id: 'spec_registry',     position: { x: 960, y: 280 }, data: { label: h('div', {className:'flow-react-node skills'}, 'Spec Registry', h('small', null, 'YAML specs')) }, style:{border:'none'} },
+    { id: 'qa_harness',        position: { x:1180, y: 170 }, data: { label: h('div', {className:'flow-react-node skills'}, 'QA Harness', h('small', null, '구조 검증')) }, style:{border:'none'} },
+    { id: 'composition',       position: { x:1180, y: 280 }, data: { label: h('div', {className:'flow-react-node skills'}, 'Composition', h('small', null, 'AI 0회 조립')) }, style:{border:'none'} },
+    { id: 'splitting',         position: { x:1180, y: 390 }, data: { label: h('div', {className:'flow-react-node skills'}, 'Splitting', h('small', null, '카테고리 분할')) }, style:{border:'none'} },
+
+    // AI
+    { id: 'model_adapter',     position: { x:1400, y:  60 }, data: { label: h('div', {className:'flow-react-node ai'}, 'Model Adapter', h('small', null, 'LLM API')) }, style:{border:'none'} },
+    { id: 'account_router',    position: { x:1400, y: 170 }, data: { label: h('div', {className:'flow-react-node ai'}, 'Account Router', h('small', null, 'Max/Pro CLI')) }, style:{border:'none'} },
+    { id: 'credentials',       position: { x:1400, y: 280 }, data: { label: h('div', {className:'flow-react-node ai'}, 'Credentials', h('small', null, 'OAuth/API')) }, style:{border:'none'} },
+
+    // Lifecycle
+    { id: 'startup',           position: { x:  40, y: 280 }, data: { label: h('div', {className:'flow-react-node lifecycle'}, 'Startup Recovery', h('small', null, 'pair heal + integrity')) }, style:{border:'none'} },
+    { id: 'watchdog',          position: { x:  40, y: 390 }, data: { label: h('div', {className:'flow-react-node lifecycle'}, 'Watchdog', h('small', null, 'SUSPENDED 자동 재개')) }, style:{border:'none'} },
+    { id: 'shutdown',          position: { x:  40, y: 500 }, data: { label: h('div', {className:'flow-react-node lifecycle'}, 'Shutdown Mgr', h('small', null, '5-stage graceful')) }, style:{border:'none'} },
+
+    // Observability
+    { id: 'metrics',           position: { x: 740, y: 500 }, data: { label: h('div', {className:'flow-react-node observ'}, 'Prometheus', h('small', null, '/metrics')) }, style:{border:'none'} },
+    { id: 'events',            position: { x: 960, y: 500 }, data: { label: h('div', {className:'flow-react-node observ'}, 'Event Store', h('small', null, 'event_store')) }, style:{border:'none'} },
+    { id: 'episodes',          position: { x:1180, y: 500 }, data: { label: h('div', {className:'flow-react-node observ'}, 'Episodes', h('small', null, 'Phase F 벡터 메모리')) }, style:{border:'none'} },
+    { id: 'verify_integrity',  position: { x:1400, y: 500 }, data: { label: h('div', {className:'flow-react-node observ'}, 'DAG Integrity', h('small', null, 'verify tool')) }, style:{border:'none'} },
+
+    // DB
+    { id: 'db_platform',       position: { x: 520, y: 390 }, data: { label: h('div', {className:'flow-react-node db'}, 'platform.db', h('small', null, 'SQLite WAL')) }, style:{border:'none'} },
+
+    // Frontend
+    { id: 'api_server',        position: { x: 260, y: 500 }, data: { label: h('div', {className:'flow-react-node frontend'}, 'API Server', h('small', null, 'FastAPI :8007')) }, style:{border:'none'} },
+    { id: 'dashboard',         position: { x:  40, y: 170 }, data: { label: h('div', {className:'flow-react-node frontend'}, 'Dashboard', h('small', null, 'Jinja2 템플릿')) }, style:{border:'none'} },
+  ];
+
+  const edgeStyle = { stroke: '#888', strokeWidth: 1.5 };
+  const marker   = { type: MarkerType.ArrowClosed, color: '#888' };
+
+  const initialEdges = [
+    // Intake 진입 흐름
+    { id:'e1', source:'intake_public', target:'intake_processor', style:edgeStyle, markerEnd:marker, animated:true },
+    { id:'e2', source:'intake_processor', target:'size_estimator', style:edgeStyle, markerEnd:marker },
+    { id:'e3', source:'size_estimator', target:'budget_scaler', style:edgeStyle, markerEnd:marker },
+    { id:'e4', source:'intake_processor', target:'dag_advancer', style:edgeStyle, markerEnd:marker, animated:true },
+    { id:'e4b',source:'budget_scaler', target:'budget_enforcer', style:edgeStyle, markerEnd:marker, label:'override' },
+
+    // DAG 실행 축
+    { id:'e5', source:'dag_advancer', target:'executor', style:edgeStyle, markerEnd:marker, animated:true, label:'dispatch' },
+    { id:'e6', source:'dag_advancer', target:'state_machine', style:edgeStyle, markerEnd:marker },
+    { id:'e7', source:'executor', target:'spec_registry', style:edgeStyle, markerEnd:marker, label:'resolve' },
+    { id:'e8', source:'executor', target:'context_assembler', style:edgeStyle, markerEnd:marker },
+    { id:'e9', source:'executor', target:'model_adapter', style:edgeStyle, markerEnd:marker, animated:true, label:'LLM' },
+    { id:'e10',source:'model_adapter', target:'account_router', style:edgeStyle, markerEnd:marker },
+    { id:'e11',source:'model_adapter', target:'credentials', style:edgeStyle, markerEnd:marker },
+    { id:'e12',source:'executor', target:'qa_harness', style:edgeStyle, markerEnd:marker, label:'QA' },
+    { id:'e13',source:'executor', target:'budget_enforcer', style:edgeStyle, markerEnd:marker, label:'L1/L2/L3' },
+    { id:'e14',source:'executor', target:'executor_cascade', style:edgeStyle, markerEnd:marker },
+    { id:'e15',source:'executor_cascade', target:'cascade', style:edgeStyle, markerEnd:marker },
+    { id:'e16',source:'cascade', target:'state_machine', style:edgeStyle, markerEnd:marker },
+    { id:'e17',source:'executor', target:'composition', style:edgeStyle, markerEnd:marker, label:'렌더' },
+    { id:'e18',source:'executor', target:'splitting', style:edgeStyle, markerEnd:marker, label:'분할' },
+
+    // Lifecycle
+    { id:'e19',source:'startup', target:'dag_advancer', style:edgeStyle, markerEnd:marker, label:'복구' },
+    { id:'e20',source:'startup', target:'verify_integrity', style:edgeStyle, markerEnd:marker },
+    { id:'e21',source:'watchdog', target:'state_machine', style:edgeStyle, markerEnd:marker, label:'SUSPENDED→NS' },
+    { id:'e22',source:'shutdown', target:'db_platform', style:edgeStyle, markerEnd:marker, label:'drain' },
+
+    // DB 연결 (모든 것의 진실 source)
+    { id:'e23',source:'dag_advancer', target:'db_platform', style:{...edgeStyle, strokeDasharray:'3 3'}, markerEnd:marker },
+    { id:'e24',source:'cascade', target:'db_platform', style:{...edgeStyle, strokeDasharray:'3 3'}, markerEnd:marker },
+    { id:'e25',source:'executor', target:'db_platform', style:{...edgeStyle, strokeDasharray:'3 3'}, markerEnd:marker },
+    { id:'e26',source:'intake_processor', target:'db_platform', style:{...edgeStyle, strokeDasharray:'3 3'}, markerEnd:marker },
+
+    // Observability
+    { id:'e27',source:'executor', target:'metrics', style:{...edgeStyle, strokeDasharray:'2 4'}, markerEnd:marker },
+    { id:'e28',source:'executor', target:'events', style:{...edgeStyle, strokeDasharray:'2 4'}, markerEnd:marker },
+    { id:'e29',source:'executor', target:'episodes', style:{...edgeStyle, strokeDasharray:'2 4'}, markerEnd:marker, label:'gotcha' },
+    { id:'e30',source:'verify_integrity', target:'db_platform', style:{...edgeStyle, strokeDasharray:'3 3'}, markerEnd:marker },
+
+    // API / Frontend
+    { id:'e31',source:'dashboard', target:'api_server', style:edgeStyle, markerEnd:marker },
+    { id:'e32',source:'api_server', target:'db_platform', style:edgeStyle, markerEnd:marker },
+    { id:'e33',source:'intake_public', target:'api_server', style:edgeStyle, markerEnd:marker },
+  ];
+
+  function App() {
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+    return h('div', { style: { width: '100%', height: '100%' } },
+      h(ReactFlow, {
+        nodes, edges,
+        onNodesChange, onEdgesChange,
+        fitView: true,
+        fitViewOptions: { padding: 0.15 },
+      },
+        h(Background, { color: 'rgba(255,255,255,0.04)', gap: 24 }),
+        h(Controls),
+        h(MiniMap, { nodeStrokeWidth: 2, pannable: true, zoomable: true })
+      )
+    );
+  }
+
+  const root = ReactDOM.createRoot(document.getElementById('flow-root'));
+  root.render(h(App));
+})();
+</script>
+{% endblock %}
