@@ -4406,6 +4406,160 @@ async def composition_reassemble(
 
 
 # ---------------------------------------------------------------------------
+# Phase 0 PoC — LLM schema 준수율 측정 (관리자 전용)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/admin/schema-poc")
+async def admin_schema_poc(
+    db: DatabaseAdapter = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+    body: dict = Body(default={}),
+):
+    """LLM 이 JSON 스키마를 얼마나 잘 지키는지 N회 호출로 실측.
+
+    body:
+        runs (int, default 10): 호출 횟수
+        model (str, default 'claude-sonnet-4-6')
+
+    Returns:
+        results (list): 각 호출의 파싱/검증 결과
+        passed, rate: 통과 수 / 비율
+    """
+    RBAC.require(current_user["role"], Permission.MANAGE_SYSTEM)
+
+    import json as _j
+    import re as _re
+    from engine.ai.model_adapter import (
+        ModelAdapter, OAuthProvider, AnthropicAPIKeyProvider,
+        AnthropicPlaintextKeyProvider,
+    )
+
+    runs = int(body.get("runs", 10))
+    model = body.get("model", "claude-sonnet-4-6")
+
+    # creds 로드 (server startup 과 동일 로직)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    creds = None
+    if api_key:
+        creds = AnthropicPlaintextKeyProvider(api_key)
+    else:
+        row = await db.fetchone(
+            "SELECT key_encrypted, oauth_config_encrypted, token_expires_at "
+            "FROM provider_credentials WHERE provider='anthropic' AND is_active=1 LIMIT 1"
+        )
+        if row:
+            if row["oauth_config_encrypted"]:
+                creds = OAuthProvider(
+                    oauth_config_encrypted=row["oauth_config_encrypted"],
+                    token_expires_at=row["token_expires_at"],
+                )
+            elif row["key_encrypted"]:
+                creds = AnthropicAPIKeyProvider(row["key_encrypted"])
+    if not creds:
+        return {"status": "error", "error": "credentials unavailable"}
+
+    adapter = ModelAdapter(creds)
+
+    system_prompt = (
+        "You are a software architect. Output STRICT JSON matching the given schema. "
+        "No markdown fences, no prose, no explanation. Pure JSON only."
+    )
+    user_prompt = """\
+다음 프로젝트의 화면 목록을 JSON 으로 출력하세요.
+
+프로젝트: 마이 루틴 — 개인 습관 추적 모바일 앱
+주요 기능: 습관 추가/수정/삭제, 달력 뷰, 통계, AI 코칭, 알림, 로그인/회원가입
+
+## 출력 스키마 (엄수)
+{
+  "screens": [
+    {
+      "id": "<고유 ID, 예: auth-login, home-dashboard>",
+      "category": "<auth | home | habit | stats | ai | settings | error>",
+      "name": "<화면 한글 이름>",
+      "description": "<화면 목적 1-2 문장>"
+    }
+  ]
+}
+
+규칙:
+1. screens 배열에 최소 20개 화면
+2. id 는 unique (중복 금지), 영문 소문자 + 하이픈만
+3. 각 화면에 4개 필드 (id, category, name, description) 모두 존재
+4. JSON 외 텍스트 절대 금지 (마크다운 코드블록도 금지)
+
+출력:"""
+
+    def _validate(raw: str) -> dict:
+        stripped = (raw or "").strip()
+        if stripped.startswith("```"):
+            stripped = _re.sub(r"^```(?:json)?\s*", "", stripped)
+            stripped = _re.sub(r"\s*```$", "", stripped)
+        try:
+            data = _j.loads(stripped)
+        except Exception as e:
+            return {"ok": False, "reason": f"json_parse_error: {e}",
+                    "screens_count": 0}
+
+        if isinstance(data, dict) and "screens" in data:
+            screens = data["screens"]
+        elif isinstance(data, list):
+            screens = data
+        else:
+            return {"ok": False, "reason": "invalid_top_level",
+                    "screens_count": 0}
+
+        if not isinstance(screens, list):
+            return {"ok": False, "reason": "screens_not_array",
+                    "screens_count": 0}
+
+        ids = []
+        missing = 0
+        required = {"id", "category", "name", "description"}
+        for s in screens:
+            if not isinstance(s, dict) or not required.issubset(s.keys()):
+                missing += 1
+                continue
+            ids.append(s.get("id"))
+        dups = len(ids) - len(set(ids))
+        ok = len(screens) >= 20 and missing == 0 and dups == 0
+        return {
+            "ok": ok,
+            "reason": "ok" if ok else f"count={len(screens)} missing={missing} dups={dups}",
+            "screens_count": len(screens),
+            "missing_fields": missing,
+            "duplicates": dups,
+        }
+
+    results: list[dict] = []
+    for i in range(runs):
+        try:
+            resp = await adapter.call(
+                model=model,
+                system=system_prompt,
+                prompt=user_prompt,
+                max_tokens=8000,
+                temperature=0.3,
+            )
+            r = _validate(resp.content or "")
+        except Exception as e:
+            r = {"ok": False, "reason": f"api_error: {e}", "screens_count": 0}
+        r["run_id"] = i + 1
+        results.append(r)
+
+    passed = sum(1 for r in results if r["ok"])
+    rate = (passed / runs * 100) if runs else 0.0
+    return {
+        "status": "ok",
+        "runs": runs,
+        "passed": passed,
+        "rate": round(rate, 1),
+        "gate_95": rate >= 95,
+        "results": results,
+    }
+
+
+# ---------------------------------------------------------------------------
 # 소급 검증 (Retroactive Validation) — 수동 트리거 API
 # ---------------------------------------------------------------------------
 

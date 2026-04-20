@@ -3698,9 +3698,22 @@ async def _handle_qa_dispatch(
         _task_phase = _task_node_row["phase"] if _task_node_row else node.phase
         _is_code = spec.get("type") == "code" if spec else False
         _is_json = spec.get("type") == "json" if spec else False
-        _is_html = spec.get("file_type") == "html" or (
-            _full_content and _full_content.strip()[:15].lower().startswith(("<!doctype", "<html", "<div", "<style"))
+        # _is_html: spec 의 type 또는 file_type 이 html 이면 확정.
+        # 없으면 content 앞 ```html fence / doctype 등 감지.
+        _spec_html = bool(spec) and (
+            spec.get("type") == "html" or spec.get("file_type") == "html"
         )
+        _content_looks_html = False
+        if _full_content:
+            _sniff = _full_content.strip()
+            # 마크다운 fence 제거 후 재검사 (LLM 이 ```html 으로 감싼 경우 대응)
+            if _sniff.startswith("```"):
+                import re as _re_sniff
+                _sniff = _re_sniff.sub(r"^```(?:html)?\s*\n?", "", _sniff)
+            _content_looks_html = _sniff[:15].lower().startswith(
+                ("<!doctype", "<html", "<div", "<style")
+            )
+        _is_html = _spec_html or _content_looks_html
         _is_document = not _is_code and not _is_json and not _is_html
 
         # ── 3-B-1. 코드형 산출물 구조 검증 ──
