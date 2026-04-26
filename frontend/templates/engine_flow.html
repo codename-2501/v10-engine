@@ -63,13 +63,22 @@
 
 <div id="flow-root" class="flow-wrap"></div>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
 
 <script>
-(function () {
-  const { useNodesState, useEdgesState, default: ReactFlow, Background, Controls, MiniMap, MarkerType } = window.ReactFlow;
+// load 이벤트 대기 — CDN UMD 전체 로드 보장
+window.addEventListener('load', function () {
+  const RF = window.ReactFlow;
+  if (!RF) {
+    document.getElementById('flow-root').innerHTML =
+      '<div style="padding:40px;text-align:center;color:#f87171;">React Flow CDN 로드 실패. 브라우저 콘솔을 확인하세요.</div>';
+    return;
+  }
+  const { useNodesState, useEdgesState, Background, Controls, MiniMap, MarkerType } = RF;
+  // reactflow UMD 는 default export 가 있을 수도 / 없을 수도 — 양쪽 지원
+  const ReactFlow = RF.default || RF.ReactFlow || RF;
   const h = React.createElement;
 
   // 엔진 모듈 정의 (V10 아키텍처)
@@ -190,6 +199,6 @@
 
   const root = ReactDOM.createRoot(document.getElementById('flow-root'));
   root.render(h(App));
-})();
+});  // end window.load
 </script>
 {% endblock %}
