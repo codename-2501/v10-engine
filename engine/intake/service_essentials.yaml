@@ -1,0 +1,61 @@
+# Pillar 4 — service_type → 필수 spec 매핑.
+# intake 시 raw["serviceType"] (또는 service_type) 값에 따라 자동 inject.
+# extends 키로 base type 의 essentials 상속.
+#
+# 사용 위치: engine/intake/processor.py — NODE_TEMPLATES 와 결합
+
+service_types:
+  web_responsive:
+    description: "반응형 웹 (모바일~데스크톱 단일 코드)"
+    essentials:
+      - name: "라우팅 설계서"
+        phase: DESIGN
+        type: routing_config
+      - name: "i18n 카탈로그"
+        phase: DESIGN
+        type: i18n_catalog
+        when: "always"
+      - name: "환경변수 스키마"
+        phase: DESIGN
+        type: env_schema
+      - name: "PWA 매니페스트"
+        phase: DESIGN
+        type: json_spec
+        when: "always"
+
+  mobile_native:
+    description: "iOS/Android 네이티브 앱"
+    essentials:
+      - name: "앱 메타데이터 (icon/splash)"
+        phase: DESIGN
+        type: json_spec
+      - name: "i18n 카탈로그"
+        phase: DESIGN
+        type: i18n_catalog
+      - name: "푸시 알림 설계"
+        phase: DESIGN
+        type: document
+      - name: "환경변수 스키마"
+        phase: DESIGN
+        type: env_schema
+
+  web_and_app:
+    extends: ["web_responsive", "mobile_native"]
+    description: "반응형 웹 + 모바일 앱 동시"
+    essentials:
+      - name: "디바이스 동기화 설계"
+        phase: DESIGN
+        type: document
+
+  ai_prediction:
+    description: "예측/이상감지 AI 서비스"
+    essentials:
+      - name: "데이터 카탈로그"
+        phase: DEFINE
+        type: document
+      - name: "모델 평가 스크립트"
+        phase: BUILD
+        type: code
+      - name: "추론 API spec"
+        phase: DESIGN
+        type: openapi_yaml

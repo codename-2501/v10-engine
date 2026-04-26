@@ -597,6 +597,50 @@ async def _resolve_chunk_items(spec: dict, node: "NodeSnapshot", db: Any) -> lis
     # A-2: extract_pattern (단일) 또는 extract_patterns (fallback chain list) 지원.
     # 여러 패턴 시도 → 첫번째로 ≥3개 매치되는 것 채택 → 도메인 다양성 커버.
     src = spec.get("chunk_items_source")
+
+    # 2-A. DB registry 우선 조회 (Tier 2-B/C) — artifact content 파싱 fragility 제거.
+    # saver 가 정의서 저장 시 screen_registry 테이블에 이미 ID↔이름 매핑 저장.
+    # DB 조회라 선행 노드 state / artifact 구조 변화와 완전 무관.
+    if src and isinstance(src, dict) and db is not None:
+        _registry_name = src.get("from_registry")
+        if _registry_name == "screen_registry":
+            try:
+                from engine.skills.artifact.screen_registry import load_screen_registry
+                _rows = await load_screen_registry(db, node.project_id)
+                if _rows:
+                    # filter_regex 적용 (bo/fo variant — SC-AD-* / SC-AU-* 등 서브셋)
+                    _filter = src.get("filter_regex")
+                    if _filter:
+                        import re as _re_f
+                        try:
+                            _filter_re = _re_f.compile(_filter)
+                            _rows = [r for r in _rows if _filter_re.search(r["id"])]
+                        except Exception:
+                            pass
+                    # side-channel 이름 맵 (chunk loop 이 prompt 에 주입)
+                    spec["_chunk_item_names"] = {
+                        r["id"]: r["name"] for r in _rows if r.get("name")
+                    }
+                    _items = [r["id"] for r in _rows]
+                    logger.info(
+                        "chunk_items_from_registry node=%s registry=%s count=%d names=%d filter=%s",
+                        node.id[:8], _registry_name, len(_items),
+                        len(spec["_chunk_item_names"]),
+                        bool(_filter),
+                    )
+                    if _items:
+                        return _items
+                    # registry 비어있으면 fallback (regex) 로 넘어감
+                    logger.info(
+                        "chunk_items_registry_empty node=%s registry=%s → fallback regex",
+                        node.id[:8], _registry_name,
+                    )
+            except Exception as _reg_err:
+                logger.warning(
+                    "chunk_items_registry_fail node=%s error=%s → fallback regex",
+                    node.id[:8], str(_reg_err)[:100],
+                )
+
     if src and isinstance(src, dict) and db is not None:
         from_spec = src.get("from_spec")
         # 단일 또는 list 둘 다 지원
@@ -616,13 +660,18 @@ async def _resolve_chunk_items(spec: dict, node: "NodeSnapshot", db: Any) -> lis
 
         if from_spec and patterns:
             try:
+                # state='COMPLETED' 조건 제거 — 선행 노드가 동시 retry 로 IN_PROGRESS
+                # 상태여도 artifact_versions.current_version 의 **직전 완료 버전**을
+                # 가져올 수 있도록 완화. current_version 은 COMPLETED 되어야만 업데이트
+                # 되므로 IN_PROGRESS 여도 이전 유효 content 반환. chunked loop 이
+                # 선행 의존성 순서 때문에 빈 items 로 퇴행하는 회귀 방지.
                 row = await db.fetchone(
                     """SELECT av.storage_path AS content FROM nodes n
                     JOIN artifacts a ON a.node_id = n.id
                     JOIN artifact_versions av ON av.artifact_id = a.id
                       AND av.version_num = a.current_version
                     WHERE n.project_id=? AND n.name LIKE ?
-                      AND n.node_type='TASK' AND n.state='COMPLETED'
+                      AND n.node_type='TASK'
                     ORDER BY n.updated_at DESC LIMIT 1""",
                     (node.project_id, f"%{from_spec}%"),
                 )
@@ -630,6 +679,9 @@ async def _resolve_chunk_items(spec: dict, node: "NodeSnapshot", db: Any) -> lis
                     import re as _re_x
                     content = row["content"]
                     # A-2: pattern fallback chain — 첫 ≥3개 매치 채택
+                    # capture group 1 = ID (반환 list 는 항상 str 로 유지해 기존 호출측 호환).
+                    # group 2 에서 이름 추출되면 spec["_chunk_item_names"] side-channel dict 에
+                    # 저장 — chunk loop 이 item str 로 lookup 해 프롬프트에 이름 주입.
                     MIN_ITEMS_THRESHOLD = 3
                     for pat in patterns:
                         try:
@@ -638,15 +690,27 @@ async def _resolve_chunk_items(spec: dict, node: "NodeSnapshot", db: Any) -> lis
                             continue
                         seen: set = set()
                         items: list = []
+                        item_names: dict = {}
                         for m in raw_matches:
-                            key = m if isinstance(m, str) else (m[0] if m else "")
+                            if isinstance(m, str):
+                                key, name = m, ""
+                            else:
+                                key = m[0] if m else ""
+                                name = (m[1] if len(m) > 1 else "").strip()
+                                name = _re_x.sub(r"[\s\t]+", " ", name).strip()
                             if key and key not in seen:
                                 seen.add(key)
                                 items.append(key)
+                                if name:
+                                    item_names[key] = name
                         if len(items) >= MIN_ITEMS_THRESHOLD:
+                            if item_names:
+                                # spec 에 side-channel 로 저장 (기존 items list 타입 불변)
+                                spec["_chunk_item_names"] = item_names
                             logger.info(
-                                "chunk_items_extracted node=%s from='%s' pattern='%s' count=%d",
+                                "chunk_items_extracted node=%s from='%s' pattern='%s' count=%d names=%d",
                                 node.id[:8], from_spec, pat[:40], len(items),
+                                len(item_names),
                             )
                             return items
                     # 모든 패턴 시도 후에도 실패
@@ -701,6 +765,9 @@ async def _chunked_json_items_generate(
 
     # 중간 캐시 로드 (이전 실행에서 성공한 아이템 재활용)
     completed_items: dict = {}
+    # Partial patch: HTML 경로와 동일 — QA FAIL 에서 추출된 item_key 만 cache bust.
+    failed_keys: set[str] = set()
+    _partial_flag = os.environ.get("V10_CHUNKED_ITEMS_PARTIAL_RETRY", "0") == "1"
     if db:
         try:
             row = await db.fetchone(
@@ -710,18 +777,37 @@ async def _chunked_json_items_generate(
                 snap = json.loads(row["task_snapshot"])
                 if isinstance(snap, dict) and snap.get("type") == "chunked_json_items":
                     completed_items = snap.get("completed_items", {}) or {}
+                    if _partial_flag:
+                        _raw_failed = snap.get("failed_items_last_attempt") or []
+                        if isinstance(_raw_failed, list):
+                            failed_keys = {
+                                str(k) for k in _raw_failed if isinstance(k, str)
+                            }
+                        if failed_keys:
+                            logger.info(
+                                "chunked_json_partial_retry node=%s failed_keys=%d "
+                                "keys=%s",
+                                node.id[:8], len(failed_keys),
+                                ",".join(sorted(failed_keys)[:5]),
+                            )
         except Exception:
             completed_items = {}
+            failed_keys = set()
 
     results: list[dict] = []
     total_in = 0
     total_out = 0
 
+    # spec side-channel 에서 ID↔이름 매핑 로드 (_resolve_chunk_items 가 저장)
+    _item_names_map = spec.get("_chunk_item_names") or {} if isinstance(spec, dict) else {}
     for item in items:
-        if not isinstance(item, str):
+        # items 는 str list 유지 (backward compat). 이름은 side-channel 에서 lookup.
+        if not isinstance(item, str) or not item:
             continue
-        # 캐시 hit
-        if item in completed_items:
+        item_name = _item_names_map.get(item, "")
+        item_intent = ""
+        # 캐시 hit — 단 failed_keys 포함 item 은 cache bust 후 LLM 재호출
+        if item in completed_items and item not in failed_keys:
             try:
                 results.append(completed_items[item])
                 logger.info("chunked_json_item_cached node=%s item=%s",
@@ -729,10 +815,16 @@ async def _chunked_json_items_generate(
                 continue
             except Exception:
                 pass
+        # failed_keys 해당 item — 기존 cache entry 제거 후 재생성 경로 진입
+        if item in failed_keys:
+            completed_items.pop(item, None)
 
         # prompt 에 {{chunk_item}} 치환 + 엄격 지시 블록
         base_prompt = assembly.prompt or ""
         item_prompt = base_prompt.replace("{{chunk_item}}", item)
+        item_prompt = item_prompt.replace("{{chunk_item_id}}", item)
+        item_prompt = item_prompt.replace("{{chunk_item_name}}", item_name)
+        item_prompt = item_prompt.replace("{{chunk_item_intent}}", item_intent)
         item_prompt += (
             f"\n\n---\n\n## ⚠ 이번 호출 엄수\n"
             f"- 오직 '{item}' 1개 객체만 JSON 으로 출력\n"
@@ -802,6 +894,7 @@ async def _chunked_json_items_generate(
         # 중간 캐시 저장 (다음 재실행 시 재활용)
         if db:
             try:
+                failed_keys.discard(item)
                 snap = {
                     "type": "chunked_json_items",
                     "completed_items": completed_items,
@@ -809,6 +902,8 @@ async def _chunked_json_items_generate(
                     "total_count": len(items),
                     "updated_at": _now(),
                 }
+                if failed_keys:
+                    snap["failed_items_last_attempt"] = sorted(failed_keys)
                 await db.execute(
                     "UPDATE nodes SET task_snapshot=?, updated_at=? WHERE id=?",
                     (json.dumps(snap, ensure_ascii=False), _now(), node.id),
@@ -1114,6 +1209,11 @@ async def _chunked_html_items_generate(
 
     # 캐시 로드
     completed_items: dict = {}
+    # Partial patch: 직전 QA FAIL 에서 추출된 item_key 셋. 이 item 만 cache bust
+    # 해 실제 LLM 재호출 → 나머지는 캐시 재사용 (토큰 절감 + 실제 재생성 보장).
+    # feature flag 기본 off → on 해야 활성.
+    failed_keys: set[str] = set()
+    _partial_flag = os.environ.get("V10_CHUNKED_ITEMS_PARTIAL_RETRY", "0") == "1"
     if db:
         try:
             row = await db.fetchone(
@@ -1135,8 +1235,75 @@ async def _chunked_html_items_generate(
                             _v = _v.replace(f'id="{_k}"', f'id="{_clean}"', 1)
                             _v = _v.replace(f"id='{_k}'", f"id='{_clean}'", 1)
                         completed_items[_clean] = _v
+                    # flag on 일 때만 failed_items_last_attempt 로드
+                    if _partial_flag:
+                        _raw_failed = snap.get("failed_items_last_attempt") or []
+                        if isinstance(_raw_failed, list):
+                            failed_keys = {
+                                str(k) for k in _raw_failed if isinstance(k, str)
+                            }
+                        if failed_keys:
+                            logger.info(
+                                "chunked_html_partial_retry node=%s failed_keys=%d "
+                                "keys=%s",
+                                node.id[:8], len(failed_keys),
+                                ",".join(sorted(failed_keys)[:5]),
+                            )
         except Exception:
             completed_items = {}
+            failed_keys = set()
+
+    # task_snapshot 비어 있어도 partial 작동: 직전 artifact 의 placeholder
+    # 패턴 자동 감지 → failed_keys 채움 + 정상 section 들 cache 복구.
+    # 환경 실패(claude binary ENOENT 등)로 일부만 placeholder 인 채 노드가
+    # COMPLETED 종료된 후 partial retry 트리거 시 사용.
+    if (
+        _partial_flag
+        and db is not None
+        and not completed_items
+        and not failed_keys
+    ):
+        try:
+            _prev_row = await db.fetchone(
+                "SELECT av.storage_path FROM artifact_versions av "
+                "JOIN artifacts a ON a.id = av.artifact_id "
+                "WHERE a.node_id = ? "
+                "ORDER BY av.version_num DESC LIMIT 1",
+                (node.id,),
+            )
+            _prev_html = (_prev_row or {}).get("storage_path") or ""
+            if _prev_html:
+                import re as _re_recover
+                _SEC_RE = _re_recover.compile(
+                    r'<section\s+id="(SC-[A-Z]{2,5}-\d{3,4})"[^>]*>.*?</section>',
+                    _re_recover.DOTALL,
+                )
+                _PLACEHOLDER_RE = _re_recover.compile(
+                    r'data-incomplete\s*=\s*"true"|'
+                    r'\(자동 생성 실패\s*[—–-]\s*재실행 필요\)'
+                )
+                _recovered_cache = 0
+                _recovered_failed = 0
+                for _m in _SEC_RE.finditer(_prev_html):
+                    _sec_id = _m.group(1)
+                    _sec_body = _m.group(0)
+                    if _PLACEHOLDER_RE.search(_sec_body):
+                        failed_keys.add(_sec_id)
+                        _recovered_failed += 1
+                    else:
+                        completed_items[_sec_id] = _sec_body
+                        _recovered_cache += 1
+                if _recovered_failed or _recovered_cache:
+                    logger.info(
+                        "chunked_html_recover_from_artifact node=%s "
+                        "cache=%d failed=%d",
+                        node.id[:8], _recovered_cache, _recovered_failed,
+                    )
+        except Exception as _rec_err:
+            logger.debug(
+                "chunked_html_recover_fail node=%s err=%s",
+                node.id[:8], str(_rec_err)[:100],
+            )
 
     sections: list[str] = []
     total_in = 0
@@ -1199,11 +1366,17 @@ async def _chunked_html_items_generate(
                 )
                 break
 
+    # spec side-channel 에서 ID↔이름 매핑 로드 (_resolve_chunk_items 가 저장)
+    _item_names_map = spec.get("_chunk_item_names") or {} if isinstance(spec, dict) else {}
     for item in items:
-        if not isinstance(item, str):
+        # items 는 str list 유지 (backward compat). 이름은 side-channel 에서 lookup.
+        if not isinstance(item, str) or not item:
             continue
-        # 캐시 hit
-        if item in completed_items:
+        item_name = _item_names_map.get(item, "")
+        item_intent = ""
+        # 캐시 hit — 단, QA FAIL 로 failed_keys 에 포함된 item 은 cache bust
+        # 해 LLM 재호출 경로로 진입 (partial patch). 나머지는 캐시 재사용.
+        if item in completed_items and item not in failed_keys:
             _cached = completed_items[item]
             # canonical 이 이미 확립됐으면 캐시된 섹션의 중복 <style> 은 strip
             # (첫 캐시 섹션에서 canonical 을 이미 가져왔으므로 나머지는 제거)
@@ -1222,6 +1395,17 @@ async def _chunked_html_items_generate(
                 except Exception as _e:
                     logger.debug("state_store_cache_sync_fail %s", _e)
             continue
+        # failed_keys 해당 item — atomic_state 를 FAILED 로 전이해 reserve() 가
+        # state_store.py:67~75 로직으로 RESERVED 재예약 허용.
+        if item in failed_keys and _state_store:
+            try:
+                await _state_store.fail(
+                    engagement_id, node.id, item, "qa_fail_partial_retry",
+                )
+            except Exception as _fe:
+                logger.debug("state_store_fail_on_retry_skip %s", _fe)
+            # 기존 캐시 entry 도 제거 (재생성 후 새 값으로 덮어쓰기)
+            completed_items.pop(item, None)
 
         # D6: StateStore reserve — 동시 워커 충돌 방지 + idempotent 재시도
         if _state_store:
@@ -1238,6 +1422,9 @@ async def _chunked_html_items_generate(
 
         base_prompt = assembly.prompt or ""
         item_prompt = base_prompt.replace("{{chunk_item}}", item)
+        item_prompt = item_prompt.replace("{{chunk_item_id}}", item)
+        item_prompt = item_prompt.replace("{{chunk_item_name}}", item_name)
+        item_prompt = item_prompt.replace("{{chunk_item_intent}}", item_intent)
         # D14: Stage 23 Shared Ledger — 이전 chunk 결정사항 prepend
         if _ledger:
             try:
@@ -1246,10 +1433,36 @@ async def _chunked_html_items_generate(
                     item_prompt = _snippet + "\n" + item_prompt
             except Exception as _e:
                 logger.debug("ledger_snippet_fail %s", _e)
+        # 화면 ID ↔ 이름 일관성 강제 — 정의서 이름을 프롬프트에 명시 (screen_registry
+        # 또는 chunk_items_source 에서 추출된 item_name 이 있을 때만 주입).
+        _screen_name_directive = ""
+        if item_name:
+            _screen_name_directive = (
+                f"\n\n## ⚠ 화면 정체성 (화면 목록 정의서 공식 명칭 — 변경 금지)\n"
+                f"- **화면 ID: `{item}`**\n"
+                f"- **화면 이름: `{item_name}`**\n"
+                f"- 이 화면은 오직 위 이름의 목적에 **정확히 일치** 하는 디자인/컨텐츠만 생성.\n"
+                f"- 임의 재해석/다른 주제 선택 금지. 정의서 공식 명칭 이외 용도 불가.\n"
+                f"- 화면 제목 (첫 `<h1>` 또는 `<header>`) 에 반드시 '{item_name}' 이라는 명칭 포함.\n"
+                f"\n"
+                f"### ❌ 금지 예시 (QA FAIL)\n"
+                f"```html\n"
+                f"<section id='{item}' class='screen'>\n"
+                f"  <header>{item}</header>   <!-- ID만 찍으면 QA screen_id_name_consistency FAIL (95% 임계) -->\n"
+                f"  ...\n"
+                f"```\n"
+                f"### ✅ 올바른 예시\n"
+                f"```html\n"
+                f"<section id='{item}' class='screen'>\n"
+                f"  <header>{item} | {item_name}</header>  <!-- ID + 공식 명칭 동시 -->\n"
+                f"  ...\n"
+                f"```\n"
+            )
+
         # 프롬프트: 첫 chunk vs 이후 chunk 분기
         if not _canonical_ready:
             # 첫 chunk — 자유 생성 (공통 CSS + HTML 전부 포함)
-            item_prompt += (
+            item_prompt += _screen_name_directive + (
                 f"\n\n---\n\n## ⚠ 이번 호출 엄수 (첫 화면 — 공통 CSS 정의 포함)\n"
                 f"- 오직 '{item}' 화면 1개만 `<section id='{item}' class='screen'>...</section>` 형태로 작성\n"
                 f"- `<!DOCTYPE>` `<html>` `<head>` `<body>` 태그 금지 (최종 병합 단계에서 감쌈)\n"
@@ -1266,7 +1479,7 @@ async def _chunked_html_items_generate(
             )
         else:
             # 이후 chunk — canonical CSS 가 <head> 에 이미 로드됨
-            item_prompt += (
+            item_prompt += _screen_name_directive + (
                 f"\n\n---\n\n## ⚠ 이번 호출 엄수 (공통 CSS 는 이미 <head> 에 로드됨)\n"
                 f"- 오직 '{item}' 화면 1개만 `<section id='{item}' class='screen'>...</section>` 형태로 작성\n"
                 f"- `<!DOCTYPE>` `<html>` `<head>` `<body>` 태그 금지\n"
@@ -1567,6 +1780,9 @@ async def _chunked_html_items_generate(
         # 중간 캐시
         if db:
             try:
+                # 방금 성공한 item 은 failed 목록에서 제거 (partial patch 재시도 완결).
+                # 남은 failed_keys 가 있으면 snap 에 유지 — 서버 재시작 idempotent.
+                failed_keys.discard(item)
                 snap = {
                     "type": "chunked_html_items",
                     "completed_items": completed_items,
@@ -1574,6 +1790,8 @@ async def _chunked_html_items_generate(
                     "total_count": len(items),
                     "updated_at": _now(),
                 }
+                if failed_keys:
+                    snap["failed_items_last_attempt"] = sorted(failed_keys)
                 await db.execute(
                     "UPDATE nodes SET task_snapshot=?, updated_at=? WHERE id=?",
                     (json.dumps(snap, ensure_ascii=False), _now(), node.id),
@@ -1581,19 +1799,10 @@ async def _chunked_html_items_generate(
             except Exception:
                 pass
 
-    # 전체 완료 → snapshot 제거
-    if db:
-        try:
-            await db.execute(
-                "UPDATE nodes SET task_snapshot=NULL, updated_at=? WHERE id=?",
-                (_now(), node.id),
-            )
-        except Exception:
-            pass
-
     # D6: Coverage Verifier — 누락 item 감지 + 리포트 저장
     # 누락 시에는 노드를 NEEDS_HUMAN 로 직접 전이하지 않고, placeholder 만 남겨
     # 사람이 /engagements/{id}/review UI(Stage 17, D8) 에서 수동 개입 가능.
+    _coverage_missing: set[str] = set()
     if _coverage and engagement_id:
         try:
             report = await _coverage.verify(
@@ -1607,6 +1816,9 @@ async def _chunked_html_items_generate(
                     node.id[:8], report.expected_count, report.produced_count,
                     len(report.missing), len(report.needs_human),
                 )
+                _coverage_missing.update(
+                    str(m) for m in report.missing if isinstance(m, str)
+                )
             else:
                 logger.info(
                     "coverage_complete node=%s expected=%d produced=%d",
@@ -1615,6 +1827,68 @@ async def _chunked_html_items_generate(
         except Exception as _e:
             logger.warning("coverage_verify_fail node=%s err=%s",
                            node.id[:8], str(_e)[:120])
+
+    # B1' — main 영역 dense 검증 (layout-shell + sparse 자동 감지).
+    # spec 의 quality_thresholds.content_density 가 있을 때만 작동.
+    _density_failed: set[str] = set()
+    _density_cfg = (spec.get("quality_thresholds") or {}).get("content_density")
+    if _density_cfg is not None:
+        try:
+            from engine.skills.qa.harness import (
+                _harness_validate_main_content_density,
+            )
+            _density_result = _harness_validate_main_content_density(
+                "\n\n".join(sections),
+                threshold_text=int(_density_cfg.get("threshold_text", 500)),
+                threshold_nodes=int(_density_cfg.get("threshold_nodes", 20)),
+                fail_prefixes=_density_cfg.get("fail_prefixes") or None,
+            )
+            for f in _density_result.get("failures", []):
+                _density_failed.add(f["id"])
+            if _density_failed:
+                logger.warning(
+                    "chunked_html_density_fail node=%s fail=%d ids=%s",
+                    node.id[:8], len(_density_failed),
+                    ",".join(sorted(_density_failed)[:5]),
+                )
+            elif _density_result.get("warnings"):
+                logger.info(
+                    "chunked_html_density_warn node=%s warn=%d",
+                    node.id[:8], len(_density_result["warnings"]),
+                )
+        except Exception as _de:
+            logger.debug("density_check_fail %s", _de)
+
+    # C1' — auto_partial_pending: 누락 OR density fail → snap 보존, 정상 → NULL clean.
+    _auto_failed = _coverage_missing | _density_failed
+    if db:
+        try:
+            if _auto_failed:
+                _snap_pending = {
+                    "type": "chunked_html_items",
+                    "completed_items": completed_items,
+                    "completed_count": len(completed_items),
+                    "total_count": len(items),
+                    "failed_items_last_attempt": sorted(_auto_failed),
+                    "auto_partial_pending": True,
+                    "updated_at": _now(),
+                }
+                await db.execute(
+                    "UPDATE nodes SET task_snapshot=?, updated_at=? WHERE id=?",
+                    (json.dumps(_snap_pending, ensure_ascii=False),
+                     _now(), node.id),
+                )
+                logger.info(
+                    "chunked_html_auto_partial_pending node=%s failed=%d",
+                    node.id[:8], len(_auto_failed),
+                )
+            else:
+                await db.execute(
+                    "UPDATE nodes SET task_snapshot=NULL, updated_at=? WHERE id=?",
+                    (_now(), node.id),
+                )
+        except Exception:
+            pass
 
     # 최종 HTML 병합 — DOCTYPE + head + 모든 섹션
     # common_head 가 없으면 안전 기본값
@@ -1634,6 +1908,21 @@ async def _chunked_html_items_generate(
         f'<title>{spec.get("name") or "UI 디자인 시안"}</title>\n'
         f'{head_block}\n'
         f'</head>\n<body>\n{body}\n</body>\n</html>'
+    )
+
+    # B3' — section 시작 태그의 single quote → double quote 통일.
+    # LLM chunk 별 일관성 결여 (id='SC-X' vs id="SC-X") 로 외부 regex parser 깨짐 차단.
+    # scope 는 section 시작 태그의 id/class attribute 만 — inline JS/CSS literal 보호.
+    import re as _re_qn
+    merged = _re_qn.sub(
+        r"<section\b([^>]*?)\bid='([^']+)'",
+        r'<section\1id="\2"',
+        merged,
+    )
+    merged = _re_qn.sub(
+        r"<section\b([^>]*?)\bclass='([^']+)'",
+        r'<section\1class="\2"',
+        merged,
     )
 
     logger.info(
@@ -1955,6 +2244,14 @@ async def _chunked_document_generate(
 
     # 모든 섹션 완료 → 병합
     merged = "\n\n".join(c for _, c in results).strip()
+
+    # Pillar 1 (B 보강) — sections-aware dual output:
+    # spec.outputs 가 list 면 마지막 section 결과에 ---FORMAT:xxx--- 마커가 있을 것.
+    # 합친 결과 앞에 ---FORMAT:markdown--- 자동 prepend → executor 8-1C 가 분리 가능.
+    # LLM 이 마지막 section 에 dual output marker 출력 안 하면 fallback (single).
+    if isinstance(spec.get("outputs"), list) and len(spec["outputs"]) >= 2:
+        if "---FORMAT:" not in merged.split("\n", 1)[0]:
+            merged = "---FORMAT:markdown---\n" + merged
 
     # 완료 시 스냅샷 제거 (다음 성공 재실행은 처음부터)
     if db and not any_truncated:
@@ -2508,6 +2805,39 @@ async def create_skill_executor(
                         )
                 except Exception as _rr_err:
                     logger.debug("responsive_rules_inject_skip: %s", _rr_err)
+
+                # ── 엔진 전역 규칙: 프로젝트 디자인 토큰 승계 ──
+                # is_design_baseline=true 스펙 (UI 디자인 시안) 의 artifact :root
+                # 블록을 다른 HTML 스킬 프롬프트 맨 앞에 주입해 색/폰트 일관성 강제.
+                # 자기 참조 방지: 베이스라인 자신 retry 시에는 주입 skip
+                # (self-reference 오염 차단 + LLM 자유 팔레트 선택 허용).
+                try:
+                    from engine.skills.artifact.design_tokens import format_tokens_prompt_block
+                    from engine.skills.artifact.design_baseline import (
+                        get_baseline_spec_names,
+                        load_baseline_root_block,
+                        node_is_baseline,
+                    )
+                    _baseline_names = get_baseline_spec_names()
+                    if not node_is_baseline(node.name, _baseline_names):
+                        _tokens = await load_baseline_root_block(
+                            db, node.project_id, _baseline_names,
+                            exclude_node_id=node.id,
+                        )
+                        if _tokens:
+                            rendered_prompt = (
+                                format_tokens_prompt_block(_tokens) + "\n\n" + rendered_prompt
+                            )
+                            logger.info(
+                                "design_tokens_injected node=%s tokens_len=%d",
+                                node.id[:8], len(_tokens),
+                            )
+                    else:
+                        logger.debug(
+                            "design_tokens_inject_skip_self_baseline node=%s", node.id[:8],
+                        )
+                except Exception as _dt_err:
+                    logger.debug("design_tokens_inject_skip: %s", _dt_err)
 
             # 분할 노드: description이 JSON 메타데이터면 카테고리 지시로 변환
             if node.node_type == "TASK" and "(" in node.name:
@@ -3184,6 +3514,104 @@ async def create_skill_executor(
                     model_adapter, model, response, max_tokens,
                 )
 
+            # 8-1B. Pillar 5 — output_schema strict + retry_with_feedback.
+            # spec.output_schema 가 strict=true 면 LLM 응답 검증 → 실패 시 errors
+            # 를 prompt 에 피드백해 1회 재호출 (max_retries 만큼).
+            # 컴포넌트 레지스트리 같은 broken 출력 (name 필드에 SC-XXX 들어감) 차단.
+            if spec and (spec.get("output_schema") or {}).get("strict"):
+                try:
+                    from engine.skills.qa.schema_validator import validate_and_retry
+                    _final_prompt = (
+                        getattr(assembly, "rendered_prompt", "")
+                        or getattr(assembly, "prompt", "")
+                        or ""
+                    )
+                    _system_prompt = getattr(assembly, "system_prompt", "") or ""
+                    _new_content, _vresult = await validate_and_retry(
+                        content=response.content,
+                        spec=spec,
+                        model_adapter=model_adapter,
+                        model=model,
+                        original_prompt=_final_prompt,
+                        system_prompt=_system_prompt,
+                        max_tokens=max_tokens,
+                    )
+                    if _new_content != response.content:
+                        # retry 결과로 교체
+                        from engine.ai.model_adapter import APIResponse
+                        response = APIResponse(
+                            content=_new_content,
+                            input_tokens=response.input_tokens,
+                            output_tokens=response.output_tokens,
+                            model=response.model,
+                            stop_reason="end_turn",
+                        )
+                    if not _vresult.pass_:
+                        logger.warning(
+                            "schema_strict_unresolved node=%s spec=%s errors=%d",
+                            node.id[:8], spec.get("name", "?"),
+                            len(_vresult.errors),
+                        )
+                except Exception as _ve:
+                    logger.warning(
+                        "schema_validate_hook_fail node=%s err=%s",
+                        node.id[:8], str(_ve)[:120],
+                    )
+
+            # 8-1C. Pillar 1 — Dual Output Dispatcher.
+            # spec.outputs 가 list 면 LLM 응답을 ---FORMAT:xxx--- 마커로 분리해
+            # 각 형식별 schema 검증 + file_manifest 에 첨부.
+            # 마커 누락 시 single fallback (warn 후 진행).
+            if spec and isinstance(spec.get("outputs"), list) and len(spec["outputs"]) >= 2:
+                try:
+                    from engine.skills.qa.dual_output import (
+                        parse_and_validate_dual,
+                    )
+                    _dual_result = await parse_and_validate_dual(
+                        spec, response.content,
+                    )
+                    # file_manifest 에 모든 part 첨부 (saver 가 이후 사용)
+                    _file_manifest = []
+                    for _p in _dual_result.parts:
+                        _ext = _p.format.replace("_", ".")
+                        _file_manifest.append({
+                            "role": _p.file_role,
+                            "format": _p.format,
+                            "filename": f"{spec.get('name', 'output')}.{_ext}",
+                            "content": _p.content,
+                            "validation_pass": _p.validation_pass,
+                            "validation_errors": _p.validation_errors[:5],
+                        })
+                    # spec 에 임시 보관 — saver 가 file_manifest 컬럼에 저장
+                    spec["_dual_output_manifest"] = _file_manifest
+                    if _dual_result.fallback_used:
+                        logger.warning(
+                            "dual_output_fallback node=%s spec=%s — marker missing",
+                            node.id[:8], spec.get("name", "?"),
+                        )
+                    else:
+                        logger.info(
+                            "dual_output_split node=%s spec=%s parts=%d",
+                            node.id[:8], spec.get("name", "?"),
+                            len(_dual_result.parts),
+                        )
+                    # human_review part 가 있으면 그것을 main content 로
+                    _human_part = _dual_result.by_role("human_review")
+                    if _human_part and _human_part.content:
+                        from engine.ai.model_adapter import APIResponse
+                        response = APIResponse(
+                            content=_human_part.content,
+                            input_tokens=response.input_tokens,
+                            output_tokens=response.output_tokens,
+                            model=response.model,
+                            stop_reason="end_turn",
+                        )
+                except Exception as _doe:
+                    logger.warning(
+                        "dual_output_dispatch_fail node=%s err=%s",
+                        node.id[:8], str(_doe)[:120],
+                    )
+
             # 8-2. Category-constraint self-check (library split TASK)
             # spec 에 _library_split_category 제약이 있으면 결과 JSON 의 category
             # 필드를 대조 → 미스매치 시 1회 교정 재호출.
@@ -3524,6 +3952,38 @@ async def _handle_qa_dispatch(
                             harness_result["pass"] = False
                             harness_result["structural_failures"].extend(_cov_result["structural_failures"])
                         harness_result["checks"].extend(_cov_result["checks"])
+
+                        # 화면 ID ↔ 이름 일관성 검증 (정의서의 공식 이름이 section 제목에 포함되는지).
+                        # 불일치 시 artifact 를 ID 는 맞지만 다른 주제의 화면으로 그리는 회귀 방지.
+                        try:
+                            from engine.skills.qa.harness import (
+                                _harness_validate_screen_id_name_consistency,
+                            )
+                            _consistency = _harness_validate_screen_id_name_consistency(
+                                _screen_content, _full_content,
+                                min_pass_ratio=0.8,
+                            )
+                            harness_result["checks"].append({
+                                "name": "screen_id_name_consistency",
+                                "pass": _consistency["pass"],
+                                **_consistency.get("stats", {}),
+                            })
+                            if not _consistency["pass"]:
+                                harness_result["pass"] = False
+                                _samples = _consistency.get("mismatches", [])[:5]
+                                _mismatch_brief = ", ".join(
+                                    f"{m['id']}[정의서:'{m['defined_name']}' 실제:'{m['actual_title'][:30]}']"
+                                    for m in _samples
+                                )
+                                harness_result["structural_failures"].append(
+                                    f"화면 ID-이름 불일치 {len(_consistency.get('mismatches', []))}건 "
+                                    f"(정의서 공식 명칭과 artifact section 제목 불일치) — 화면 목록 정의서 기준 재생성 필요. "
+                                    f"샘플: {_mismatch_brief}"
+                                )
+                        except Exception as _cons_err:
+                            logger.warning(
+                                "screen_id_name_consistency_check_failed: %s", _cons_err,
+                            )
                 except Exception as _cov_err:
                     logger.warning("screen_coverage_check_failed: %s", _cov_err)
 
@@ -4593,6 +5053,51 @@ async def _handle_post_ai_call(
             db, node, save_content, spec["composition_role"]
         )
 
+    # 9-2B. Pillar 3 — 페이지 레시피 종료 후 cross-reference 검증.
+    # 라이브러리에 정의되지 않은 컴포넌트를 레시피가 참조하면 logger.warning +
+    # DB report 저장. 향후 라이브러리 retry 트리거의 단서로 활용.
+    if spec and spec.get("composition_role") == "recipe":
+        try:
+            from engine.skills.qa.cross_reference import (
+                verify_component_consistency,
+            )
+            _cross = await verify_component_consistency(db, node.project_id)
+            if _cross.severity != "pass":
+                logger.warning(
+                    "cross_ref_post_recipe node=%s severity=%s missing=%d "
+                    "match_ratio=%.2f",
+                    node.id[:8], _cross.severity,
+                    len(_cross.missing), _cross.match_ratio,
+                )
+                # report 를 nodes.description (JSON) 에 첨부 — 후속 retry 가 활용
+                try:
+                    _row = await db.fetchone(
+                        "SELECT description FROM nodes WHERE id=?", (node.id,),
+                    )
+                    _desc = {}
+                    if _row and _row.get("description"):
+                        try:
+                            _desc = json.loads(_row["description"])
+                        except (ValueError, TypeError):
+                            _desc = {}
+                    _desc["cross_reference"] = {
+                        "severity": _cross.severity,
+                        "missing": sorted(_cross.missing),
+                        "match_ratio": round(_cross.match_ratio, 3),
+                        "suggested_action": _cross.suggested_action,
+                    }
+                    await db.execute(
+                        "UPDATE nodes SET description=? WHERE id=?",
+                        (json.dumps(_desc, ensure_ascii=False), node.id),
+                    )
+                except Exception as _de:
+                    logger.debug("cross_ref_desc_persist_fail %s", _de)
+        except Exception as _ce:
+            logger.warning(
+                "cross_ref_post_recipe_fail node=%s err=%s",
+                node.id[:8], str(_ce)[:120],
+            )
+
     # 9-3. Output Size Gate: 프론트엔드 컴포넌트 노드 크기 검증
     # AI 비결정성 구조적 해결 — 기대 대비 극단적 부족 시 즉시 INVALID
     if (
@@ -4902,6 +5407,90 @@ async def _handle_post_ai_call(
                             logger.info(
                                 "verdict_extracted_missing_sections count=%d names=%s",
                                 len(_missing), ", ".join(_missing[:5]),
+                            )
+
+                        # Chunked items partial patch (HTML + JSON) — item_key 추출.
+                        # paired TASK 의 spec.type in ('html','json') + chunk_items 경로에서만.
+                        # 기존 `missing_sections_last_attempt` 와 분리된 `failed_items_last_attempt`
+                        # 로 기록 → 문서 섹션 경로 완전 격리.
+                        try:
+                            from engine.skills.qa.verdict_parser import extract_failed_item_keys
+                            from engine.skills.registry import SkillRegistry as _SkReg2
+                            _task_row = await db.fetchone(
+                                "SELECT name, phase, node_type FROM nodes WHERE id=?",
+                                (node.task_pair_node_id,),
+                            )
+                            _task_spec_ci = None
+                            if _task_row:
+                                _task_spec_ci = _SkReg2().resolve(
+                                    _task_row["name"], _task_row["phase"],
+                                    _task_row.get("node_type") or "TASK",
+                                )
+                            _ci_type = (_task_spec_ci or {}).get("type")
+                            _ci_chunk_items = (_task_spec_ci or {}).get("chunk_items") or []
+                            if _ci_type in ("html", "json") and _ci_chunk_items:
+                                _ci_patterns = (
+                                    (_task_spec_ci.get("chunk_items_source") or {})
+                                    .get("extract_patterns")
+                                )
+                                # verdict 전체에서 item_key 추출 (dict 또는 text)
+                                _item_keys = extract_failed_item_keys(
+                                    verdict, _ci_patterns,
+                                )
+                                if not _item_keys:
+                                    _item_keys = extract_failed_item_keys(
+                                        fail_text, _ci_patterns,
+                                    )
+                                # hallucination 필터 — spec.chunk_items 에 있는 것만
+                                _known_items = set(
+                                    str(k) for k in _ci_chunk_items if isinstance(k, str)
+                                )
+                                _item_keys = [k for k in _item_keys if k in _known_items]
+                                if _item_keys:
+                                    # version CAS 로 race 방지
+                                    _snap_row2 = await db.fetchone(
+                                        "SELECT task_snapshot, version FROM nodes WHERE id=?",
+                                        (node.task_pair_node_id,),
+                                    )
+                                    _snap2: dict = {}
+                                    if _snap_row2 and _snap_row2.get("task_snapshot"):
+                                        try:
+                                            _snap2 = _jv_patch.loads(
+                                                _snap_row2["task_snapshot"]
+                                            ) or {}
+                                        except Exception:
+                                            _snap2 = {}
+                                    if not isinstance(_snap2, dict):
+                                        _snap2 = {}
+                                    _snap2["failed_items_last_attempt"] = _item_keys
+                                    # type key: html 경로는 chunked_html_items, json 은 chunked_json_items
+                                    _snap2.setdefault(
+                                        "type",
+                                        "chunked_html_items" if _ci_type == "html"
+                                        else "chunked_json_items",
+                                    )
+                                    _cur_ver = (_snap_row2 or {}).get("version") or 0
+                                    _affected_cas = await db.execute(
+                                        """UPDATE nodes
+                                           SET task_snapshot=?, updated_at=?,
+                                               version=version+1
+                                           WHERE id=? AND version=?""",
+                                        (
+                                            _jv_patch.dumps(_snap2, ensure_ascii=False),
+                                            _now(), node.task_pair_node_id, _cur_ver,
+                                        ),
+                                    )
+                                    logger.info(
+                                        "verdict_extracted_failed_items "
+                                        "count=%d type=%s keys=%s cas_hit=%s",
+                                        len(_item_keys), _ci_type,
+                                        ",".join(_item_keys[:5]),
+                                        bool(_affected_cas),
+                                    )
+                        except Exception as _citem_err:
+                            logger.warning(
+                                "failed_item_key_extraction_failed error=%s",
+                                _citem_err,
                             )
                     except Exception as _verr:
                         logger.warning("verdict_parser failed: %s", _verr)

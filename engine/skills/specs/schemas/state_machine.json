@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "engine/skills/specs/schemas/state_machine.json",
+  "title": "State Machine (XState v5 / Stately)",
+  "type": "object",
+  "required": ["id", "initial", "states"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-zA-Z0-9_]*$"
+    },
+    "initial": {"type": "string"},
+    "context": {"type": "object"},
+    "states": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-zA-Z0-9_]*$": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "on": {
+              "type": "object"
+            },
+            "entry": {"type": ["array", "string"]},
+            "exit": {"type": ["array", "string"]},
+            "type": {
+              "enum": ["atomic", "compound", "parallel", "final", "history"]
+            },
+            "states": {"type": "object"},
+            "invoke": {"type": ["array", "object"]}
+          }
+        }
+      }
+    }
+  }
+}

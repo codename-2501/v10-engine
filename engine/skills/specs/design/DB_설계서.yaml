@@ -3,6 +3,15 @@ phase: DESIGN
 type: document
 model_preference: opus
 
+# Pillar 1 (B) — Dual Output: 인간 검토 MD + 개발자 사용 SQL DDL.
+outputs:
+  - format: markdown
+    file_role: human_review
+  - format: sql_ddl
+    file_role: developer_consumable
+    strict: false  # SQL syntax 는 별도 lint 로 검증 (jsonschema 부적합)
+    on_fail: warn
+
 # Stage 9: Dynamic Layer Selection — DB 는 PRD + data flow 필요 (UI design system 불필요)
 context_layers:
   - prd
@@ -22,8 +31,8 @@ sections:
     outline: "테이블(테이블명/인덱스명/컬럼/유형/용도) + 복합 인덱스 전략"
     target_tokens: 4000
   - name: "데이터 마이그레이션 계획"
-    outline: "마이그레이션 대상·절차·검증·롤백 계획"
-    target_tokens: 4000
+    outline: "마이그레이션 대상·절차·검증·롤백 계획. 본 섹션 끝에 ---FORMAT:sql_ddl--- 마커 출력 후 모든 테이블에 대한 CREATE TABLE / CREATE INDEX / FOREIGN KEY DDL 작성 (Postgres 14+ 문법 기준, 코드블록(```) 사용 금지)."
+    target_tokens: 9000
 
 prompt: |
   ## 산출물: {{name}}

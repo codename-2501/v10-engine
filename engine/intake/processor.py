@@ -186,6 +186,14 @@ NODE_TEMPLATES: list[dict] = [
         # SI 전용
         {"name": "시스템 통합 아키텍처 설계",                  "model": "opus",   "when": ["si"]},
         {"name": "데이터 매핑 테이블",                         "model": "sonnet", "when": ["si"]},
+        # 백엔드별 데이터 모델/권한 정책 (Pillar 2 — backend:instantdb 등)
+        {"name": "InstantDB 데이터 모델 설계",                 "model": "opus",   "when": ["backend:instantdb"]},
+        {"name": "InstantDB 권한 정책 설계",                   "model": "opus",   "when": ["backend:instantdb"]},
+        # Pillar 4 essentials — service_type 별 필수 spec
+        {"name": "라우팅 설계서",                              "model": "sonnet", "when": ["service:web_responsive", "service:web_and_app"]},
+        {"name": "i18n 카탈로그",                              "model": "sonnet", "when": ["service:web_responsive", "service:mobile_native", "service:web_and_app"]},
+        {"name": "환경변수 스키마",                            "model": "sonnet", "when": ["service:web_responsive", "service:mobile_native", "service:web_and_app"]},
+        {"name": "PWA 매니페스트",                             "model": "sonnet", "when": ["service:web_responsive", "service:web_and_app"]},
     ]},
 
     # ══════════════════════════════════════════════════════════════════════
@@ -223,6 +231,11 @@ NODE_TEMPLATES: list[dict] = [
         # MLOps
         {"name": "MLOps 환경 구성",                            "model": "opus",   "when": ["mlops"]},
         {"name": "모델 서빙 API 배포",                         "model": "sonnet", "when": ["mlops"]},
+        # 백엔드별 BUILD 노드 (Pillar 2 — backend:instantdb 등)
+        {"name": "InstantDB 백엔드 구현",                      "model": "sonnet", "when": ["backend:instantdb"]},
+        {"name": "InstantDB 인증 구현",                        "model": "sonnet", "when": ["backend:instantdb"]},
+        {"name": "InstantDB 실시간 쿼리",                      "model": "sonnet", "when": ["backend:instantdb"]},
+        {"name": "InstantDB 프론트엔드 통합",                  "model": "sonnet", "when": ["backend:instantdb"]},
     ]},
 
     # ══════════════════════════════════════════════════════════════════════
@@ -304,6 +317,18 @@ INTRA_PHASE_DEPS: list[tuple[str, str]] = [
     ("화면 설계서 (와이어프레임+스토리보드)",   "UI 디자인 시안"),
     ("API 설계서",                             "인터페이스 명세서 (ICD)"),
     ("시스템 통합 아키텍처 설계",              "데이터 매핑 테이블"),
+    # Pillar 2 — 백엔드 spec 의존
+    ("DB 설계서 (ERD·테이블 정의)",            "InstantDB 데이터 모델 설계"),
+    ("보안 설계서 (ISMS)",                     "InstantDB 권한 정책 설계"),
+    # Pillar 4 — essentials 의존 (각자 적절한 upstream 보유)
+    ("화면 목록 정의서",                       "라우팅 설계서"),
+    ("페이지 레시피",                           "라우팅 설계서"),
+    ("화면 설계서 (와이어프레임+스토리보드)",   "i18n 카탈로그"),
+    ("UI 디자인 시안",                         "i18n 카탈로그"),
+    ("시스템 아키텍처 설계서 (HLD)",           "환경변수 스키마"),
+    ("API 설계서",                             "환경변수 스키마"),
+    ("디자인 토큰",                             "PWA 매니페스트"),
+    ("화면 설계서 (와이어프레임+스토리보드)",   "PWA 매니페스트"),
 
     # ── BUILD ── (개발표준 이후)
     ("개발표준 정의서 (코드 컨벤션·브랜치 전략)", "프론트엔드 공통 인프라"),
@@ -491,13 +516,25 @@ class IntakeProcessor:
         )
         priority = _resolve(raw, "priority", default=3)
 
-        # S11-A1: 도메인 자동 감지 → global_context 에 저장
-        # 키워드 기반 매칭 (LLM 호출 X, 결정적·빠름).
-        # 다운스트림 (executor·harness) 가 domain_profile 을 활용해 spec override.
+        # S11-A1 + Pillar 2: 도메인 자동 감지 → global_context 에 저장.
+        # 키워드 매치 + LLM 분류 hybrid (LLM 실패 시 키워드 fallback).
+        # 둘 다 실패 시 'general' fallback 도메인 — 항상 _domain_profile_data 보장.
         try:
-            from engine.intake.domain_profiles import detect_profile, load_profile
-            _combined_text = " ".join(str(v) for v in raw.values() if isinstance(v, (str, int, float)))
-            _detected = detect_profile(_combined_text)
+            from engine.intake.domain_profiles import (
+                detect_profile_hybrid, load_profile,
+            )
+            _combined_text = " ".join(
+                str(v) for v in raw.values() if isinstance(v, (str, int, float))
+            )
+            # LLM adapter 가 있으면 hybrid, 없으면 키워드만 + general fallback
+            try:
+                from engine.ai.model_adapter import CLIProxyAdapter
+                _domain_adapter: Any = CLIProxyAdapter()
+            except Exception:
+                _domain_adapter = None
+            _detected = await detect_profile_hybrid(
+                _combined_text, _domain_adapter,
+            )
             _profile_data = load_profile(_detected) if _detected else None
             if _detected and _profile_data:
                 raw["_domain_profile"] = _detected
@@ -680,6 +717,26 @@ class IntakeProcessor:
         is_new = project_type in ("new", "신규", "신규 구축", "")
         is_upgrade = project_type in ("upgrade", "고도화", "리뉴얼", "enhancement")
         scopes = set(_resolve_list(raw, "scope", "project_types", "projectTypes"))
+        # Pillar 2 hot-fix — backendChoice 를 scope token 으로 inject.
+        # `when=["backend:instantdb"]` 같은 형식으로 노드 활성화 가능.
+        backend_choice = (raw.get("backendChoice")
+                          or raw.get("backend_choice") or "").strip().lower()
+        if backend_choice:
+            scopes.add(f"backend:{backend_choice}")
+        # Pillar 4 — serviceType 을 scope token 으로 inject.
+        # raw["serviceType"] 가 list 또는 string 모두 지원.
+        # `when=["service:web_responsive"]` 같은 형식으로 essentials 노드 활성화.
+        _svc = raw.get("serviceType") or raw.get("service_type") or []
+        if isinstance(_svc, str):
+            _svc = [_svc]
+        for s in _svc:
+            tok = str(s).strip().lower()
+            if tok:
+                scopes.add(f"service:{tok}")
+                # web_and_app 은 web + mobile 두 essentials 모두 활성화 (extends)
+                if tok == "web_and_app":
+                    scopes.add("service:web_responsive")
+                    scopes.add("service:mobile_native")
 
         def _is_applicable(when) -> bool:
             """when 조건 평가 → True면 실행 대상, False면 SKIPPED."""

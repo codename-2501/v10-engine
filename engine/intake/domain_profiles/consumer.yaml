@@ -1,0 +1,98 @@
+name: 소비자 서비스 (배달 / 쇼핑 / 미디어)
+keywords:
+  - 배달
+  - delivery
+  - 쇼핑
+  - shopping
+  - 마켓플레이스
+  - marketplace
+  - 미디어
+  - media
+  - 콘텐츠
+  - content
+  - 스트리밍
+  - streaming
+  - 소셜
+  - social
+  - 커뮤니티
+  - community
+  - 리뷰
+  - 별점
+  - 큐레이션
+
+terminology:
+  - 사용자: 일반 소비자 (B2C)
+  - 가맹점: 셀러 / 파트너
+  - 주문: 단건 거래 단위
+  - 큐레이션: 추천 알고리즘 결과
+
+regulations:
+  - 개인정보보호법(PIPA)
+  - 전자상거래법
+  - 청소년보호법 (해당 시)
+
+screen_estimate:
+  small: 30
+  medium: 55
+  large: 90
+
+spec_overrides:
+  보안_설계서:
+    extra_required:
+      - 결제 PCI-DSS
+      - 개인정보 비식별
+      - 콘텐츠 등급 / 금지어
+  화면_목록_정의서:
+    group_prefix_examples:
+      - "SC-AU: 인증/소셜로그인"
+      - "SC-HM: 홈/피드"
+      - "SC-CT: 카테고리/탐색"
+      - "SC-PD: 상품/콘텐츠 상세"
+      - "SC-CT: 카트/주문"
+      - "SC-PY: 결제"
+      - "SC-MY: 마이페이지"
+      - "SC-RV: 리뷰/평점"
+
+design_tone:
+  palette: "활기찬 — 강한 액센트 + 콘텐츠 우선"
+  density: "이미지 풍부, 가독성 위주"
+  display: "모바일 우선, 무한스크롤 OK"
+  forbidden:
+    - "산업용 KPI 차트"
+    - "관리자 톤"
+
+component_categories:
+  - name: "layout"
+    chunk_items:
+      - app_header
+      - bottom_nav
+      - search_bar
+      - sidebar
+  - name: "discovery"
+    chunk_items:
+      - hero_banner
+      - category_grid
+      - product_card
+      - content_card
+      - filter_chip
+      - sort_dropdown
+  - name: "transaction"
+    chunk_items:
+      - cart_item
+      - order_summary
+      - payment_method_select
+      - delivery_address_form
+  - name: "social"
+    chunk_items:
+      - review_card
+      - rating_stars
+      - comment_input
+      - like_button
+      - share_button
+  - name: "feedback"
+    chunk_items:
+      - toast
+      - snackbar
+      - modal
+      - empty_state
+      - loading_spinner

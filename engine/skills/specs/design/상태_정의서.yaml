@@ -3,6 +3,16 @@ phase: DESIGN
 type: document
 model_preference: sonnet
 
+# Pillar 1 (B) — Dual Output: 인간 검토 MD + 개발자 사용 XState v5 JSON.
+outputs:
+  - format: markdown
+    file_role: human_review
+  - format: state_machine_json
+    file_role: developer_consumable
+    schema_ref: schemas/state_machine.json
+    strict: true
+    on_fail: warn
+
 # F4 섹션 분할 (S1-1) — 화면별 상태·전환·에러 처리 리스트가 큰 문서.
 sections:
   - name: "상태 관리 전략"
@@ -25,8 +35,8 @@ sections:
     target_tokens: 4000
     min_items: 10
   - name: "로딩 및 빈 상태"
-    outline: "테이블(화면ID/로딩표시/스켈레톤유형/빈상태메시지/빈상태액션)"
-    target_tokens: 4000
+    outline: "테이블(화면ID/로딩표시/스켈레톤유형/빈상태메시지/빈상태액션). 본 섹션 끝에 ---FORMAT:state_machine_json--- 마커 출력 후 핵심 화면 1~3개에 대한 XState v5 호환 JSON state machine 작성 ({id, initial, states} 형식, 코드블록(```) 사용 금지)."
+    target_tokens: 7000
     min_items: 10
 
 prompt: |

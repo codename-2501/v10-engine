@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "engine/skills/specs/schemas/page_recipe.json",
+  "title": "Page Recipe",
+  "description": "한 페이지의 컴포넌트 placement 정의. component_name 은 라이브러리 정의 식별자.",
+  "type": "object",
+  "required": ["page_name", "page_slug", "scr_id", "placements"],
+  "additionalProperties": true,
+  "properties": {
+    "page_name": {"type": "string", "minLength": 1},
+    "page_slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "scr_id": {
+      "type": "string",
+      "pattern": "^(SC-[A-Z]{2,4}-[0-9]{3,4}|SCR-[0-9]{3,4})$"
+    },
+    "title": {"type": "string"},
+    "description": {"type": "string"},
+    "layout": {
+      "type": "string",
+      "enum": ["single-column", "sidebar-left", "sidebar-right",
+               "two-column", "three-column", "grid", "fullscreen"]
+    },
+    "placements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["component_name"],
+        "properties": {
+          "component_name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "snake_case — 라이브러리에 정의된 컴포넌트 식별자"
+          },
+          "order": {"type": "integer"},
+          "condition": {"type": "string"},
+          "bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["slot_name"],
+              "properties": {
+                "slot_name": {"type": "string"},
+                "value": {}
+              }
+            }
+          },
+          "repeat": {"type": "string"},
+          "wrapper_css_class": {"type": "string"}
+        }
+      }
+    }
+  }
+}

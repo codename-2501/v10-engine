@@ -3,10 +3,16 @@ phase: DESIGN
 type: html
 model_preference: opus
 
+# 디자인 토큰 source of truth (FO 변형) — saver 가 본 artifact 의 :root 를
+# 프로젝트 나머지 HTML 산출물의 색/폰트 토큰 기준으로 사용.
+is_design_baseline: true
+
 # Stage 1: FO 화면마다 1 chunk (단일 호출 토큰 억제)
 chunk_items_source:
+  from_registry: screen_registry  # Tier 2-B/C: DB 우선
   from_spec: "화면 목록 정의서"
   extract_patterns:
+    - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})\\s*[|│]\\s*([^|│\\n]+?)\\s*[|│]"
     - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
     - "([A-Z]{2,5}-[A-Z]{2,4}-\\d{3,4})"
   filter_regex: "(SC-AU-|SC-CW-|SC-WA-|SC-CB-|SCR-FO-)"
@@ -17,6 +23,13 @@ context_layers:
   - design_system
   - current_task
   - sibling_artifacts
+
+# B1' — main 영역 dense 검증. FO 의 홈/대시보드/AI 류는 콘텐츠 fail level.
+quality_thresholds:
+  content_density:
+    threshold_text: 500
+    threshold_nodes: 20
+    fail_prefixes: ["HM", "AI", "AN", "CK", "CV", "CW"]
 
 prompt: |
   ## 산출물: {{name}}

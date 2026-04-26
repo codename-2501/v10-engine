@@ -609,6 +609,24 @@ class CLIProxyAdapter:
     """
 
     def __init__(self, cli_path: str = "claude", config_dir: str | None = None) -> None:
+        # binary 사전 검증 (fail-fast) — chunk loop 의 placeholder 양산 방지.
+        # 절대 경로 fileexists OR PATH 에서 resolve 가능해야 함.
+        import os as _os
+        import shutil as _shutil
+        if _os.path.isabs(cli_path):
+            if not _os.path.exists(cli_path):
+                raise RuntimeError(
+                    f"Claude CLI 바이너리 누락 — '{cli_path}' 없음. "
+                    f"npm install -g @anthropic-ai/claude-code 후 경로 확인."
+                )
+        else:
+            resolved = _shutil.which(cli_path)
+            if not resolved:
+                raise RuntimeError(
+                    f"Claude CLI 바이너리 누락 — PATH 에서 '{cli_path}' 못 찾음. "
+                    f"npm install -g @anthropic-ai/claude-code 필요."
+                )
+            cli_path = resolved
         self._cli = cli_path
         if config_dir:
             import pathlib

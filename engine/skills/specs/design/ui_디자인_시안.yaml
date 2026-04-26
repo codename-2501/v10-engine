@@ -3,11 +3,18 @@ phase: DESIGN
 type: html
 model_preference: opus
 
+# 프로젝트 디자인 토큰 source of truth — saver.py 의 enforce_design_tokens 가
+# 본 스펙의 artifact :root 블록을 기준으로 다른 HTML 산출물을 결정론 교체함.
+# 베이스라인 자신은 enforce 면제 → 자유롭게 LLM 이 팔레트 생성.
+is_design_baseline: true
+
 # S11: 100% 화면 커버리지 보장 — 화면 목록 정의서에서 SC-XX-NNN 자동 추출 후
 # 화면당 1회 LLM 호출로 <section> 생성 → 병합. 수십 화면도 완전 구현 보장.
 chunk_items_source:
+  from_registry: screen_registry  # Tier 2-B/C: DB 우선 (안정), regex fallback
   from_spec: "화면 목록 정의서"
   extract_patterns:
+    - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})\\s*[|│]\\s*([^|│\\n]+?)\\s*[|│]"
     - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
     - "([A-Z]{2,5}-[A-Z]{2,4}-\\d{3,4})"
 
@@ -20,6 +27,14 @@ context_layers:
 
 # Stage 12: Prompt·Output 토큰 상한 선언 (spec 단위, 기존 8000 하드코딩 이동)
 max_output_tokens: 8000
+
+# B1' — main 영역 dense 검증. 대시보드/AI/홈 류 화면은 콘텐츠 fail level.
+# 와이어프레임이 아닌 UI 시안이므로 충실한 콘텐츠 강제.
+quality_thresholds:
+  content_density:
+    threshold_text: 500
+    threshold_nodes: 20
+    fail_prefixes: ["AI", "HM", "AN", "CK", "CV"]
 
 # Stage 10: Formal Schema Validation
 output_schema:
