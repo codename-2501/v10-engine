@@ -185,9 +185,14 @@ class CompositionRenderer:
             rendered = _render_component(comp, placement, data_ctx, preview_mode)
             body_parts.append(_wrap_placement(rendered, placement))
 
-        # 2-6. 미리보기 모드: 라이트 테마 + 잔여 핸들바 태그 정리
+        # 2-6. 미리보기 모드: 라이트 테마 + 잔여 핸들바 태그 정리.
+        # 기존 css_parts (토큰 + 컴포넌트 + 레이아웃) 는 @layer base 로, preview
+        # override 는 unlayered 로 내보낸다. CSS 명세상 unlayered 규칙은 any @layer
+        # 보다 우선. 따라서 `!important` 없이도 preview 가 토큰·컴포넌트 선언을
+        # 안정적으로 이긴다.
         if preview_mode:
-            css_parts.append(_preview_light_theme_css())
+            wrapped_base = "@layer base {\n" + "\n".join(css_parts) + "\n}"
+            css_parts = [wrapped_base, _preview_light_theme_css()]
 
         # 3. 최종 HTML 조립
         full_css = "\n".join(css_parts)
@@ -1277,56 +1282,61 @@ def _layout_css(layout: str) -> str:
 
 
 def _preview_light_theme_css() -> str:
-    """미리보기 모드: 다크 토큰을 라이트로 오버라이드 (시맨틱 변수 포함)."""
-    return """/* preview light theme override */
+    """미리보기 모드: 다크 토큰을 라이트로 오버라이드 (시맨틱 변수 포함).
+
+    본 블록은 renderer 에서 unlayered 로 삽입되고, base 토큰/컴포넌트 CSS 는
+    `@layer base` 안으로 감싸진다. CSS 명세상 unlayered 규칙은 어떤 layer 의
+    규칙보다도 우선하므로 `!important` 없이도 안정적으로 override 된다.
+    """
+    return """/* preview light theme override (unlayered beats @layer base) */
 :root {
   /* 기본 */
-  --color-bg: #ffffff !important;
-  --color-surface: #f8fafc !important;
-  --color-surface-hover: #f1f5f9 !important;
-  --color-text: #1a1a2e !important;
-  --color-text-muted: #64748b !important;
-  --color-text-dim: #94a3b8 !important;
-  --color-border: #e2e8f0 !important;
+  --color-bg: #ffffff;
+  --color-surface: #f8fafc;
+  --color-surface-hover: #f1f5f9;
+  --color-text: #1a1a2e;
+  --color-text-muted: #64748b;
+  --color-text-dim: #94a3b8;
+  --color-border: #e2e8f0;
   /* 시맨틱 bg/surface */
-  --color-bg-primary: #ffffff !important;
-  --color-bg-surface: #f8fafc !important;
-  --color-bg-card: #ffffff !important;
-  --color-surface-1: #f8fafc !important;
-  --color-surface-2: #f1f5f9 !important;
-  --color-surface-3: #e2e8f0 !important;
+  --color-bg-primary: #ffffff;
+  --color-bg-surface: #f8fafc;
+  --color-bg-card: #ffffff;
+  --color-surface-1: #f8fafc;
+  --color-surface-2: #f1f5f9;
+  --color-surface-3: #e2e8f0;
   /* 시맨틱 text */
-  --color-text-primary: #1a1a2e !important;
-  --color-text-secondary: #64748b !important;
-  --color-text-inverse: #ffffff !important;
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #64748b;
+  --color-text-inverse: #ffffff;
   /* border */
-  --color-border-subtle: #e2e8f0 !important;
+  --color-border-subtle: #e2e8f0;
   /* legacy */
-  --color-card-bg: #ffffff !important;
-  --color-sidebar-bg: #f1f5f9 !important;
-  --color-sidebar-text: #334155 !important;
-  --color-header-bg: #ffffff !important;
-  --color-header-text: #1a1a2e !important;
-  --color-input-bg: #ffffff !important;
-  --color-input-border: #d1d5db !important;
-  --color-hover: #f1f5f9 !important;
-  --color-table-header: #f8fafc !important;
-  --color-table-stripe: #fafbfc !important;
-  --color-footer-bg: #1e293b !important;
-  --color-footer-text: #e2e8f0 !important;
+  --color-card-bg: #ffffff;
+  --color-sidebar-bg: #f1f5f9;
+  --color-sidebar-text: #334155;
+  --color-header-bg: #ffffff;
+  --color-header-text: #1a1a2e;
+  --color-input-bg: #ffffff;
+  --color-input-border: #d1d5db;
+  --color-hover: #f1f5f9;
+  --color-table-header: #f8fafc;
+  --color-table-stripe: #fafbfc;
+  --color-footer-bg: #1e293b;
+  --color-footer-text: #e2e8f0;
 }
 body {
-  background: #ffffff !important;
-  color: #1a1a2e !important;
-  font-family: var(--font-family-base, var(--font-family, sans-serif)) !important;
+  background: #ffffff;
+  color: #1a1a2e;
+  font-family: var(--font-family-base, var(--font-family, sans-serif));
 }
 /* 모바일 메뉴/햄버거 숨기기 */
 .page-header__mobile-nav,
 .page-header__mobile-menu,
-.page-header__hamburger { display: none !important; }
+.page-header__hamburger { display: none; }
 /* 네비 링크 가로 정렬 */
-.page-header__nav { display: flex !important; align-items: center; gap: 8px; }
-.page-header__nav-list { display: flex !important; list-style: none; gap: 4px; margin: 0; padding: 0; }
+.page-header__nav { display: flex; align-items: center; gap: 8px; }
+.page-header__nav-list { display: flex; list-style: none; gap: 4px; margin: 0; padding: 0; }
 .page-header__nav a,
 .page-header__nav-link { white-space: nowrap; }
 /* 헤더 레이아웃 */
@@ -1335,7 +1345,7 @@ body {
 /* 사이드바 */
 .sidebar { min-height: 100vh; }
 /* 테이블 로딩 스켈레톤 숨기기 */
-.data-table__loading { display: none !important; }
+.data-table__loading { display: none; }
 .data-table__td:empty { height: 40px; }
 /* 카드 그림자 */
 .stat-card, .claim-card, .billing-card, .care-plan, .client-card,

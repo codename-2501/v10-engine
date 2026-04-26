@@ -87,6 +87,51 @@ async def _cascade_for_node(
         (ds_node["id"],),
     )
 
+    # Chunked items partial patch — downstream 이 chunked html/json 스킬이고
+    # task_snapshot.failed_items_last_attempt 기록이 있으면, atomic_state 에서
+    # 해당 item 만 FAILED 로 전이해 다음 실행 시 cache bust 되도록 한다.
+    # 전체 DELETE 하지 않음 — 나머지 item 캐시는 보존 (토큰 절감).
+    # feature flag 기본 off — 명시적 on 시에만 작동.
+    if os.environ.get("V10_CHUNKED_ITEMS_PARTIAL_RETRY", "0") == "1":
+        try:
+            _snap_row = await db.fetchone(
+                "SELECT task_snapshot FROM nodes WHERE id=?", (ds_node["id"],),
+            )
+            _failed_items: list[str] = []
+            if _snap_row and _snap_row.get("task_snapshot"):
+                try:
+                    _snap = json.loads(_snap_row["task_snapshot"]) or {}
+                    if isinstance(_snap, dict):
+                        _snap_type = _snap.get("type")
+                        if _snap_type in ("chunked_html_items", "chunked_json_items"):
+                            _raw = _snap.get("failed_items_last_attempt") or []
+                            _failed_items = [
+                                str(k) for k in _raw if isinstance(k, str)
+                            ]
+                except Exception:
+                    _failed_items = []
+            if _failed_items:
+                _placeholders = ",".join(["?"] * len(_failed_items))
+                await db.execute(
+                    f"""UPDATE atomic_state
+                        SET status='FAILED',
+                            retry_count=COALESCE(retry_count, 0) + 1,
+                            reason='cascade_partial_retry',
+                            updated_at=?
+                        WHERE node_id=? AND item_key IN ({_placeholders})""",
+                    [now, ds_node["id"], *_failed_items],
+                )
+                logger.info(
+                    "cascade_chunked_partial_mark node=%s count=%d keys=%s",
+                    ds_node["id"][:8], len(_failed_items),
+                    ",".join(_failed_items[:5]),
+                )
+        except Exception as _cascade_ci_err:
+            logger.warning(
+                "cascade_chunked_partial_failed node=%s error=%s",
+                ds_node["id"][:8], _cascade_ci_err,
+            )
+
     # 버그 3: 같은 phase의 COMPLETED GATE 리셋 (GATE가 고아 COMPLETED로 남으면 후행 단계가 진행됨)
     await db.execute(
         """UPDATE nodes SET state='NOT_STARTED', completed_at=NULL, updated_at=?
