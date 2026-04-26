@@ -255,7 +255,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
     max-width: 100%; padding: 20px;
     font-family: 'Pretendard', -apple-system, sans-serif;
   }
-  .toolbar { display: none !important; }
+  .toolbar { display: none; }
   .section { background: #f8f9fa; border-color: #e0e0e0; }
   .summary { background: #f8f9fa; border-color: #e0e0e0; }
   th { background: #f0f1f3; color: #333; border-color: #d0d0d0; }

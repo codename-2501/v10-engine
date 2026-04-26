@@ -1155,14 +1155,15 @@ def _harness_validate_screen_coverage(
     # 테이블 행(| ID | 이름 |) 또는 일반 텍스트 모두에서 추출.
     defined_screens: list[dict] = []
     _seen_ids: set[str] = set()
-    # 포괄 패턴: A-B-123, AB-001, SC-AU-001, SCR-123 등을 모두 매치
+    # SC-XX-NNN + SCR-NNN 두 컨벤션만 인정 (B4 — 단축형 XX-NNN 본문 노이즈 차단).
+    # 단축형 [A-Z]{2,4}-\d{3,4} 는 정의서 본문 가독성 표기로 흔히 등장 → total_defined 부풀림.
     generic_id_re = re.compile(
-        r'\b(SCR-\d{3,4}|SC-[A-Z]{2,4}-\d{3,4}|[A-Z]{2,4}-\d{3,4})\b',
+        r'\b(SCR-\d{3,4}|SC-[A-Z]{2,4}-\d{3,4})\b',
         re.IGNORECASE,
     )
     # 테이블 행에서 이름까지 추출 (| ID | 이름 | ... |)
     table_row_re = re.compile(
-        r'\|\s*(SCR-\d{3,4}|SC-[A-Z]{2,4}-\d{3,4}|[A-Z]{2,4}-\d{3,4})\s*\|\s*([^|\n]+?)\s*\|',
+        r'\|\s*(SCR-\d{3,4}|SC-[A-Z]{2,4}-\d{3,4})\s*\|\s*([^|\n]+?)\s*\|',
         re.IGNORECASE,
     )
     for m in table_row_re.finditer(screen_list_content):
@@ -1304,6 +1305,166 @@ def _harness_validate_screen_coverage(
             len(structural_failures), [f[:80] for f in structural_failures[:3]],
         )
     return {"pass": all_pass, "structural_failures": structural_failures, "checks": checks}
+
+
+def _harness_validate_main_content_density(
+    artifact_content: str,
+    threshold_text: int = 500,
+    threshold_nodes: int = 20,
+    fail_prefixes: list[str] | None = None,
+) -> dict:
+    """각 section main 영역 dense 검증 (B1' — layout-shell + sparse 자동 감지).
+
+    LLM 이 sidebar/header chrome 만 그리고 main 영역 비우는 결손을 차단.
+    visible text < threshold_text OR 시작 태그 count < threshold_nodes → 결손 후보.
+
+    Args:
+        fail_prefixes: 명시된 prefix 화면 (예: ["AI", "HM"]) 은 fail level.
+            None/빈 list 면 모든 결손이 warn level (와이어프레임 spec 등).
+    Returns:
+        {"pass": bool, "failures": [...], "warnings": [...]}
+    """
+    SECTION_RE = re.compile(
+        r'<section[^>]*\bid=[\"\'](SC-[A-Z]{2,5}-\d{3,4})[\"\'][^>]*>(.*?)</section>',
+        re.DOTALL,
+    )
+    fail_re = (
+        re.compile(r'^SC-(' + '|'.join(re.escape(p) for p in fail_prefixes) + r')-')
+        if fail_prefixes else None
+    )
+    failures: list[dict] = []
+    warnings: list[dict] = []
+    for m in SECTION_RE.finditer(artifact_content or ""):
+        sid = m.group(1)
+        body = m.group(2)
+        visible = re.sub(r'<[^>]+>|\s+', ' ', body).strip()
+        node_count = body.count('<')
+        sparse = len(visible) < threshold_text or node_count < threshold_nodes
+        if not sparse:
+            continue
+        record = {
+            "id": sid,
+            "visible_chars": len(visible),
+            "node_count": node_count,
+        }
+        if fail_re and fail_re.match(sid):
+            record["level"] = "fail"
+            failures.append(record)
+        else:
+            record["level"] = "warn"
+            warnings.append(record)
+    return {
+        "pass": len(failures) == 0,
+        "failures": failures,
+        "warnings": warnings,
+        "checked_sections": len(SECTION_RE.findall(artifact_content or "")),
+    }
+
+
+def _harness_validate_screen_id_name_consistency(
+    screen_list_content: str,
+    artifact_content: str,
+    min_pass_ratio: float = 0.95,
+) -> dict:
+    """산출물의 `<section id="SC-...">` 제목이 화면 목록 정의서의 이름과 일치하는지 검증.
+
+    화면 목록 정의서의 ID↔이름 매핑이 공식 source of truth. UI 시안/화면 설계서 등
+    모든 design artifact 가 같은 ID 에 다른 화면을 담으면 개발 이양 시 혼란.
+    불일치 비율 20% 이상 시 FAIL — artifact 재생성 유도.
+
+    Args:
+        screen_list_content: 화면 목록 정의서 artifact (markdown/html)
+        artifact_content: 검증 대상 artifact (UI 시안/화면 설계서 등 HTML)
+        min_pass_ratio: 일치 비율 하한 (0.8 = 80% 이상 매칭)
+
+    Returns:
+        {"pass": bool, "mismatches": [...], "stats": {...}}
+    """
+    # 1. 정의서에서 ID ↔ 이름 매핑 추출 (table row 우선)
+    table_row_re = re.compile(
+        r"\|\s*(SCR-\d{3,4}|SC-[A-Z]{2,4}-\d{3,4}|[A-Z]{2,4}-\d{3,4})\s*\|\s*([^|\n]+?)\s*\|",
+        re.IGNORECASE,
+    )
+    defined_map: dict[str, str] = {}
+    for m in table_row_re.finditer(screen_list_content):
+        sid = m.group(1).upper()
+        name = m.group(2).strip()
+        if sid not in defined_map and name:
+            defined_map[sid] = name
+
+    if not defined_map:
+        return {
+            "pass": True,
+            "skipped_reason": "no_id_name_map_in_screen_list",
+            "mismatches": [],
+            "stats": {"defined": 0},
+        }
+
+    # 2. artifact 의 `<section id="SC-..."` 블록에서 첫 제목/헤더 텍스트 추출
+    section_re = re.compile(
+        r'<section[^>]*id=[\'"]((?:SCR-\d{3,4}|SC-[A-Z]{2,4}-\d{3,4}|[A-Z]{2,4}-\d{3,4}))[\'"][^>]*>([\s\S]*?)</section>',
+        re.IGNORECASE,
+    )
+    title_re = re.compile(
+        r"<(?:h[1-6]|header)[^>]*>([\s\S]*?)</(?:h[1-6]|header)>",
+        re.IGNORECASE,
+    )
+    tag_strip_re = re.compile(r"<[^>]+>")
+
+    def _normalize_ko(s: str) -> str:
+        # 공백/특수문자 축소 + 소문자화 — 제목 포함 여부 비교용
+        s = re.sub(r"[\s·\-—|│:()\[\]]+", "", s)
+        return s.lower().strip()
+
+    actual_map: dict[str, str] = {}
+    for m in section_re.finditer(artifact_content):
+        sid = m.group(1).upper()
+        body = m.group(2)
+        tm = title_re.search(body)
+        if tm:
+            raw_title = tag_strip_re.sub(" ", tm.group(1))
+            title = re.sub(r"\s+", " ", raw_title).strip()
+            if sid not in actual_map:
+                actual_map[sid] = title
+
+    # 3. 매칭 판정: 정의서 이름이 실제 제목에 포함 (normalize 후 substring) 되면 OK
+    mismatches: list[dict] = []
+    matched = 0
+    checked = 0
+    for sid, defined_name in defined_map.items():
+        actual_title = actual_map.get(sid)
+        if not actual_title:
+            continue  # artifact 에 해당 ID 섹션 없음 — coverage 검증이 다룸
+        checked += 1
+        if _normalize_ko(defined_name) in _normalize_ko(actual_title) or \
+           _normalize_ko(actual_title) in _normalize_ko(defined_name):
+            matched += 1
+        else:
+            mismatches.append({
+                "id": sid,
+                "defined_name": defined_name,
+                "actual_title": actual_title[:80],
+            })
+
+    ratio = matched / checked if checked > 0 else 1.0
+    is_pass = ratio >= min_pass_ratio or checked == 0
+    stats = {
+        "defined": len(defined_map),
+        "checked": checked,
+        "matched": matched,
+        "mismatches": len(mismatches),
+        "ratio": round(ratio, 2),
+        "threshold": min_pass_ratio,
+    }
+    if is_pass:
+        logger.info("harness_screen_id_name_consistency_pass %s", stats)
+    else:
+        logger.warning(
+            "harness_screen_id_name_consistency_fail %s sample=%s",
+            stats,
+            [f"{mm['id']}: {mm['defined_name']} vs {mm['actual_title']}" for mm in mismatches[:3]],
+        )
+    return {"pass": is_pass, "mismatches": mismatches, "stats": stats}
 
 
 # ============================================================
@@ -1602,6 +1763,65 @@ def _harness_validate_html(
         if section_count < min_items:
             failures.append(f"<section> 수 부족: {section_count} < {min_items}")
 
+    # 4-A1. 디자인 시스템 사전 선언 (create system up front) 검증.
+    # HTML artifact 는 `<!-- DESIGN_SYSTEM_USED { ... } -->` 블록으로
+    # 사용할 palette/typography/spacing 을 먼저 명시해야 한다 (responsive_rules #7).
+    # 본 블록 부재 시 LLM 이 즉흥적으로 inline hex 를 남발해 일관성이 깨진다.
+    _has_design_system = bool(re.search(
+        r"<!--\s*DESIGN_SYSTEM_USED\s*\{[\s\S]+?\}\s*-->",
+        content, re.IGNORECASE,
+    ))
+    checks.append({"name": "design_system_declared", "pass": _has_design_system})
+    # 현 단계는 warn-only — 기존 산출물 회귀 방지. 추후 FAIL 로 승격 가능.
+
+    # 4-A2. 디자인 토큰 참조 검증 — body 가 inline hex 로 흰 배경 만드는 회귀 방지.
+    # saver 의 enforce_design_tokens 가 `:root` 블록과 body background `var()` 치환까지
+    # 결정론적으로 처리하므로 대부분 케이스는 PASS. harness 는 드문 edge case 감지 전용:
+    #   - body 자체에 inline background:#xxx (var() 미사용) 을 여러 선언에 도배한 경우
+    #   - :root 블록이 완전히 누락되어 있고 기준 프로젝트 없을 때
+    _body_rule = re.search(
+        r"body\s*\{[^}]*background\s*:\s*([^;}]+)",
+        content, re.IGNORECASE | re.DOTALL,
+    )
+    if _body_rule:
+        _bg_val = _body_rule.group(1).strip()
+        _uses_token = "var(--" in _bg_val
+        _has_root = ":root" in content
+        checks.append({
+            "name": "design_tokens_referenced",
+            "pass": _uses_token or _has_root,
+            "body_bg_uses_var": _uses_token,
+            "has_root_block": _has_root,
+        })
+        if not (_uses_token or _has_root):
+            failures.append(
+                "디자인 토큰 미사용 — body background 가 var() 미참조 + :root 블록 부재 "
+                "(프로젝트 팔레트 이탈, 흰 배경 회귀 위험)"
+            )
+
+    # 4-B. 블록 태그 balance — open vs close 개수 불일치 검증.
+    # LLM 이 `</section>`/`</main>` 을 빼먹으면 다음 섹션이 이전 섹션의
+    # 자식으로 nesting 되어 width 가 부모 grid/flex 규칙으로 축소됨
+    # (카탈로그 후반 섹션일수록 68px 까지 쪼그라드는 버그). 생성 시점에 FAIL 시켜
+    # 재시도 유도. void/self-closing 태그 아닌 블록 태그만 검사.
+    _balance_failures: list[str] = []
+    for _tag in ("section", "main", "article", "aside", "nav"):
+        _opens = len(re.findall(rf"<{_tag}(?:\s[^>]*)?>", content, re.IGNORECASE))
+        _closes = len(re.findall(rf"</{_tag}\s*>", content, re.IGNORECASE))
+        if _opens != _closes:
+            _balance_failures.append(f"<{_tag}> open={_opens} close={_closes}")
+    checks.append({
+        "name": "tag_balance",
+        "pass": len(_balance_failures) == 0,
+        "mismatches": _balance_failures,
+    })
+    if _balance_failures:
+        failures.append(
+            "블록 태그 열림/닫힘 불일치 — "
+            + ", ".join(_balance_failures)
+            + " (섹션이 DOM 상 서로 nesting 되어 layout 왜곡 발생)"
+        )
+
     # 5. style 존재
     has_style = ("<style" in content_lower
                  or "<link" in content_lower and "stylesheet" in content_lower
@@ -1638,7 +1858,31 @@ def _harness_validate_html(
         if not c_pass:
             failures.append(f"분량 부족: {len(content)} < {min_chars}자")
 
-    # 7-R. 풀 반응형 safeguard CSS 포함 여부 (엔진 전역 규칙)
+    # 7-A. 최소 수치 기준 (responsive_rules #9) — 접근성/사용성 최소치.
+    # 정적 CSS 분석이므로 모든 케이스를 잡을 수는 없지만, 명백한 위반
+    # (font-size < 12px 남용, button 에 min-height 정의 부재 중 심각한 케이스) 을 경고.
+    _small_font_occurrences = len(re.findall(
+        r"font-size\s*:\s*(?:[0-9]|1[01])(?:\.\d+)?\s*px",
+        content, re.IGNORECASE,
+    ))
+    # 12px 미만 폰트가 5개 이상이면 가독성 위반으로 간주 (가끔 소형 badge 는 허용)
+    if _small_font_occurrences >= 5:
+        checks.append({
+            "name": "min_font_size",
+            "pass": False,
+            "violations": _small_font_occurrences,
+        })
+        failures.append(
+            f"font-size 12px 미만 {_small_font_occurrences}건 — 본문 가독성 위반"
+        )
+    else:
+        checks.append({
+            "name": "min_font_size",
+            "pass": True,
+            "below_12px_count": _small_font_occurrences,
+        })
+
+    # 7-B. 풀 반응형 safeguard CSS 포함 여부 (엔진 전역 규칙)
     # engine/skills/specs/_common/responsive_rules.md 의 필수 CSS 패턴 체크.
     # 구체적으로 다음 핵심 2가지 존재하면 PASS:
     #   (a) `min-width: 0` 을 * 또는 전역 선택자에 적용
@@ -1669,7 +1913,202 @@ def _harness_validate_html(
             "(_common/responsive_rules.md 참조)"
         )
 
+    # 7-C. 컴포넌트 반응형 patch 적용 여부 (saver 의 apply_responsive_patch 통과 증거).
+    # 이 블록이 없으면 저장 파이프라인에 문제가 있거나 view endpoint 만 거침 =
+    # 저장 artifact 자체가 baseline 없이 저장됨 → warn-only (재생성 대신 파이프라인 점검).
+    _has_responsive_patch = bool(re.search(
+        r"data-v10-responsive-patch", content, re.IGNORECASE,
+    ))
+    checks.append({
+        "name": "responsive_patch_applied",
+        "pass": _has_responsive_patch,
+    })
+    if not _has_responsive_patch:
+        logger.warning(
+            "harness_responsive_patch_missing node_kind=html size=%d "
+            "(saver 파이프라인 점검 필요)", len(content),
+        )
+
+    # 7-D. stylesheet 블록 내 고정 px min-width 잔존 감지 (320px 초과 = 모바일 overflow).
+    # sanitize_inline_styles 는 inline 만 처리하므로 <style> 블록 안의 문제는 따로 감지.
+    # apply_responsive_patch 가 min(Xpx, 100%) 로 치환하므로 정상 경로면 0.
+    _style_blocks = re.findall(r"<style[^>]*>([\s\S]*?)</style>", content, re.IGNORECASE)
+    _large_fixed_widths: list[int] = []
+    for _sb in _style_blocks:
+        for _m in re.finditer(r"min-width\s*:\s*(\d+)\s*px", _sb, re.IGNORECASE):
+            _px = int(_m.group(1))
+            if _px > 320:
+                _large_fixed_widths.append(_px)
+    checks.append({
+        "name": "stylesheet_no_large_fixed_width",
+        "pass": len(_large_fixed_widths) == 0,
+        "occurrences": len(_large_fixed_widths),
+    })
+    if _large_fixed_widths:
+        logger.warning(
+            "harness_stylesheet_large_min_width count=%d values=%s (모바일 overflow 위험)",
+            len(_large_fixed_widths), sorted(set(_large_fixed_widths))[:5],
+        )
+
+    # 7-E. 테이블 모바일 대응 커버율. table 수 대비 overflow-x wrapper 또는 @media
+    # 내 display:block 전환이 있으면 OK. apply_responsive_patch 의 @media rule 이
+    # 전역으로 적용되어 대부분 커버되지만, 개별 LLM 선언 누락 감지용.
+    _table_count = len(re.findall(r"<table\b", content, re.IGNORECASE))
+    _has_table_scroll_wrap = bool(re.search(
+        r"(?:\.table-responsive|\.table-wrap|data-responsive-table)[^{]*\{[^}]*overflow-x\s*:\s*auto",
+        content, re.IGNORECASE | re.DOTALL,
+    ))
+    _has_table_media_reflow = bool(re.search(
+        r"@media[^{]+\{[^}]*table[^}]*display\s*:\s*block",
+        content, re.IGNORECASE | re.DOTALL,
+    ))
+    _table_mobile_ready = (
+        _table_count == 0 or _has_table_scroll_wrap or _has_table_media_reflow
+    )
+    checks.append({
+        "name": "table_mobile_ready",
+        "pass": _table_mobile_ready,
+        "table_count": _table_count,
+    })
+    if _table_count > 0 and not _table_mobile_ready:
+        logger.warning(
+            "harness_table_mobile_not_ready tables=%d "
+            "(overflow-x wrap 또는 @media 내 display:block 없음)", _table_count,
+        )
+
+    # 7-F. flex 선언 중 min-width:0 커버율. apply_responsive_patch 의 `* { min-width:0 }`
+    # 이 전역 적용하므로 실제 overflow 위험은 없지만, LLM 개별 선언 품질 추적용.
+    _flex_blocks = re.findall(
+        r"\{([^}]*display\s*:\s*flex[^}]+)\}", content, re.IGNORECASE,
+    )
+    _flex_total = len(_flex_blocks)
+    _flex_with_mw0 = sum(
+        1 for b in _flex_blocks if re.search(r"min-width\s*:\s*0", b)
+    )
+    _flex_coverage_pct = (
+        int(100 * _flex_with_mw0 / _flex_total) if _flex_total else 100
+    )
+    checks.append({
+        "name": "flex_min_width_coverage",
+        "pass": True,  # warn-only (patch 가 전역 보강)
+        "flex_blocks": _flex_total,
+        "with_min_width_zero": _flex_with_mw0,
+        "coverage_pct": _flex_coverage_pct,
+    })
+    if _flex_total > 0 and _flex_coverage_pct < 50:
+        logger.info(
+            "harness_flex_min_width_coverage flex=%d mw0=%d pct=%d "
+            "(patch 가 전역 보강하나 LLM 개별 선언 개선 여지)",
+            _flex_total, _flex_with_mw0, _flex_coverage_pct,
+        )
+
+    # 7-G. 유니코드 기호를 아이콘 용도로 남발하는 패턴 감지. §8 금지.
+    # 주석/문자 본문 (한 두 번 쓰는 건 OK) 과 구분하기 위해 5건 이상 시 warn.
+    # HTML 주석 제거 후 상/하향 삼각형, 마름모, 별, 원, 화살표 등 geometric 문자 수.
+    _content_no_comments = re.sub(r"<!--[\s\S]*?-->", "", content)
+    _glyph_pattern = re.compile(
+        r"[▲▼◆◇★●◎→←"
+        r"‹›↩↪‼✨✰]"
+    )
+    _glyph_count = len(_glyph_pattern.findall(_content_no_comments))
+    checks.append({
+        "name": "icon_unicode_glyph",
+        "pass": _glyph_count < 5,
+        "occurrences": _glyph_count,
+    })
+    if _glyph_count >= 5:
+        logger.warning(
+            "harness_icon_unicode_glyph count=%d (§8 유니코드 기호 아이콘 대체 금지)",
+            _glyph_count,
+        )
+
+    # 7-H. emoji 아이콘 남용 감지 (§8 브랜드 외 emoji 금지).
+    # 일반 emoji range (U+1F300~U+1F6FF, U+2600~U+27BF 등) 중 기능 아이콘 용도로
+    # 반복 사용되는 패턴. 3건 이상 warn.
+    _emoji_pattern = re.compile(
+        r"[\U0001F300-\U0001F5FF\U0001F600-\U0001F64F\U0001F680-\U0001F6FF"
+        r"\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F☀-⛿✀-➿]"
+    )
+    _emoji_count = len(_emoji_pattern.findall(_content_no_comments))
+    checks.append({
+        "name": "emoji_as_icon",
+        "pass": _emoji_count < 3,
+        "occurrences": _emoji_count,
+    })
+    if _emoji_count >= 3:
+        logger.warning(
+            "harness_emoji_as_icon count=%d (§8 브랜드 외 emoji 아이콘 금지)",
+            _emoji_count,
+        )
+
+    # 7-I. 테이블 td 의 data-label 커버율 (모바일 reflow 품질).
+    # saver 의 apply_responsive_patch 가 자동 주입하므로 정상 경로면 100%.
+    # 누락 시 saver 파이프라인 이상 또는 data-no-reflow opt-out 다수 사용.
+    _all_td_tags = re.findall(r"<td\b[^>]*>", content, re.IGNORECASE)
+    _td_total = len(_all_td_tags)
+    _td_with_label = sum(
+        1 for tag in _all_td_tags if re.search(r"\bdata-label\s*=", tag, re.IGNORECASE)
+    )
+    _td_label_pct = (
+        int(100 * _td_with_label / _td_total) if _td_total else 100
+    )
+    # data-no-reflow table 의 td 는 카운트에서 제외하고 싶지만 간단히 전체 비율로 체크.
+    # 50% 미만이면 saver 미적용 의심 or 심각한 opt-out 사용.
+    checks.append({
+        "name": "table_td_data_label_coverage",
+        "pass": _td_label_pct >= 50 or _td_total == 0,
+        "td_total": _td_total,
+        "with_data_label": _td_with_label,
+        "coverage_pct": _td_label_pct,
+    })
+    if _td_total > 0 and _td_label_pct < 50:
+        logger.warning(
+            "harness_td_data_label_low_coverage total=%d labeled=%d pct=%d "
+            "(saver 파이프라인 점검 필요)",
+            _td_total, _td_with_label, _td_label_pct,
+        )
+
+    # 7-J. inline transition 에 :hover 미정의 감지 (§11 위반).
+    # inline style 에 transition 있는 요소 수 vs <style> 블록 내 :hover 선언 수 비교.
+    # inline transition >> :hover 개수면 hover 효과 실제 동작 안 할 가능성 높음.
+    _inline_transition_count = len(re.findall(
+        r'style\s*=\s*["\'][^"\']*\btransition\s*:',
+        content, re.IGNORECASE,
+    ))
+    _hover_rule_count = len(re.findall(r":hover\b", content, re.IGNORECASE))
+    _orphan_transition = max(0, _inline_transition_count - _hover_rule_count)
+    checks.append({
+        "name": "inline_transition_hover",
+        "pass": _orphan_transition < 3,
+        "inline_transitions": _inline_transition_count,
+        "hover_rules": _hover_rule_count,
+        "orphan_transitions": _orphan_transition,
+    })
+    if _orphan_transition >= 3:
+        logger.warning(
+            "harness_inline_transition_orphan inline=%d hover_rules=%d orphan=%d "
+            "(§11 inline transition 은 :hover 동작 불가 — <style> 블록 CSS 정의 필요)",
+            _inline_transition_count, _hover_rule_count, _orphan_transition,
+        )
+
     # 8. forbidden 키워드 (HTML 주석 영역 제외)
+    # AI slop 폰트는 primary font-family 첫 선언 위치에서만 감지 (fallback chain
+    # 에 흔히 쓰이는 Arial/Helvetica 를 오탐하지 않기 위함). warn-only, FAIL 아님.
+    _ai_slop_primary_re = re.compile(
+        r"font-family\s*:\s*['\"]?(Inter|Roboto|Fraunces)['\"]?\s*[,;]",
+        re.IGNORECASE,
+    )
+    _ai_slop_hits = len(_ai_slop_primary_re.findall(content))
+    checks.append({
+        "name": "ai_slop_font_primary",
+        "pass": True,
+        "occurrences": _ai_slop_hits,
+    })
+    if _ai_slop_hits > 0:
+        logger.info(
+            "harness_ai_slop_font_warn node_kind=html count=%d", _ai_slop_hits,
+        )
+
     forbidden_list = structural.get("forbidden", [])
     if forbidden_list:
         # HTML 주석 제거 후 검사

@@ -1,0 +1,53 @@
+# Pillar 2 — backendChoice → 필수 spec 매핑.
+# intake 시 raw["backendChoice"] (또는 backend_choice) 값에 따라
+# DAG 에 추가 활성화할 노드들.
+#
+# 사용 위치: engine/intake/processor.py 의 _create_dag_and_nodes
+# (현재는 NODE_TEMPLATES 의 when=["backend:xxx"] 토큰으로 inline 처리)
+#
+# 본 파일은 향후 NODE_TEMPLATES 분리 시 정식 사용. 현재는 참조 문서.
+
+backend_choices:
+  instantdb:
+    description: "InstantDB — 클라이언트-퍼스트 실시간 DB"
+    required_design_specs:
+      - name: "InstantDB 데이터 모델 설계"
+        type: instantdb_schema
+      - name: "InstantDB 권한 정책 설계"
+        type: iam_policy_json
+    required_build_specs:
+      - "InstantDB 백엔드 구현"
+      - "InstantDB 인증 구현"
+      - "InstantDB 실시간 쿼리"
+      - "InstantDB 프론트엔드 통합"
+
+  firebase:
+    description: "Firebase — Firestore + Auth + Functions"
+    required_design_specs:
+      - name: "Firestore 데이터 모델"
+        type: instantdb_schema
+      - name: "Firebase Security Rules"
+        type: iam_policy_json
+    required_build_specs:
+      - "Firebase 백엔드 구현"
+
+  supabase:
+    description: "Supabase — Postgres + RLS"
+    required_design_specs:
+      - name: "Postgres 스키마 (Supabase)"
+        type: sql_ddl
+      - name: "Row Level Security 정책"
+        type: iam_policy_json
+    required_build_specs:
+      - "Supabase 백엔드 구현"
+
+  custom_rest:
+    description: "직접 구축 REST API"
+    required_design_specs:
+      - name: "API 설계서"
+        type: openapi_yaml
+      - name: "DB 설계서 (ERD·테이블 정의)"
+        type: sql_ddl
+    required_build_specs:
+      - "백엔드 API 구현"
+      - "DB 스키마 및 마이그레이션 구현"

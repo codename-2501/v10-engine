@@ -5,8 +5,12 @@ model_preference: opus
 
 # Stage 1: 페이지당 1 chunk 분할 — 단일 호출 244K → 각 chunk 5~10K 토큰
 chunk_items_source:
+  # Tier 2-B/C: DB registry 최우선 (artifact 파싱 fragility 제거). 비어있으면 fallback.
+  from_registry: screen_registry
   from_spec: "화면 목록 정의서"
+  # group 1 = ID, group 2 = 화면명 (fallback regex)
   extract_patterns:
+    - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})\\s*[|│]\\s*([^|│\\n]+?)\\s*[|│]"
     - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
     - "([A-Z]{2,5}-[A-Z]{2,4}-\\d{3,4})"
 
@@ -16,6 +20,14 @@ context_layers:
   - design_system
   - current_task
   - sibling_artifacts
+
+# B1' — 와이어프레임은 의도적 sparse (textsy < 500 char 도 정상) → 모든 prefix warn level.
+# fail_prefixes 비워 둠 = false positive 방지.
+quality_thresholds:
+  content_density:
+    threshold_text: 200
+    threshold_nodes: 10
+    fail_prefixes: []
 
 prompt: |
   ## 산출물: {{name}}

@@ -3,6 +3,16 @@ phase: DESIGN
 type: document
 model_preference: opus
 
+# Pillar 1 (B) — Dual Output: 인간 검토 MD + 개발자 사용 OpenAPI 3.1 YAML.
+outputs:
+  - format: markdown
+    file_role: human_review
+  - format: openapi_yaml
+    file_role: developer_consumable
+    schema_ref: schemas/openapi-3.1.json
+    strict: false  # OpenAPI 표준 schema 미정 — warn only
+    on_fail: warn
+
 # Stage 9: Dynamic Layer Selection — API 는 PRD + DB schema + data flow 필요
 context_layers:
   - prd
@@ -29,8 +39,8 @@ sections:
     outline: "HTTP 상태 코드별 커스텀 에러 코드·메시지·원인·해결 테이블. 공통 에러 응답 포맷"
     target_tokens: 5000
   - name: "API 버전 관리"
-    outline: "버저닝 전략(URL/Header), 하위 호환성, Deprecation, 마이그레이션 가이드"
-    target_tokens: 3000
+    outline: "버저닝 전략(URL/Header), 하위 호환성, Deprecation, 마이그레이션 가이드. 본 섹션 끝에 ---FORMAT:openapi_yaml--- 마커 출력 후 OpenAPI 3.1 YAML 전체 spec 작성 (paths/components/securitySchemes 모두 포함, 코드블록(```) 사용 금지)."
+    target_tokens: 8000
 
 prompt: |
   ## 산출물: {{name}}

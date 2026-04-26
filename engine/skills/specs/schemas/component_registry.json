@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "engine/skills/specs/schemas/component_registry.json",
+  "title": "Component Registry",
+  "description": "페이지별 컴포넌트 매핑. name 필드는 컴포넌트 식별자 (snake_case 영문) — 화면 ID (SC-XXX-NNN) 절대 금지.",
+  "type": "object",
+  "required": ["pages"],
+  "additionalProperties": true,
+  "properties": {
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["page_name", "page_slug", "components"],
+        "additionalProperties": true,
+        "properties": {
+          "page_name": {"type": "string", "minLength": 1},
+          "page_slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "minLength": 1
+          },
+          "screen_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(SC-[A-Z]{2,4}-[0-9]{3,4}|SCR-[0-9]{3,4})$"
+            }
+          },
+          "area": {"enum": ["FO", "BO", "ADMIN", "USER", "GENERAL"]},
+          "layout": {"type": "string"},
+          "components": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["component_name"],
+              "properties": {
+                "component_name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "description": "컴포넌트 식별자 (snake_case). SC-XXX 화면 ID 형식 금지."
+                },
+                "order": {"type": "integer"},
+                "purpose": {"type": "string"},
+                "data_source": {"type": "string"},
+                "slots_mapping": {"type": "object"},
+                "condition": {"type": "string"},
+                "repeat": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "shared_components": {"type": "object"},
+    "missing_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "reason": {"type": "string"},
+          "suggested_category": {"type": "string"}
+        }
+      }
+    }
+  }
+}

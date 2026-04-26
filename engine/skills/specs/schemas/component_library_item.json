@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "engine/skills/specs/schemas/component_library_item.json",
+  "title": "Component Library Item",
+  "description": "단일 컴포넌트 정의 — name(snake_case) / category / html_template / css 필수.",
+  "type": "object",
+  "required": ["name", "category", "html_template", "css"],
+  "additionalProperties": true,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "snake_case identifier (no dashes)"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["layout", "form", "feedback", "data", "monitoring",
+               "production", "navigation", "content", "habit",
+               "calendar", "insight", "discovery", "transaction",
+               "social", "collaboration", "dashboard"]
+    },
+    "description": {"type": "string"},
+    "html_template": {
+      "type": "string",
+      "minLength": 10
+    },
+    "css": {
+      "type": "string"
+    },
+    "slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "type": {"type": "string"},
+          "required": {"type": "boolean"},
+          "default": {}
+        }
+      }
+    },
+    "states": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "a11y": {"type": "object"}
+  }
+}

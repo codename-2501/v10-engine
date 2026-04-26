@@ -1,0 +1,56 @@
+name: "PWA 매니페스트"
+phase: DESIGN
+type: json
+model_preference: sonnet
+
+# Pillar 4 essentials — 모바일 설치 가능 web app 시 필수.
+# manifest.json + service worker 전략.
+
+context_layers:
+  - prd
+  - design_system
+  - current_task
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙: 순수 JSON 만. 마크다운 코드 블록 금지.
+
+  PWA manifest.json + service worker 전략 정의.
+
+  ### 출력 JSON 스키마
+  ```json
+  {
+    "manifest": {
+      "name": "전체 이름",
+      "short_name": "짧은 이름",
+      "description": "...",
+      "start_url": "/",
+      "display": "standalone",
+      "background_color": "#fff",
+      "theme_color": "#000",
+      "orientation": "portrait",
+      "icons": [
+        {"src": "/icons/192.png", "sizes": "192x192", "type": "image/png"},
+        {"src": "/icons/512.png", "sizes": "512x512", "type": "image/png"}
+      ]
+    },
+    "service_worker": {
+      "strategy": "stale-while-revalidate|cache-first|network-first",
+      "cached_routes": ["/", "/dashboard"],
+      "offline_fallback": "/offline"
+    }
+  }
+  ```
+
+  ### 규칙
+  - icons 192x192 + 512x512 필수
+  - display ∈ {standalone, fullscreen, minimal-ui, browser}
+  - 오프라인 지원 시 service_worker 명시
+
+validation:
+  structural:
+    min_chars: 400
+  semantic:
+    - "필수 icon 사이즈 (192/512) 모두 포함"

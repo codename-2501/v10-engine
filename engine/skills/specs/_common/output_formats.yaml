@@ -1,0 +1,109 @@
+# Pillar 1 — Spec Type 11종 정의 + 형식별 schema/extension/role.
+# spec.yaml 의 `type:` 필드에서 사용. dual output 시 outputs: list 에서도 사용.
+#
+# 사용 예:
+#   spec.yaml:
+#     type: openapi_yaml          # single output
+#   또는:
+#     outputs:
+#       - format: markdown
+#         file_role: human_review
+#       - format: openapi_yaml
+#         file_role: developer_consumable
+#         schema_ref: schemas/openapi-3.1.json
+
+types:
+  # ── 인간 검토 ──
+  document:
+    description: "Markdown 인간 검토 문서"
+    file_ext: md
+    parser: text
+    schema_ref: null
+
+  html:
+    description: "시각 산출물 (UI 시안 / IA / 와이어프레임)"
+    file_ext: html
+    parser: html
+    schema_ref: null
+
+  # ── 구조화 spec (개발 직접 사용) ──
+  json_spec:
+    description: "범용 JSON 구조 spec (디자인 토큰 / 컴포넌트 라이브러리 등)"
+    file_ext: json
+    parser: json
+    schema_ref: null  # spec 별 schema_ref 명시
+
+  openapi_yaml:
+    description: "API spec — OpenAPI 3.x YAML"
+    file_ext: openapi.yaml
+    parser: yaml
+    schema_ref: schemas/openapi-3.1.json
+
+  sql_ddl:
+    description: "DB 스키마 — CREATE TABLE / migration SQL"
+    file_ext: sql
+    parser: text
+    schema_ref: null  # SQL 은 syntax 검증으로 별도 처리
+
+  instantdb_schema:
+    description: "InstantDB schema.ts (TypeScript schema definition)"
+    file_ext: schema.ts
+    parser: text
+    schema_ref: schemas/instantdb_schema.json
+
+  firebase_rules:
+    description: "Firebase Security Rules (.rules)"
+    file_ext: rules
+    parser: text
+    schema_ref: null
+
+  state_machine_json:
+    description: "XState v5 또는 Stately state machine config"
+    file_ext: machine.json
+    parser: json
+    schema_ref: schemas/state_machine.json
+
+  iam_policy_json:
+    description: "RBAC / IAM policy JSON (역할·권한 매핑)"
+    file_ext: policy.json
+    parser: json
+    schema_ref: schemas/iam_policy.json
+
+  env_schema:
+    description: ".env.example + zod-style 검증 schema"
+    file_ext: env.json
+    parser: json
+    schema_ref: schemas/env_schema.json
+
+  i18n_catalog:
+    description: "다국어 message keys (ko/en/...)"
+    file_ext: i18n.json
+    parser: json
+    schema_ref: schemas/i18n_catalog.json
+
+  routing_config:
+    description: "라우팅 table (path → screen_id → guard)"
+    file_ext: routes.json
+    parser: json
+    schema_ref: schemas/routing_config.json
+
+  code:
+    description: "BUILD 단계 — 직접 코드 generate"
+    file_ext: source
+    parser: text
+    schema_ref: null
+
+  reference:
+    description: "참조 문서 (LLM 컨텍스트용)"
+    file_ext: md
+    parser: text
+    schema_ref: null
+
+# ── file_role: dual output 시 산출물 역할 분류 ──
+file_roles:
+  human_review:
+    description: "사용자/PM 검토용 — 시각·서술 위주"
+  developer_consumable:
+    description: "개발자가 그대로 import/실행 가능 — machine-readable"
+  intermediate:
+    description: "다른 spec 의 입력으로 사용되는 중간 산출물"

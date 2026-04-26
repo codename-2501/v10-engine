@@ -4,6 +4,15 @@ type: json
 model_preference: sonnet
 composition_role: registry
 
+# Pillar 5 — strict schema + retry_with_feedback.
+# 본 산출물의 LLM 출력이 schema 위반 (예: name 필드에 SC-XXX 화면 ID 들어감) 시
+# error 메시지를 prompt 에 피드백해 1회 재호출. 그래도 실패면 NEEDS_HUMAN.
+output_schema:
+  schema_ref: "schemas/component_registry.json"
+  strict: true
+  on_fail: retry_with_feedback
+  max_retries: 1
+
 # S9: upstream 화면 목록 정의서에서 페이지 ID 자동 추출 → 페이지당 1회 LLM 호출.
 # 프로젝트 도메인 무관 (실버케어 SC-XX, 이커머스 SC-SH, 금융 SC-AC 등 모두 동작).
 chunk_items_source:
