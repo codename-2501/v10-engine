@@ -38,6 +38,7 @@ validation:
       - "리스크 관리"
     required_tables: 2
     min_chars: 2000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "WBS 코드가 일관된 계층 체계를 따르는지 검증"

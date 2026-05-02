@@ -43,6 +43,7 @@ validation:
       - "일정 관리"
     required_tables: 4
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "RACI 매트릭스에 모든 산출물에 대해 Responsible이 1인 이상 지정되어 있는지 검증"

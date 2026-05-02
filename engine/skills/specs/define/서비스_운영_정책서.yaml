@@ -42,6 +42,7 @@ validation:
       - "보안 정책"
     required_tables: 3
     min_chars: 2500
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "SLA 항목에 측정 가능한 정량적 목표치가 모두 명시되어 있는지 검증"

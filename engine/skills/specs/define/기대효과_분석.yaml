@@ -42,6 +42,7 @@ validation:
       - "리스크"
     required_tables: 5
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "ROI 산출에 명확한 계산식과 근거 데이터가 포함되어 있는지 검증"

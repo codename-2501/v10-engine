@@ -59,6 +59,7 @@ validation:
       - "비상 계획"
     required_tables: 5
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "리스크 ID가 일관된 체계를 따르고 모든 리스크에 부여되어 있는지 검증"

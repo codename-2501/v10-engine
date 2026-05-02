@@ -40,6 +40,7 @@ validation:
       - "용어 정의"
     required_tables: 3
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "요구사항 간 상충 또는 모순이 없는지 교차 검증"

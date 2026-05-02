@@ -65,6 +65,7 @@ validation:
       - "의존성 및 리스크"
     required_tables: 4
     min_chars: 3000
+    min_section_body: 150
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "모든 기능에 P0/P1/P2 우선순위가 명시되어 있는지 검증"

@@ -53,6 +53,7 @@ validation:
       - "유스케이스 다이어그램"
     required_tables: 1
     min_chars: 2500
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "모든 액터가 최소 1개 이상의 유스케이스와 연결되어 있는지 검증"

@@ -41,6 +41,7 @@ validation:
       - "마이그레이션 계획"
     required_tables: 5
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "목표 시스템 구성도에 기술 스택 선정 사유가 포함되어 있는지 검증"
