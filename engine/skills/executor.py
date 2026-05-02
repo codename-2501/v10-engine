@@ -5286,10 +5286,12 @@ async def _handle_post_ai_call(
             await _save_qa_stamp(db, node, verdict)  # PASS로 재저장
             logger.info("qa_score_pass node=%s score=%d (threshold 50)", node.id[:8], _qa_score)
 
-        # S6: Harness-Supreme — 구조 검증 PASS 이면 AI FAIL 무시.
-        # AI hallucination 으로 완벽한 산출물이 SUSPENDED 되는 패턴 차단.
-        # Harness 는 결정론적 (regex 기반 headings·tables·chars 검증) — 거짓말 못 함.
-        if verdict["summary"] == "FAIL" and node.task_pair_node_id:
+        # S6: Harness-Supreme — 구조 검증과 AI verdict 가 어긋나면 deterministic 우선.
+        # 양방향 적용:
+        #   - AI=FAIL & harness=PASS → AI hallucination → PASS 로 override (기존)
+        #   - AI=PASS & harness=FAIL → AI 가 빈섹션/구조 결함 못 catch → FAIL 로 강제 (F2)
+        # Harness 는 결정론적 (regex 기반 headings·sections·tables·chars 검증) — 거짓말 못 함.
+        if node.task_pair_node_id and verdict["summary"] in ("FAIL", "PASS", "CONDITIONAL_PASS"):
             try:
                 from engine.skills.qa.harness import _harness_validate_document
                 from engine.skills.registry import SkillRegistry as _SkReg
@@ -5323,8 +5325,8 @@ async def _handle_post_ai_call(
                             _h = _harness_validate_document(
                                 _actual, _task_row["name"], _task_spec,
                             )
-                        if _h.get("pass"):
-                            # AI 의견은 description 에 보존, verdict 은 PASS 로 승격
+                        if _h.get("pass") and verdict["summary"] == "FAIL":
+                            # AI=FAIL but harness=PASS → AI hallucination → PASS 승격
                             verdict["ai_concerns"] = {
                                 "original_summary": "FAIL",
                                 "original_score": _qa_score,
@@ -5342,6 +5344,35 @@ async def _handle_post_ai_call(
                                 "harness_supreme_override node=%s ai_score=%d ai_issues=%d → PASS",
                                 node.id[:8], _qa_score,
                                 len(verdict["ai_concerns"]["issues"]),
+                            )
+                        elif (not _h.get("pass")) and verdict["summary"] in ("PASS", "CONDITIONAL_PASS"):
+                            # F2: AI=PASS but harness=FAIL → 구조 결함 강제 catch → FAIL 강등
+                            _h_failures = _h.get("structural_failures", [])
+                            verdict["ai_concerns"] = {
+                                "original_summary": verdict["summary"],
+                                "original_score": _qa_score,
+                                "harness_failures": _h_failures[:10],
+                            }
+                            # categories 에 harness 결함 주입 — 기존 FAIL 흐름이 재사용 가능
+                            existing_cats = list(verdict.get("categories") or [])
+                            existing_cats.append({
+                                "name": "harness_structural",
+                                "issues": [
+                                    {"title": f, "severity": "HIGH"}
+                                    for f in _h_failures[:10]
+                                ],
+                            })
+                            verdict["categories"] = existing_cats
+                            verdict["summary"] = "FAIL"
+                            # score 보정 — harness FAIL 은 50 미만 강제
+                            verdict["score"] = min(_qa_score, 40)
+                            _qa_score = verdict["score"]
+                            verdict["method"] = (verdict.get("method") or "") + "_harness_supreme_demote"
+                            await _save_qa_stamp(db, node, verdict)
+                            logger.warning(
+                                "harness_supreme_demote node=%s ai_score=%d harness_failures=%d → FAIL",
+                                node.id[:8], verdict["ai_concerns"]["original_score"],
+                                len(_h_failures),
                             )
             except Exception as _herr:
                 logger.warning("harness_supreme check failed: %s", _herr)

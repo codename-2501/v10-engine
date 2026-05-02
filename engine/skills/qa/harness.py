@@ -488,12 +488,24 @@ def _harness_validate_document(
     # spec에서 검증 규칙 추출
     validation = spec.get("validation", {}) if spec else {}
     structural_rules = validation.get("structural", {}) if isinstance(validation, dict) else {}
-    required_sections = structural_rules.get("required_sections", []) if isinstance(structural_rules, dict) else []
-    requires_table = structural_rules.get("requires_table", False) if isinstance(structural_rules, dict) else False
+    # spec yaml 들은 required_headings 키 사용 — required_sections 는 alias 지원
+    required_sections = (
+        structural_rules.get("required_headings")
+        or structural_rules.get("required_sections")
+        or []
+    ) if isinstance(structural_rules, dict) else []
+    requires_table = (
+        structural_rules.get("requires_table")
+        or (structural_rules.get("required_tables", 0) > 0)
+    ) if isinstance(structural_rules, dict) else False
     min_section_body = structural_rules.get("min_section_body", 0) if isinstance(structural_rules, dict) else 0
 
-    # ── 1. 최소 크기 ──
-    min_chars = 300
+    # ── 1. 최소 크기 ── spec.min_chars 우선, 없으면 default 300
+    min_chars = (
+        structural_rules.get("min_chars")
+        or structural_rules.get("min_size_bytes")
+        or 300
+    ) if isinstance(structural_rules, dict) else 300
     c1_pass = len(content) >= min_chars
     checks.append({"name": "min_size", "pass": c1_pass, "size": len(content), "min": min_chars})
     if not c1_pass:

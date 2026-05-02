@@ -65,6 +65,7 @@ validation:
       - "출시 기준"
     required_tables: 5
     min_chars: 3000
+    min_section_body: 200
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "제품 비전이 구체적이고 측정 가능한 목표를 포함하는지 검증"
