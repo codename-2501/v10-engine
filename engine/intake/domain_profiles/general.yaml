@@ -1,0 +1,51 @@
+name: 일반 / 도메인 미정 fallback
+keywords:
+  - 일반
+  - general
+  - 기타
+  - 미정
+  - misc
+
+terminology: []
+
+regulations:
+  - 개인정보보호법(PIPA)
+
+screen_estimate:
+  small: 20
+  medium: 40
+  large: 70
+
+spec_overrides:
+  화면_목록_정의서:
+    group_prefix_examples:
+      - "SC-AU: 인증"
+      - "SC-HM: 홈"
+      - "SC-MY: 마이페이지"
+      - "SC-AD: 관리"
+
+design_tone:
+  palette: "중립 — 프로젝트 컨텍스트 따라 LLM 자유 결정"
+  density: "프로젝트 type 에 맞춰 결정"
+  forbidden:
+    - "AI스럽고 정형화된 디자인"
+    - "보라색 그라디언트 / 쿠키커터"
+
+component_categories:
+  - name: "layout"
+    chunk_items:
+      - page_header
+      - page_footer
+      - sidebar
+  - name: "form"
+    chunk_items:
+      - input_field
+      - select_box
+      - button
+      - checkbox
+  - name: "feedback"
+    chunk_items:
+      - toast
+      - modal
+      - empty_state
+      - loading_spinner

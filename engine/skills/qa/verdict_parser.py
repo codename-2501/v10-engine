@@ -163,6 +163,92 @@ def extract_from_categories(
     return extract_missing_sections(combined, known_section_names)
 
 
+# 기본 item_key fallback regex — SC-/SCR-/FR-/API-/UC- 등 흔한 포맷 포괄.
+# spec 의 chunk_items_source.extract_patterns 가 있으면 그쪽 우선.
+_DEFAULT_ITEM_KEY_PATTERNS = [
+    r"(?<![A-Za-z0-9_])(SC-[A-Z]{2,5}-\d{3,4})(?![A-Za-z0-9_])",
+    r"(?<![A-Za-z0-9_])(SCR-[A-Z]{0,5}-?\d{3,4})(?![A-Za-z0-9_])",
+    r"(?<![A-Za-z0-9_])([A-Z]{2,5}-[A-Z]{2,5}-\d{3,4})(?![A-Za-z0-9_])",
+]
+
+
+def extract_failed_item_keys(
+    verdict_input: str | list | dict,
+    patterns: list[str] | None = None,
+) -> list[str]:
+    """QA verdict 에서 chunked items 의 item_key 목록 추출.
+
+    chunked html/json items 스킬의 partial patch 용. spec 의
+    `chunk_items_source.extract_patterns` 를 동적으로 받아 정규식 적용.
+    전달된 patterns 가 없으면 기본 fallback 셋 사용.
+
+    Args:
+        verdict_input:
+            - str: QA fail 사유 text. 예: "SC-HB-005 섹션 깨짐; SC-HB-012 빈 껍데기"
+            - list[dict]: QA verdict 의 categories 구조 (issues.title/description/actual 합침)
+            - dict: categories 키를 담은 최상위 verdict dict
+        patterns: spec.chunk_items_source.extract_patterns 리스트. None 이면 기본 셋.
+
+    Returns:
+        등장 순서 중복 제거된 item_key 리스트. 빈 입력 또는 매치 없음 → [].
+    """
+    if not verdict_input:
+        return []
+
+    # 1. 입력을 단일 text 로 정규화
+    if isinstance(verdict_input, str):
+        combined = verdict_input
+    elif isinstance(verdict_input, dict):
+        cats = verdict_input.get("categories") or []
+        combined = _join_category_text(cats)
+    elif isinstance(verdict_input, list):
+        combined = _join_category_text(verdict_input)
+    else:
+        return []
+
+    if not combined:
+        return []
+
+    # 2. 패턴 준비 — spec 의 extract_patterns 있으면 그것만, 없으면 기본 fallback
+    regexes: list[re.Pattern] = []
+    for pat in (patterns or []):
+        if isinstance(pat, str) and pat:
+            try:
+                regexes.append(re.compile(pat))
+            except re.error:
+                continue
+    if not regexes:
+        regexes = [re.compile(p) for p in _DEFAULT_ITEM_KEY_PATTERNS]
+
+    # 3. 각 regex 로 매칭 + 등장순 중복 제거
+    found: list[str] = []
+    seen: set[str] = set()
+    for rx in regexes:
+        for m in rx.finditer(combined):
+            key = m.group(1) if m.groups() else m.group(0)
+            if key and key not in seen:
+                found.append(key)
+                seen.add(key)
+
+    return found
+
+
+def _join_category_text(categories: list) -> str:
+    """categories[].issues 의 title/description/actual 필드를 합친 text."""
+    chunks: list[str] = []
+    for cat in categories or []:
+        if not isinstance(cat, dict):
+            continue
+        for iss in cat.get("issues") or []:
+            if not isinstance(iss, dict):
+                continue
+            for k in ("title", "description", "actual"):
+                v = iss.get(k)
+                if isinstance(v, str) and v:
+                    chunks.append(v)
+    return "; ".join(chunks)
+
+
 # ────────────────────────────────────────────────────────────────────────
 # 헬퍼
 # ────────────────────────────────────────────────────────────────────────

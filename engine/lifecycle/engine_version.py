@@ -45,7 +45,12 @@ TRACKED_FILES: dict[str, list[str]] = {
 GROUP_TO_NODE_PATTERNS: dict[str, list[str]] = {
     "codegen": ["%프론트엔드%"],
     "workspace": ["%프론트엔드%"],
-    "composition": ["%레시피%", "%조립%", "%시안%"],
+    # composition 그룹: composition renderer 경유로 생성되는 산출물만 포함.
+    # "%시안%" 은 여기서 제외 — UI 디자인 시안은 LLM chunked HTML 경로로 직접
+    # 생성되며 composition/renderer.py 의 컴포넌트 조립 로직을 타지 않음.
+    # 과거 "%시안%" 매핑은 renderer.py 변경 시 UI 시안까지 무효화시키는
+    # false positive 를 유발 (관계없는 산출물의 2시간+ 재생성 강제).
+    "composition": ["%레시피%", "%조립%"],
     "testing": [],  # 테스트 변경은 재빌드 불필요
 }
 

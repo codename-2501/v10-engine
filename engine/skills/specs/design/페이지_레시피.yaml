@@ -6,8 +6,11 @@ composition_role: recipe
 
 # S9: upstream 화면 목록 정의서에서 페이지 ID 자동 추출 → 페이지당 1회 LLM 호출.
 chunk_items_source:
+  from_registry: screen_registry  # Tier 2-B/C: DB 우선
   from_spec: "화면 목록 정의서"
-  extract_pattern: "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
+  extract_patterns:
+    - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})\\s*[|│]\\s*([^|│\\n]+?)\\s*[|│]"
+    - "(SC-[A-Z]{2,4}-\\d{3,4}|SCR-\\d{3,4})"
 
 prompt: |
   ## 산출물: {{name}}

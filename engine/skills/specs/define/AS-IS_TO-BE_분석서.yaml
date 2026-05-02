@@ -40,6 +40,7 @@ validation:
       - "기대 효과"
     required_tables: 4
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "AS-IS 항목과 TO-BE 항목이 동일한 기준으로 대비되는지 검증"

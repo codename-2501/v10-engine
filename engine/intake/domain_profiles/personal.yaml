@@ -1,0 +1,104 @@
+name: 개인 도구 / 라이프스타일 앱
+keywords:
+  - 습관
+  - 다이어리
+  - 일기
+  - 가계부
+  - 루틴
+  - tracker
+  - habit
+  - journal
+  - personal
+  - lifestyle
+  - 운동
+  - 식단
+  - 명상
+  - 독서
+  - 학습 기록
+  - 자기개발
+  - 개인 관리
+
+terminology:
+  - 체크인: 일일 실행 기록
+  - 스트릭: 연속 달성 일수
+  - 알림: 사용자 맞춤 리마인더
+  - 인사이트: 패턴 분석 결과
+
+regulations:
+  - 개인정보보호법(PIPA)
+  - 헬스 데이터 (해당 시 의료기기법)
+
+screen_estimate:
+  small: 25
+  medium: 45
+  large: 75
+
+spec_overrides:
+  보안_설계서:
+    extra_required:
+      - 개인 기록 비식별화
+      - 로컬 저장 vs 동기화 정책
+  화면_목록_정의서:
+    group_prefix_examples:
+      - "SC-AU: 인증/회원"
+      - "SC-ON: 온보딩"
+      - "SC-HM: 홈/대시보드"
+      - "SC-HB: 습관/루틴 관리"
+      - "SC-CK: 체크인/기록"
+      - "SC-CV: 달력/기록 보기"
+      - "SC-AI: AI 인사이트"
+      - "SC-AN: 통계/분석"
+      - "SC-NT: 알림 설정"
+      - "SC-PR: 프라이버시"
+
+design_tone:
+  palette: "따뜻하고 친근한 — 부드러운 톤 + 단일 액센트"
+  density: "여백 충분, 1초 체크인 강조"
+  display: "모바일 우선, 한손 조작 가능"
+  forbidden:
+    - "잔소리/부정적 카피"
+    - "과한 알림 / 정보 밀집"
+    - "산업용 그래프"
+
+component_categories:
+  - name: "layout"
+    chunk_items:
+      - app_header
+      - bottom_nav
+      - page_container
+      - sidebar
+  - name: "habit"
+    chunk_items:
+      - habit_card
+      - habit_checkin_row
+      - streak_badge
+      - habit_list
+      - habit_form
+  - name: "calendar"
+    chunk_items:
+      - calendar_grid
+      - calendar_day_cell
+      - calendar_week_view
+  - name: "insight"
+    chunk_items:
+      - insight_card
+      - tip_card
+      - pattern_chart
+      - progress_ring_stat
+      - empty_state
+  - name: "form"
+    chunk_items:
+      - input_field
+      - select_box
+      - date_picker
+      - button
+      - checkbox
+      - radio
+  - name: "feedback"
+    chunk_items:
+      - toast
+      - snackbar
+      - modal
+      - confirm_dialog
+      - loading_spinner
+      - sync_status_indicator

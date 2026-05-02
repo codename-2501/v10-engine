@@ -88,6 +88,85 @@ async def _save_artifact(db: Any, node: "NodeSnapshot", content: str, artifact_t
                     content = content[:i + 1]
                     break
 
+    # HTML 구조 정규화 (저장 전) — section/main 등이 안 닫혀 nesting 되는 것을
+    # flatten 하여 원본 자체를 깨끗한 상태로 저장. 이래야 workspace 배포,
+    # 파일 다운로드, 다운스트림 스킬이 모두 올바른 DOM 구조를 참조함.
+    # view endpoint 보정은 렌더링 순간만 고치므로 이 계층이 진짜 범용 처리.
+    if artifact_type == "html":
+        from engine.skills.artifact.html_normalize import (
+            normalize_html_structure,
+            enforce_design_tokens,
+            sanitize_inline_styles,
+        )
+        from engine.skills.artifact.responsive_patch import apply_responsive_patch
+        from engine.skills.artifact.design_baseline import (
+            get_baseline_spec_names,
+            load_baseline_root_block,
+            node_is_baseline,
+        )
+        _before_len = len(content)
+        # normalize_html_structure 가 fragment 감지 시 표준 HTML5 document 로
+        # 자동 래핑 (DOCTYPE + html + head[viewport/charset] + body). IA v5 처럼
+        # LLM 이 본문만 반환해도 저장 단계에서 근본 보정.
+        content = normalize_html_structure(content, title=node.name)
+        # inline style 의 고정 px 폭 제거 — 모바일 overflow 근본 차단.
+        # !important 의존 회피: safeguard CSS 가 정상 specificity 로 이길 수 있게.
+        content = sanitize_inline_styles(content)
+        # 컴포넌트 반응형 baseline patch — table overflow-x, button word-break/44px,
+        # checkbox 터치 사이즈, flex min-width:0 등 LLM 누락을 결정론적으로 보강.
+        # <head> 앞에 삽입되어 LLM 의 뒤 <style> 가 override 가능 (커스텀 유지).
+        # stylesheet 내 min-width:Xpx (X>320) 는 min(Xpx, 100%) 로 sanitize.
+        content = apply_responsive_patch(content)
+
+        # normalize 이후에도 DOCTYPE/html/body 가 없다면 wrap 이 예상 밖 상황
+        # (빈 content, LLM 이 <html> 은 있는데 body 누락 등 변형 케이스) 에서 실패.
+        # warning 이 아니라 error 로 승격 — 정상 경로면 이 로그는 절대 찍히지 않음.
+        _cl = content.lower()
+        if not ("<!doctype html" in _cl and "<html" in _cl and "<body" in _cl):
+            logger.error(
+                "html_fragment_post_normalize node=%s size=%d "
+                "(wrap 이후에도 DOCTYPE/html/body 누락 — 비정상 케이스, QA FAIL)",
+                node.id[:8], len(content),
+            )
+
+        # 디자인 토큰 강제 — baseline spec 을 source of truth 로 사용.
+        # is_design_baseline=true 플래그가 있는 스펙의 artifact (예: UI 디자인 시안)
+        # 의 :root 블록이 해당 프로젝트 모든 HTML 의 토큰 기준이 된다.
+        # 베이스라인 자신은 enforce 면제 (LLM 자유 생성).
+        # 베이스라인 artifact 가 프로젝트에 없으면 enforce skip (첫 생성 단계).
+        try:
+            _baseline_names = get_baseline_spec_names()
+            _is_self_baseline = node_is_baseline(node.name, _baseline_names)
+            if _is_self_baseline:
+                logger.info("design_tokens_skip_self_baseline node=%s", node.id[:8])
+            else:
+                _ref_root = await load_baseline_root_block(
+                    db, node.project_id, _baseline_names, exclude_node_id=node.id,
+                )
+                if _ref_root:
+                    content = enforce_design_tokens(content, _ref_root)
+                    logger.info(
+                        "design_tokens_enforced node=%s ref_len=%d",
+                        node.id[:8], len(_ref_root),
+                    )
+                else:
+                    logger.debug(
+                        "design_tokens_skip_no_baseline node=%s project=%s",
+                        node.id[:8], node.project_id[:8],
+                    )
+        except Exception as _tok_err:
+            # enforce 실패 시 팔레트 오염 가능성 — 관찰 가능하게 warning
+            logger.warning(
+                "design_tokens_enforce_failed node=%s error=%s",
+                node.id[:8], _tok_err,
+            )
+
+        if len(content) != _before_len:
+            logger.info(
+                "html_normalize_applied node=%s delta=%+d",
+                node.id[:8], len(content) - _before_len,
+            )
+
     # JSON 유효성 검증 (저장 전 — 깨진 JSON이 current_version이 되는 걸 방지)
     # QA 노드는 제외 (verdict는 자유 형식)
     if artifact_type == "json" and node.node_type != "QA":
@@ -110,13 +189,20 @@ async def _save_artifact(db: Any, node: "NodeSnapshot", content: str, artifact_t
     import hashlib as _hl
     content_hash = _hl.sha256(content.encode("utf-8")).hexdigest()
 
-    # 기존 artifact 있으면 버전 업, 없으면 신규 생성
+    # 기존 artifact 있으면 버전 업, 없으면 신규 생성.
+    # NOTE: current_version 을 롤백한 경우 (예: v9 → v1 수동 rollback) +1 만 하면
+    # 기존 version 과 충돌 (UNIQUE violation). 실제 최대 version_num + 1 을 사용.
     existing = await db.fetchone(
         "SELECT id, current_version FROM artifacts WHERE node_id=?", (node.id,)
     )
     if existing:
         artifact_id = existing["id"]
-        new_ver = (existing["current_version"] or 0) + 1
+        _max_row = await db.fetchone(
+            "SELECT MAX(version_num) as mv FROM artifact_versions WHERE artifact_id=?",
+            (artifact_id,),
+        )
+        _max_ver = (_max_row or {}).get("mv") or 0
+        new_ver = max((existing["current_version"] or 0) + 1, _max_ver + 1)
         file_type = artifact_type if artifact_type in ("html", "json") else "markdown"
         await db.execute(
             "UPDATE artifacts SET current_version=?, artifact_type=?, file_type=?, updated_at=? WHERE id=?",
@@ -189,6 +275,101 @@ async def _save_artifact(db: Any, node: "NodeSnapshot", content: str, artifact_t
             )
         else:
             raise
+
+    # Screen Registry 자동 동기화 — 화면 목록 정의서 저장 시 ID↔이름 매핑 추출 → DB UPSERT.
+    # Tier 2-B/C: 후속 design skill (UI 시안 / 화면 설계서 / 페이지 레시피) 이 artifact
+    # content 를 매 chunk_items 호출마다 regex 파싱하는 fragility 제거.
+    # graceful degrade — registry sync 실패해도 artifact 저장 자체는 성공 유지.
+    if node.name and "화면 목록 정의서" in node.name:
+        try:
+            from engine.skills.artifact.screen_registry import (
+                extract_screen_registry, sync_screen_registry,
+            )
+            _screens = extract_screen_registry(content)
+            if _screens:
+                _upserted = await sync_screen_registry(
+                    db, node.project_id, new_ver, _screens,
+                )
+                logger.info(
+                    "screen_registry_synced node=%s version=%d screens=%d upserted=%d",
+                    node.id[:8], new_ver, len(_screens), _upserted,
+                )
+            else:
+                logger.warning(
+                    "screen_registry_no_screens_extracted node=%s version=%d "
+                    "(정의서에서 ID 추출 실패 — LLM 포맷 확인 필요)",
+                    node.id[:8], new_ver,
+                )
+        except Exception as _reg_err:
+            logger.warning(
+                "screen_registry_sync_failed node=%s error=%s",
+                node.id[:8], str(_reg_err)[:120],
+            )
+
+    # post-event hook — wave-engine 등 plugin 이 register
+    try:
+        from engine.core.hook_registry import call_hooks
+        await call_hooks("post_save_artifact", db, node, content, artifact_type)
+    except Exception as _hook_err:
+        logger.debug("post_save_artifact_hook_skipped err=%s", _hook_err)
+
+
+# ---------------------------------------------------------------------------
+# Resave (LLM 재호출 없이 saver 파이프라인만 재실행)
+# ---------------------------------------------------------------------------
+
+async def resave_latest_version(db: Any, node_id: str) -> int:
+    """최신 artifact content 를 saver 파이프라인에 재주입해 새 버전으로 저장.
+
+    사용 맥락: 엔진 post-processing 규칙 (normalize_html_structure / sanitize /
+    apply_responsive_patch / enforce_design_tokens) 이 새로 추가됐을 때 **LLM 재호출
+    없이** 기존 artifact 에 소급 적용. node state / atomic_state / cascade 는
+    건드리지 않음 — artifact_versions 에 새 버전만 append.
+
+    Args:
+        db:      Async DB adapter.
+        node_id: 대상 노드 ID.
+    Returns:
+        새로 저장된 version_num.
+    Raises:
+        ValueError: 기존 artifact 없음.
+    """
+    row = await db.fetchone(
+        "SELECT av.storage_path, a.artifact_type, n.name AS node_name, "
+        "n.project_id AS project_id, n.id AS node_id "
+        "FROM artifact_versions av "
+        "JOIN artifacts a ON a.id = av.artifact_id "
+        "JOIN nodes n ON n.id = a.node_id "
+        "WHERE a.node_id = ? ORDER BY av.version_num DESC LIMIT 1",
+        (node_id,),
+    )
+    if not row:
+        raise ValueError(f"resave: no existing artifact for node {node_id}")
+
+    # _save_artifact 가 요구하는 최소 필드만 가진 경량 노드 객체.
+    # NodeSnapshot 풀 인스턴스 재구성 비용 회피 (saver 는 id/name/project_id 만 사용).
+    class _NodeLite:
+        __slots__ = ("id", "name", "project_id")
+        def __init__(self, id: str, name: str, project_id: str):
+            self.id, self.name, self.project_id = id, name, project_id
+
+    node = _NodeLite(row["node_id"], row["node_name"], row["project_id"])
+
+    # 기존 content 를 그대로 _save_artifact 로 흘려보냄 → HTML 이면 normalize +
+    # sanitize + apply_responsive_patch + enforce_design_tokens 자동 재실행.
+    await _save_artifact(db, node, row["storage_path"], row["artifact_type"])
+
+    new_row = await db.fetchone(
+        "SELECT MAX(av.version_num) AS mv FROM artifact_versions av "
+        "JOIN artifacts a ON a.id = av.artifact_id WHERE a.node_id = ?",
+        (node_id,),
+    )
+    new_ver = (new_row or {}).get("mv") or 0
+    logger.info(
+        "resave_completed node=%s new_version=%d (LLM 호출 없이 파이프라인 재실행)",
+        node_id[:8], new_ver,
+    )
+    return new_ver
 
 
 # ---------------------------------------------------------------------------

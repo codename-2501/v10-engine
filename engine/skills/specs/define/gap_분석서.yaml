@@ -43,6 +43,7 @@ validation:
       - "이행 계획"
     required_tables: 6
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "모든 GAP 항목에 고유 ID가 부여되어 있고 추적 가능한지 검증"

@@ -1488,33 +1488,66 @@ async def view_artifact_html(
         match = _rev.search(r'(<!DOCTYPE[\s\S]*</html>)', content, _rev.IGNORECASE)
         if match:
             content = match.group(1)
+        # HTML 구조 정규화 — 과거 저장된 (정규화 이전 시점) 산출물도 렌더 시점에
+        # 복구하기 위한 최후 방어선. 신규 산출물은 saver 에서 이미 정규화됨.
+        from engine.skills.artifact.html_normalize import normalize_html_structure
+        content = normalize_html_structure(content)
         # Universal responsive safeguard (과거 생성 산출물도 즉시 보호)
         # - min-width:0: flex item 이 내부 콘텐츠에 의해 부모 넘어서는 것 방지
         # - overflow-wrap: anywhere: 긴 URL/이메일/영문 단어 어디서든 끊김
         # - word-break: keep-all: 한글은 어절 단위로 유지 (예쁜 줄바꿈)
         # - img/video max-width: 반응형 미디어
+        # Safeguard CSS — `!important` 없이 cascade 순서 + specificity 로 작동.
+        # saver 가 HTML 저장 시 inline `min-width:Xpx` / `width:Xpx` 를 제거하므로
+        # 본 블록은 normal cascade 로 LLM 외부 <style> 규칙을 덮을 수 있다
+        # (safeguard 가 <head> 말미에 삽입되어 동일 specificity 에서 뒤에 선언됨).
         _safeguard_css = (
-            "<style data-v10-safeguard='1'>\n"
-            "*, *::before, *::after { min-width: 0; box-sizing: border-box; }\n"
-            "html, body { overflow-wrap: anywhere; word-break: keep-all; }\n"
+            "<style data-v10-safeguard='4'>\n"
+            "* { box-sizing: border-box; min-width: 0; }\n"
+            # 한글 어절 단위 wrap — 영문 연속 긴 단어는 break-word 로
+            "html, body { word-break: keep-all; overflow-wrap: break-word; }\n"
             "img, video, iframe, svg { max-width: 100%; height: auto; }\n"
-            # 테이블: 넓은 컬럼은 자체 가로 스크롤로 우회
+            # 버튼 터치 영역 + 텍스트 wrap (구버전 artifact 렌더 보정)
+            "button, [role='button'], .btn, input[type='submit'], input[type='button'] {"
+            " min-height: 44px;"
+            " word-break: break-word;"
+            " overflow-wrap: anywhere;"
+            " }\n"
+            # checkbox/radio 최소 터치 사이즈
+            "input[type='checkbox'], input[type='radio'] { min-width: 20px; min-height: 20px; }\n"
+            # 테이블: 넓은 컬럼은 자체 가로 스크롤
             "table { max-width: 100%; display: block; overflow-x: auto; }\n"
-            "pre, code { white-space: pre-wrap; word-break: break-all; overflow-x: auto; }\n"
-            # 긴 연속 문자열 강제 줄바꿈 — 타이틀/링크
-            "h1, h2, h3, h4, h5, h6, p, a, span, button, label { overflow-wrap: anywhere; }\n"
-            # 시안 카탈로그 화면 라벨: position:absolute 금지 (콘텐츠 겹침 방지)
-            # screen-label / section-label / screen-id 등 관용 클래스 모두 커버
+            "table colgroup, table col { max-width: none; width: auto; }\n"
+            "@media (max-width: 768px) {"
+            " table td, table th {"
+            " max-width: 100%;"
+            " word-break: break-word;"
+            " white-space: normal;"
+            " }"
+            " }\n"
+            "pre, code { white-space: pre-wrap; overflow-x: auto; }\n"
+            # 시안 카탈로그 화면 라벨: position:absolute 회피 (콘텐츠 겹침 방지)
             ".screen-label, .section-label, .screen-id,"
             " [class*='screen-label'], [class*='section-header'] {"
-            " position: static !important;"
-            " margin-bottom: 12px !important;"
-            " display: block !important;"
+            " position: static;"
+            " margin-bottom: 12px;"
+            " display: block;"
             " }\n"
-            # section 내부 content 가 label 과 겹치지 않도록 여유 padding
+            # 시안 카탈로그 섹션: 각 화면 = 1 행 (full width)
+            # 부모 grid/flex 가 2개 섹션을 1행에 배치하는 왜곡 방지
             "section.screen, section[id^='SC-'], section[id^='SCR-'] {"
-            " padding-top: 0 !important;"
             " position: relative;"
+            " display: block;"
+            " width: 100%;"
+            " max-width: 1280px;"
+            " margin: 0 auto 40px;"
+            " flex: none;"
+            " grid-column: 1 / -1;"
+            " }\n"
+            # 섹션들의 직계 부모는 단일 컬럼 블록 레이아웃
+            "body, main, [class*='screens'], [class*='catalog'], [class*='sections'] {"
+            " display: block;"
+            " grid-template-columns: none;"
             " }\n"
             "</style>"
         )
@@ -1838,6 +1871,39 @@ async def retry_node(
         if dag_row:
             await _dag_advancer.enqueue(dag_row["dag_id"])
     return {"status": "retried", "mode": "full"}
+
+
+@app.post("/api/v1/projects/{project_id}/nodes/{node_id}/resave")
+async def resave_node_artifact(
+    project_id: str,
+    node_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseAdapter = Depends(get_db),
+):
+    """LLM 재호출 없이 saver 파이프라인만 거쳐 최신 artifact 을 새 버전으로 저장.
+
+    사용 맥락: 엔진 post-processing (normalize_html_structure / sanitize /
+    apply_responsive_patch / enforce_design_tokens) 이 새로 추가됐을 때 기존 artifact
+    에 소급 적용. 노드 state / atomic_state / cascade 영향 없음.
+
+    권한: RETRY_NODE (동일 수준 — artifact 수정이므로).
+    """
+    from engine.skills.artifact.saver import resave_latest_version
+    RBAC.require(current_user["role"], Permission.RETRY_NODE)
+
+    node = await db.fetchone(
+        "SELECT id FROM nodes WHERE id=? AND project_id=?",
+        (node_id, project_id),
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="노드 없음")
+
+    try:
+        new_ver = await resave_latest_version(db, node_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return {"status": "resaved", "node_id": node_id, "version": new_ver}
 
 
 @app.post("/api/v1/projects/{project_id}/deduplicate-nodes")

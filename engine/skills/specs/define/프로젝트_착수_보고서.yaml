@@ -43,6 +43,7 @@ validation:
       - "위험요소 개요"
     required_tables: 5
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "프로젝트 목표에 정량적 성공 기준과 측정 방법이 명시되어 있는지 검증"

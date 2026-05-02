@@ -41,6 +41,7 @@ validation:
       - "권장 사항"
     required_tables: 5
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "진단 범위에 대상, 기간, 방법론이 명확히 정의되어 있는지 검증"

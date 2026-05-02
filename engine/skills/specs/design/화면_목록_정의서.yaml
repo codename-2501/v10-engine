@@ -63,9 +63,37 @@ prompt: |
   □ TODO/TBD/미정/작성 예정/추후 작성 키워드 없음
   □ 화면 15개 이상
   □ 접근 권한 매트릭스 완성
+  □ **SCREEN_REGISTRY JSON 블록** (아래 ### SCREEN_REGISTRY 참조) 정확히 포함
 
   자가검증 결과를 산출물 말미에 첨부:
   <!-- SELF_CHECK: {"sections":6,"tables":5,"pass":true/false} -->
+
+  ### SCREEN_REGISTRY — 기계 판독 가능 구조화 블록 (MANDATORY)
+
+  인간 가독성 (테이블) 과 별개로, 산출물 **맨 마지막** 에 아래 JSON 블록을 **반드시** 포함.
+  후속 design skill (UI 시안 / 화면 설계서 / 페이지 레시피) 이 이 블록을 파싱해 공식 ID ↔ 이름 매핑을 강제로 따릅니다. 빠지거나 형식 틀리면 **엔진이 다른 화면을 그리게 됨** — 일관성 필수.
+
+  ```
+  <!-- SCREEN_REGISTRY
+  {
+    "version": "1.0",
+    "project": "{{project_name}}",
+    "screens": [
+      {"id": "SC-AU-001", "name": "로그인", "domain": "Auth", "priority": "P0", "intent": "이메일/소셜 로그인 진입점"},
+      {"id": "SC-AD-002", "name": "사용자 관리", "domain": "Admin", "priority": "P1", "intent": "사용자 CRUD·권한 변경"}
+      // ... 화면 목록 섹션의 모든 화면을 빠짐없이
+    ]
+  }
+  -->
+  ```
+
+  **규칙:**
+  - JSON 배열의 `screens` 는 화면 목록 섹션 테이블의 **모든 행** 을 그대로 반영 (수 일치 필수).
+  - `name` 은 테이블의 **화면명 컬럼을 그대로** 복사 (재해석/축약/변경 금지).
+  - `domain` 은 화면 그룹 / 모듈 (Auth/Admin/Home/Habit/Notification 등).
+  - `priority` 는 P0/P1/P2 (없으면 "P1" 기본).
+  - `intent` 는 화면의 주요 목적 1줄 요약 (<= 40자).
+  - 주석 형식 `<!-- SCREEN_REGISTRY ... -->` 를 엄수 (앞뒤 공백 OK, 다른 문자 불가).
 
 validation:
   structural:

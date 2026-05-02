@@ -367,8 +367,38 @@ class ValidationGateway:
             await self._db.execute(
                 "DELETE FROM agent_token_usage WHERE node_id=?", (node_id,)
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            # 미삭제 시 토큰 누적 재사용 → 한도 조기 도달. 재시도 의미 훼손이므로
+            # silent pass 대신 warning 으로 드러내 관찰 가능하게.
+            logger.warning(
+                "c9_retry_token_cleanup_failed node=%s error=%s", node_id, exc,
+            )
+
+        # atomic_state chunk-item 캐시 삭제 — 이 clear 가 없으면 chunked_*_items
+        # 실행 시 모든 item 이 COMPLETE 로 남아있어 reserve() 가 False 반환 →
+        # LLM 호출 전부 skip → 빈 skeleton 산출물 생성됨 (UI 시안 Linkwave 샘플
+        # 현상의 근본 원인). task_snapshot 도 함께 초기화하여 이전 completed_items
+        # 캐시가 오염된 팔레트로 재조립되는 것을 방지.
+        try:
+            await self._db.execute(
+                "DELETE FROM atomic_state WHERE node_id=?", (node_id,)
+            )
+        except Exception as exc:
+            # 실패 시 chunker 가 재실행 대신 skip → retry 무력화.
+            # 표면에 드러내 원인 파악 가능하도록 warning.
+            logger.warning(
+                "c9_retry_atomic_state_cleanup_failed node=%s error=%s",
+                node_id, exc,
+            )
+        try:
+            await self._db.execute(
+                "UPDATE nodes SET task_snapshot=NULL WHERE id=?", (node_id,)
+            )
+        except Exception as exc:
+            logger.warning(
+                "c9_retry_snapshot_cleanup_failed node=%s error=%s",
+                node_id, exc,
+            )
 
         affected = await self._db.execute(
             """UPDATE nodes SET state='READY', retry_count=0, stall_count=0,

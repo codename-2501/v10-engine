@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "engine/skills/specs/schemas/env_schema.json",
+  "title": "Environment Variable Schema",
+  "type": "object",
+  "required": ["vars"],
+  "additionalProperties": true,
+  "properties": {
+    "vars": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "description": "UPPER_SNAKE_CASE only"
+          },
+          "type": {
+            "enum": ["string", "number", "boolean", "url", "enum"]
+          },
+          "required": {"type": "boolean"},
+          "secret": {"type": "boolean"},
+          "default": {},
+          "description": {"type": "string"},
+          "example": {"type": "string"},
+          "enum_values": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "env_files": {
+      "type": "object",
+      "properties": {
+        "development": {"type": "string"},
+        "staging": {"type": "string"},
+        "production": {"type": "string"}
+      }
+    }
+  }
+}

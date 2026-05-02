@@ -1,0 +1,66 @@
+name: "i18n 카탈로그"
+phase: DESIGN
+type: json
+model_preference: sonnet
+
+# Pillar 4 essentials — 다국어 지원 필요 시.
+# UI 시안의 모든 한국어 string → key 추출 + 영문 번역 (옵션).
+
+output_schema:
+  schema_ref: "schemas/i18n_catalog.json"
+  strict: true
+  on_fail: retry_with_feedback
+  max_retries: 1
+
+context_layers:
+  - prd
+  - design_system
+  - current_task
+  - sibling_artifacts
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙: 순수 JSON 만. 마크다운 코드 블록 금지.
+
+  UI 시안 + 화면 설계서 의 모든 사용자 노출 텍스트 → 다국어 key 카탈로그.
+
+  ### 출력 JSON 스키마
+  ```json
+  {
+    "default_locale": "ko",
+    "supported_locales": ["ko", "en"],
+    "namespaces": ["common", "auth", "habit", "settings"],
+    "messages": {
+      "ko": {
+        "common": {
+          "save": "저장",
+          "cancel": "취소"
+        },
+        "auth": {
+          "login.title": "로그인",
+          "login.button": "로그인하기"
+        }
+      },
+      "en": {
+        "common": {
+          "save": "Save",
+          "cancel": "Cancel"
+        }
+      }
+    }
+  }
+  ```
+
+  ### 규칙
+  - key 는 dot.notation (namespace.key.subkey)
+  - 영문 번역은 부분만 있어도 OK (점진적 추가)
+  - 동일 의미 중복 key 금지
+
+validation:
+  structural:
+    min_chars: 500
+  semantic:
+    - "JSON 파싱 가능"
+    - "default_locale 이 supported_locales 에 포함"

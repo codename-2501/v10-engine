@@ -43,6 +43,7 @@ validation:
       - "확대 전략"
     required_tables: 6
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "파일럿 범위가 전체 프로젝트 범위의 적절한 부분집합인지 검증"

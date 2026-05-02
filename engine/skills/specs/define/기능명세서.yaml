@@ -42,6 +42,7 @@ validation:
       - "기술 스택"
     required_tables: 3
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "기능 목록의 모든 항목이 사용자 스토리와 1:1 또는 1:N 매핑되는지 검증"

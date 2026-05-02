@@ -160,6 +160,19 @@ async def _build_qa_ai_prompt(
 
     prompt += f"## 출력 형식 (엄격 준수)\n{_QA_OUTPUT_SCHEMA}\n"
 
+    # post-event hook — plugin 이 prompt 강화 가능 (wave-engine A4 등)
+    try:
+        from engine.core.hook_registry import call_hooks
+        results = await call_hooks(
+            "post_qa_prompt", db, node, spec, project, prompt,
+        )
+        # hook 가 string 반환 시 마지막 non-None 결과로 교체
+        for r in results:
+            if isinstance(r, str) and r:
+                prompt = r
+    except Exception:
+        pass
+
     return prompt
 
 

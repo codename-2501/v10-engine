@@ -1,0 +1,72 @@
+name: "환경변수 스키마"
+phase: DESIGN
+type: json
+model_preference: sonnet
+
+# Pillar 4 essentials — .env.example + 검증 schema (zod-style).
+# 백엔드 / 외부 서비스 / API key 등 모든 환경변수 정의.
+
+output_schema:
+  schema_ref: "schemas/env_schema.json"
+  strict: true
+  on_fail: retry_with_feedback
+  max_retries: 1
+
+context_layers:
+  - prd
+  - current_task
+  - sibling_artifacts
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙: 순수 JSON 만. 마크다운 코드 블록 금지.
+
+  프로젝트 의 모든 환경변수 (백엔드 URL, API key, OAuth, feature flag 등).
+
+  ### 출력 JSON 스키마
+  ```json
+  {
+    "vars": [
+      {
+        "name": "INSTANT_DB_APP_ID",
+        "required": true,
+        "type": "string",
+        "secret": false,
+        "description": "InstantDB 프로젝트 식별자",
+        "example": "5ff66411-beab-4ed6-..."
+      },
+      {
+        "name": "INSTANT_DB_ADMIN_TOKEN",
+        "required": true,
+        "type": "string",
+        "secret": true,
+        "description": "InstantDB 어드민 권한 토큰 (서버 only)"
+      },
+      {
+        "name": "FEATURE_AI_INSIGHT",
+        "required": false,
+        "type": "boolean",
+        "default": false,
+        "description": "AI 인사이트 기능 토글"
+      }
+    ],
+    "env_files": {
+      "development": ".env.local",
+      "staging": ".env.staging",
+      "production": ".env.production"
+    }
+  }
+  ```
+
+  ### 규칙
+  - secret=true 인 변수는 클라이언트 노출 금지 (서버 only)
+  - required=true 면 default 없어도 OK, 없으면 default 필수
+  - type ∈ {string, number, boolean, url, enum}
+
+validation:
+  structural:
+    min_chars: 500
+  semantic:
+    - "secret=true 변수의 prefix (e.g. NEXT_PUBLIC_) 노출 금지 검증"

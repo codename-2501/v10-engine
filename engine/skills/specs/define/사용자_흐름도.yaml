@@ -44,6 +44,7 @@ validation:
       - "흐름도 다이어그램 명세"
     required_tables: 4
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "사용자 유형별 주요 경로가 완전히 정의되어 있는지 검증"

@@ -41,6 +41,7 @@ validation:
       - "운영 현황"
     required_tables: 5
     min_chars: 3000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "시스템 구성도에 모든 주요 구성 요소와 연동 관계가 포함되어 있는지 검증"

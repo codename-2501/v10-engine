@@ -38,6 +38,7 @@ validation:
       - "역할별 책임"
     required_tables: 2
     min_chars: 2000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "모든 프로세스 흐름에 시작점과 종료점이 명확히 정의되어 있는지 검증"

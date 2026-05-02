@@ -154,12 +154,26 @@ class ContextAssembler:
             layers=used,
         )
 
-        return AssemblyResult(
+        result = AssemblyResult(
             prompt=prompt,
             system=system,
             estimated_tokens=estimated,
             layers_used=used,
         )
+
+        # post-event hook — wave-engine A4 task_prompt 강화 등 plugin 진입점
+        try:
+            from engine.core.hook_registry import call_hooks_sync
+            hr = call_hooks_sync(
+                "post_context_assemble", node, project, deltas, result,
+            )
+            for r in hr:
+                if isinstance(r, AssemblyResult):
+                    result = r
+        except Exception:
+            pass
+
+        return result
 
     # ------------------------------------------------------------------
     # 레이어 생성

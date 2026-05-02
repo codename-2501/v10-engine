@@ -4,6 +4,16 @@ type: document
 model_preference: opus
 backend_requirement: "instantdb"
 
+# Pillar 1 — Dual Output: 인간 검토 MD + 개발자 사용 instantdb_schema (TS).
+outputs:
+  - format: markdown
+    file_role: human_review
+  - format: instantdb_schema
+    file_role: developer_consumable
+    schema_ref: schemas/instantdb_schema.json
+    strict: true
+    on_fail: warn
+
 prompt: |
   ## 산출물: {{name}}
   프로젝트 "{{project_name}}" ({{client_name}})
@@ -48,6 +58,34 @@ prompt: |
 
   자가검증 결과를 산출물 말미에 첨부:
   <!-- SELF_CHECK: {"sections":6,"schema_blocks":N,"pass":true/false} -->
+
+  ### Dual Output (둘 다 출력 필수)
+  마커로 정확히 분리:
+  ```
+  ---FORMAT:markdown---
+  (위 6개 필수 섹션 markdown)
+
+  ---FORMAT:instantdb_schema---
+  {
+    "entities": {
+      "users": {
+        "fields": {
+          "name": {"type": "string", "indexed": true},
+          "email": {"type": "string", "unique": true},
+          "createdAt": {"type": "date"},
+          "updatedAt": {"type": "date"}
+        }
+      }
+    },
+    "links": {
+      "userHabits": {
+        "forward": {"on": "users", "has": "many", "label": "habits"},
+        "reverse": {"on": "habits", "has": "one", "label": "owner"}
+      }
+    }
+  }
+  ```
+  두 마커 모두 정확히 (앞뒤 공백 없이) 출력. 코드블록(```) 으로 감싸지 마세요.
 
 validation:
   structural:

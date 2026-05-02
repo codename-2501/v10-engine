@@ -1,0 +1,67 @@
+name: "라우팅 설계서"
+phase: DESIGN
+type: json
+model_preference: sonnet
+
+# Pillar 4 essentials — 모든 web_responsive 프로젝트 필수.
+# 페이지 레시피의 page_slug 와 매칭되는 routing table 정의.
+
+output_schema:
+  schema_ref: "schemas/routing_config.json"
+  strict: true
+  on_fail: retry_with_feedback
+  max_retries: 1
+
+context_layers:
+  - prd
+  - current_task
+  - sibling_artifacts
+
+prompt: |
+  ## 산출물: {{name}}
+  프로젝트 "{{project_name}}" ({{client_name}})
+
+  ★ 출력 규칙: 순수 JSON 만. 마크다운 코드 블록 금지.
+
+  화면 목록 정의서 + 페이지 레시피 의 page_slug 들 모두 라우팅 정의 포함.
+
+  ### 출력 JSON 스키마
+  ```json
+  {
+    "framework": "react-router|next-app|nuxt|vue-router|expo-router",
+    "routes": [
+      {
+        "path": "/",
+        "screen_id": "SC-HM-001",
+        "page_slug": "home",
+        "auth_required": false,
+        "layout": "main"
+      }
+    ],
+    "guards": [
+      {
+        "name": "auth_guard",
+        "applies_to": ["/dashboard", "/profile"],
+        "redirect": "/login"
+      }
+    ],
+    "fallback": {
+      "404": "/not-found",
+      "500": "/error"
+    }
+  }
+  ```
+
+  ### 규칙
+  - 모든 SC-XX-NNN 화면이 routes 에 1개 이상 매핑
+  - 인증 필요 페이지는 guards 로 보호
+  - 404 / 500 fallback 필수
+
+validation:
+  structural:
+    min_chars: 1000
+    forbidden: ["TODO", "TBD", "미정"]
+  semantic:
+    - "JSON 파싱 가능 여부"
+    - "모든 화면이 routes 에 매핑 됐는지"
+    - "auth_guard 가 보호 화면을 누락 없이 커버"

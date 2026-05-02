@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "engine/skills/specs/schemas/instantdb_schema.json",
+  "title": "InstantDB Schema (TypeScript AST 직렬화)",
+  "description": "InstantDB schema.ts 의 entities + links + permissions 구조.",
+  "type": "object",
+  "required": ["entities"],
+  "additionalProperties": true,
+  "properties": {
+    "entities": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^\\$?[a-z][a-zA-Z0-9_]*$": {
+          "type": "object",
+          "required": ["fields"],
+          "properties": {
+            "fields": {
+              "type": "object",
+              "patternProperties": {
+                "^[a-z][a-zA-Z0-9_]*$": {
+                  "type": "object",
+                  "required": ["type"],
+                  "properties": {
+                    "type": {
+                      "enum": ["string", "number", "boolean", "date", "json", "id"]
+                    },
+                    "indexed": {"type": "boolean"},
+                    "unique": {"type": "boolean"},
+                    "optional": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z][a-zA-Z0-9_]*$": {
+          "type": "object",
+          "required": ["forward", "reverse"],
+          "properties": {
+            "forward": {
+              "type": "object",
+              "required": ["on", "has", "label"],
+              "properties": {
+                "on": {"type": "string"},
+                "has": {"enum": ["one", "many"]},
+                "label": {"type": "string"}
+              }
+            },
+            "reverse": {
+              "type": "object",
+              "required": ["on", "has", "label"],
+              "properties": {
+                "on": {"type": "string"},
+                "has": {"enum": ["one", "many"]},
+                "label": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

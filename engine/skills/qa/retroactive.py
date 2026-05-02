@@ -99,6 +99,19 @@ async def run_retroactive_validation(
         "retroactive_validation_complete projects=%d results=%d",
         len(projects), len(results),
     )
+
+    # post-event hook — wave-engine A4 retroactive 가 DEFINE phase 검증 추가
+    try:
+        from engine.core.hook_registry import call_hooks
+        hook_results = await call_hooks(
+            "post_retroactive_validation", db, project_id, results,
+        )
+        for hr in hook_results:
+            if isinstance(hr, list):
+                results.extend(hr)
+    except Exception:
+        pass
+
     return results
 
 
@@ -141,14 +154,32 @@ async def _validate_design_coverage(db, project_id: str, project_name: str) -> l
 
     screen_content = screen_list_row["storage_path"]
 
-    # 레시피 slugs
+    # 레시피 slugs — composition_recipes 우선, fallback 으로 artifact JSON spec 의 scr_id 직접 추출 (B6).
     recipe_rows = await db.fetchall(
         "SELECT page_slug FROM composition_recipes WHERE project_id=?",
         (project_id,),
     )
     recipe_slugs = [r["page_slug"] for r in recipe_rows]
+    if not recipe_slugs:
+        # composition_recipes 미생성 (DESIGN 단계 직후) → 페이지 레시피 artifact 의 JSON spec 직접 분석.
+        recipe_art_row = await db.fetchone(
+            """SELECT av.storage_path FROM artifacts a
+               JOIN artifact_versions av ON a.id=av.artifact_id
+               WHERE a.node_id=? AND av.version_num=a.current_version""",
+            (recipe_task["id"],),
+        )
+        if recipe_art_row and recipe_art_row.get("storage_path"):
+            import re as _re_recipe
+            recipe_content = recipe_art_row["storage_path"]
+            scr_ids = _re_recipe.findall(
+                r'"scr_id"\s*:\s*"(SC-[A-Z]{2,4}-\d{3,4})"',
+                recipe_content,
+            )
+            if scr_ids:
+                recipe_slugs = [f"scr-{rid.lower()}" for rid in scr_ids]
 
-    # 디자인 시안 slugs (preview 폴더)
+    # 디자인 시안 slugs — workspace preview 폴더 우선 (BUILD 단계 산출),
+    # 폴더 부재 시(DESIGN 단계 직후) DB artifact 의 section ID 직접 추출 (B5).
     from engine.workspace.paths import WORKSPACES_ROOT, _make_slug
     ws_path = WORKSPACES_ROOT / _make_slug(project_name) / "preview"
     design_slugs: list[str] = []
@@ -157,6 +188,21 @@ async def _validate_design_coverage(db, project_id: str, project_name: str) -> l
             f.stem for f in ws_path.iterdir()
             if f.suffix == ".html" and f.stem != "index"
         ]
+    if not design_slugs:
+        design_art_row = await db.fetchone(
+            """SELECT av.storage_path FROM artifacts a
+               JOIN artifact_versions av ON a.id=av.artifact_id
+               WHERE a.node_id=? AND av.version_num=a.current_version""",
+            (design_task["id"],),
+        )
+        if design_art_row and design_art_row.get("storage_path"):
+            import re as _re_design
+            design_html = design_art_row["storage_path"]
+            section_ids = set(_re_design.findall(
+                r'<section[^>]*\bid=["\'](SC-[A-Z]{2,5}-\d{3,4})["\']',
+                design_html,
+            ))
+            design_slugs = [f"scr-{sid.lower()}" for sid in sorted(section_ids)]
 
     # harness 검증 실행
     from engine.skills.qa.harness import _harness_validate_screen_coverage

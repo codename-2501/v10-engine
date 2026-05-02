@@ -41,6 +41,7 @@ validation:
       - "다음 단계"
     required_tables: 3
     min_chars: 2000
+    min_section_body: 100
     forbidden: ["TODO", "TBD", "미정", "작성 예정", "추후 작성"]
   semantic:
     - "결정 사항이 논의 사항에서 도출된 내용과 일치하는지 검증"
