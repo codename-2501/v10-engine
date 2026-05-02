@@ -8,6 +8,38 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _extract_section_body(content: str, section_name: str) -> str:
+    """주어진 섹션명의 본문 추출. 다음 같은 레벨 또는 상위 레벨 헤딩 직전까지.
+
+    퍼지 매칭: 공백/대소문자 무시. 같은 섹션명이 여러 번 나오면 첫 번째.
+    """
+    section_norm = section_name.lower().replace(" ", "")
+    lines = content.split("\n")
+
+    target_idx = -1
+    target_level = 0
+    for i, line in enumerate(lines):
+        m = re.match(r'^(#{1,6})\s+(.+)$', line)
+        if not m:
+            continue
+        heading_norm = m.group(2).lower().replace(" ", "")
+        if section_norm in heading_norm or heading_norm in section_norm:
+            target_idx = i
+            target_level = len(m.group(1))
+            break
+
+    if target_idx < 0:
+        return ""
+
+    body_lines: list[str] = []
+    for line in lines[target_idx + 1:]:
+        m = re.match(r'^(#{1,6})\s+', line)
+        if m and len(m.group(1)) <= target_level:
+            break
+        body_lines.append(line)
+    return "\n".join(body_lines)
+
+
 def _harness_validate_programmatic(
     content: str,
     task_desc: dict,
@@ -458,6 +490,7 @@ def _harness_validate_document(
     structural_rules = validation.get("structural", {}) if isinstance(validation, dict) else {}
     required_sections = structural_rules.get("required_sections", []) if isinstance(structural_rules, dict) else []
     requires_table = structural_rules.get("requires_table", False) if isinstance(structural_rules, dict) else False
+    min_section_body = structural_rules.get("min_section_body", 0) if isinstance(structural_rules, dict) else 0
 
     # ── 1. 최소 크기 ──
     min_chars = 300
@@ -473,19 +506,33 @@ def _harness_validate_document(
     if not c2_pass:
         structural_failures.append("마크다운 헤딩(#) 없음 — 구조화되지 않은 문서")
 
-    # ── 3. 필수 섹션 존재 ──
+    # ── 3. 필수 섹션 존재 + 본문 충실성 ──
     if required_sections:
         heading_text = " ".join(h.lstrip("#").strip().lower() for h in headings)
         missing_sections = []
+        empty_sections = []
         for section in required_sections:
             # 섹션명이 헤딩에 포함되는지 퍼지 매칭
             section_lower = section.lower()
             if section_lower not in heading_text and section_lower.replace(" ", "") not in heading_text.replace(" ", ""):
                 missing_sections.append(section)
-        c3_pass = len(missing_sections) == 0
-        checks.append({"name": "required_sections", "pass": c3_pass, "missing": missing_sections})
-        if not c3_pass:
+                continue
+            # 헤딩 발견 시 본문 길이 검증 (min_section_body > 0 일 때만)
+            if min_section_body > 0:
+                body = _extract_section_body(content, section)
+                if len(body.strip()) < min_section_body:
+                    empty_sections.append(f"{section} ({len(body.strip())}자/{min_section_body}자)")
+        c3_pass = len(missing_sections) == 0 and len(empty_sections) == 0
+        checks.append({
+            "name": "required_sections",
+            "pass": c3_pass,
+            "missing": missing_sections,
+            "empty": empty_sections,
+        })
+        if missing_sections:
             structural_failures.append(f"필수 섹션 누락: {', '.join(missing_sections[:5])}")
+        if empty_sections:
+            structural_failures.append(f"빈/부실 섹션: {', '.join(empty_sections[:5])}")
     else:
         checks.append({"name": "required_sections", "pass": True, "skipped": True})
 
