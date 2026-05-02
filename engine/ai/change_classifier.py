@@ -358,12 +358,30 @@ async def classify_change(
             change_type, len(affected_sections), confidence,
             downstream_node_name[:40],
         )
-        return {
+        result = {
             "type": change_type,
             "affected_sections": affected_sections,
             "confidence": confidence,
             "reason": reason,
         }
+
+        # post-event hook — wave-engine A8 등이 PARTIAL 의미 검증 추가 가능
+        try:
+            from engine.core.hook_registry import call_hooks
+            hr = await call_hooks(
+                "post_classify_change",
+                diff, downstream_node_name, downstream_artifact_type,
+                old_content, result,
+            )
+            # hook 가 dict 반환 시 escalation 처리 (CONTEXTUAL 우선)
+            for r in hr:
+                if isinstance(r, dict) and r.get("type") == "CONTEXTUAL" and result["type"] == "PARTIAL":
+                    result = r
+                    break
+        except Exception:
+            pass
+
+        return result
 
     except json.JSONDecodeError as e:
         logger.warning("change_classifier_json_parse_failed error=%s → CONTEXTUAL", str(e))

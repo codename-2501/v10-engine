@@ -119,18 +119,30 @@ async def detect_profile_hybrid(
     LLM 실패/None 시 graceful 키워드 결과로 진행.
     """
     keyword_result = detect_profile(project_text)
-    if model_adapter is None:
-        return keyword_result or "general"
+    llm_result = None
+    if model_adapter is not None:
+        llm_result = await classify_domain_llm(project_text, model_adapter)
 
-    llm_result = await classify_domain_llm(project_text, model_adapter)
     if llm_result is None:
-        return keyword_result or "general"
+        decision = keyword_result or "general"
+    else:
+        llm_top = llm_result["top"]
+        llm_conf = llm_result["confidence"]
+        if keyword_result == llm_top:
+            decision = keyword_result
+        elif llm_conf >= confidence_threshold:
+            decision = llm_top
+        else:
+            decision = keyword_result or "general"
 
-    llm_top = llm_result["top"]
-    llm_conf = llm_result["confidence"]
+    # post-event hook — wave-engine A2 등 plugin 이 분류 결과 받음
+    try:
+        from engine.core.hook_registry import call_hooks
+        await call_hooks(
+            "post_intake_profile_detect",
+            project_text, keyword_result, llm_result, decision,
+        )
+    except Exception:
+        pass
 
-    if keyword_result == llm_top:
-        return keyword_result
-    if llm_conf >= confidence_threshold:
-        return llm_top
-    return keyword_result or "general"
+    return decision

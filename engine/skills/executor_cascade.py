@@ -837,8 +837,20 @@ async def trigger_upstream_rework_if_needed(
         except Exception:
             pass
 
-    # dry-run 모드는 호출자가 INVALID 처리 안 하도록 0 반환
-    return 0 if mode == "dry-run" else affected
+    final_affected = 0 if mode == "dry-run" else affected
+
+    # post-event hook — plugin 이 cascade 결과 받아 추가 처리 (wave-engine A1 등)
+    try:
+        from engine.core.hook_registry import call_hooks
+        await call_hooks(
+            "post_upstream_rework",
+            db, failed_qa_node_id, failed_task_node_id,
+            qa_verdict_text, final_affected,
+        )
+    except Exception:
+        pass
+
+    return final_affected
 
 
 # ────────────────────────────────────────────────────────────────────────

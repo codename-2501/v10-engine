@@ -306,6 +306,13 @@ async def _save_artifact(db: Any, node: "NodeSnapshot", content: str, artifact_t
                 node.id[:8], str(_reg_err)[:120],
             )
 
+    # post-event hook — wave-engine 등 plugin 이 register
+    try:
+        from engine.core.hook_registry import call_hooks
+        await call_hooks("post_save_artifact", db, node, content, artifact_type)
+    except Exception as _hook_err:
+        logger.debug("post_save_artifact_hook_skipped err=%s", _hook_err)
+
 
 # ---------------------------------------------------------------------------
 # Resave (LLM 재호출 없이 saver 파이프라인만 재실행)

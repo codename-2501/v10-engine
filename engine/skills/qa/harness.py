@@ -671,6 +671,25 @@ def _harness_validate_document(
             len(structural_failures),
             [f[:80] for f in structural_failures[:3]],
         )
+
+    # post-event hook — plugin 이 추가 검증 가능 (wave-engine A4 AND 조건)
+    try:
+        from engine.core.hook_registry import call_hooks_sync
+        hook_results = call_hooks_sync(
+            "post_harness_validate_document", content, task_name, spec, result,
+        )
+        # hook 가 dict 반환 시 result merge (pass=False 우선, structural_failures append)
+        for hr in hook_results:
+            if isinstance(hr, dict):
+                if hr.get("pass") is False:
+                    result["pass"] = False
+                if hr.get("structural_failures"):
+                    result["structural_failures"] = list(
+                        result.get("structural_failures", [])
+                    ) + list(hr["structural_failures"])
+    except Exception:
+        pass
+
     return result
 
 

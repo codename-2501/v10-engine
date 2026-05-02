@@ -99,6 +99,19 @@ async def run_retroactive_validation(
         "retroactive_validation_complete projects=%d results=%d",
         len(projects), len(results),
     )
+
+    # post-event hook — wave-engine A4 retroactive 가 DEFINE phase 검증 추가
+    try:
+        from engine.core.hook_registry import call_hooks
+        hook_results = await call_hooks(
+            "post_retroactive_validation", db, project_id, results,
+        )
+        for hr in hook_results:
+            if isinstance(hr, list):
+                results.extend(hr)
+    except Exception:
+        pass
+
     return results
 
 
